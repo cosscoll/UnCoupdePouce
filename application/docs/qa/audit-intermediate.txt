@@ -1,0 +1,38 @@
+....FFFF...                                                              [100%]
+=================================== FAILURES ===================================
+__ test_revoked_session_cannot_write_after_dependency_authentication[message] __
+ucp-v4-2/backend/tests/test_access_audit.py:46: in test_revoked_session_cannot_write_after_dependency_authentication
+    assert v['call'](client,csrf,method,path,json=body).status_code==401
+E   AssertionError: assert 201 == 401
+E    +  where 201 = <Response [201 Created]>.status_code
+E    +    where <Response [201 Created]> = <function env.<locals>.call at 0x7faf015c9ee0>(<starlette.testclient.TestClient object at 0x7faf014807d0>, 'SQ2P1dTYDMNWT7lJEZnHKJ3IrN8zJM5BSjWh7uOx6fM', 'post', '/api/conversations/1/messages', json={'body': 'Ce message ne doit pas être enregistré.'})
+__ test_revoked_session_cannot_write_after_dependency_authentication[project] __
+ucp-v4-2/backend/tests/test_access_audit.py:46: in test_revoked_session_cannot_write_after_dependency_authentication
+    assert v['call'](client,csrf,method,path,json=body).status_code==401
+E   AssertionError: assert 201 == 401
+E    +  where 201 = <Response [201 Created]>.status_code
+E    +    where <Response [201 Created]> = <function env.<locals>.call at 0x7faf028c2b60>(<starlette.testclient.TestClient object at 0x7faf014c6e70>, 'JNVFJq3GRdsPFN8O6_-Vdk8UMe6sYcT4pw3kHek8aGA', 'post', '/api/projects', json={'title': 'Projet rejeté', 'description': 'Ce projet de test ne doit jamais être enregistré.', 'town': 'Toulouse', 'trade': 'plomberie'})
+___ test_revoked_session_cannot_write_after_dependency_authentication[draft] ___
+ucp-v4-2/backend/tests/test_access_audit.py:46: in test_revoked_session_cannot_write_after_dependency_authentication
+    assert v['call'](client,csrf,method,path,json=body).status_code==401
+E   AssertionError: assert 201 == 401
+E    +  where 201 = <Response [201 Created]>.status_code
+E    +    where <Response [201 Created]> = <function env.<locals>.call at 0x7faf01556660>(<starlette.testclient.TestClient object at 0x7faf015698e0>, 'RrfJNrt11ij9untimuKLj0HuTxqutf8itgvRssen7mY', 'post', '/api/v4/drafts', json={'title': 'Brouillon rejeté'})
+__ test_revoked_session_cannot_write_after_dependency_authentication[account] __
+ucp-v4-2/backend/tests/test_access_audit.py:46: in test_revoked_session_cannot_write_after_dependency_authentication
+    assert v['call'](client,csrf,method,path,json=body).status_code==401
+E   AssertionError: assert 200 == 401
+E    +  where 200 = <Response [200 OK]>.status_code
+E    +    where <Response [200 OK]> = <function env.<locals>.call at 0x7faf0298ce00>(<starlette.testclient.TestClient object at 0x7faf0169f890>, '5v17yv5ca8XQHBjZK8X4WIXN4630CoZWkOl1uxCdeME', 'put', '/api/v4/account', json={'name': 'Nom non autorisé'})
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/starlette/testclient.py:45
+  /workspace/scratch/7ba017b1957d/.venv/lib/python3.12/site-packages/starlette/testclient.py:45: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_revoked_session_cannot_write_after_dependency_authentication[message]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_revoked_session_cannot_write_after_dependency_authentication[project]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_revoked_session_cannot_write_after_dependency_authentication[draft]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_revoked_session_cannot_write_after_dependency_authentication[account]
+4 failed, 7 passed, 1 warning in 16.36s

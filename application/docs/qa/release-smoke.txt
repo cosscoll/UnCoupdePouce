@@ -1,0 +1,1 @@
+PASS Work 4.0.2: demo seed, login, 3 projects, 1 draft, all static assets, nonempty database protection; credentials not logged.

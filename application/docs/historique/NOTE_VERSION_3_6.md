@@ -1,0 +1,25 @@
+# UCP — Laboratoire connecté v3.6 | 13 octobre 2026
+
+**Usage : LOCAL UNIQUEMENT.** Ces corrections ne valent ni conformité RGPD, ni audit de sécurité, ni autorisation de publier, ni validation du produit. Aucune vraie identité, adresse, pièce d'assurance ou carte bancaire ne doit être utilisée.
+
+## Modifications effectives dans cette version
+
+1. **Confidentialité avant sélection :** les API `POST /api/projects` et `PUT /api/projects/{id}` refusent les emails directs, URL, numéros de téléphone classiques français et adresses de rue évidentes dans le titre, la commune et la description. La validation rejette les champs composés uniquement d'espaces. Les noms publics d'utilisateurs, noms de comptes Entreprise, alias d'artisans liés et communes de profil font l'objet du même contrôle sommaire. Les anciens projets fictifs v3.5 qui contiennent ces coordonnées sont masqués aux professionnels par `GET /api/projects` ; `POST /api/projects/{id}/apply` et `apply-linked` refusent les tentatives directes contre de tels projets.
+2. **Compte Entreprise :** une nouvelle colonne SQLite `enterprise_accounts.manager_artisan_active` (valeur par défaut 0) rend explicite le statut de l'administrateur comme artisan actif. Le gestionnaire du compte n'est facturé dans la **simulation** que lorsqu'il active son siège artisan fictif. Endpoint `POST /api/enterprise/manager-profile` avec `{"active": true|false}`, gestionnaire connecté et professionnel approuvé uniquement. Le montant calculé est `20 + 15 × (artisans liés actifs + gestionnaire artisan actif)` HT/mois, sans TVA, prorata ni appel Stripe. La suspension de son profil ou sa modification efface son siège actif. L'interface affiche cette option et le montant simulé.
+3. **Migration de LAB :** toute base fictive v3.5 ouverte par le code v3.6 reçoit la nouvelle colonne avec défaut à 0, sans suppression des données existantes. Un test dédié vérifie la conservation du compte Entreprise et de l'utilisateur fictifs.
+4. **Tests :** 73 cas backend pytest vérifiés (72 en quatre lots de 18, puis 1 test de migration complémentaire), 11 règles métier JS, 7 validations SIRET statiques, 9 garde-fous de revue Gmail et 4 garde-fous MASTER supplémentaires, soit **104 contrôles automatisés réussis** sur des modules distincts. Le script de recette sur un vrai serveur HTTP **local** `/scripts/http_e2e_v36.py` a également réussi : inscription et rôle, création protégée, approbation fictive, matching, candidature, sélection, simulation d'abonnement, accès privé au chat et suspension. Les scripts Gmail restent NON INSTALLÉS.
+5. **Navigateur :** tentative réelle Playwright+Chromium dans cet environnement : `net::ERR_BLOCKED_BY_ADMINISTRATOR` à l'ouverture de `http://127.0.0.1`. La recette visuelle DESKTOP/MOBILE est donc **NON VALIDÉE**. Le script `scripts/browser_v36_smoke.py` est inclus pour réexécution dans un environnement où le navigateur est autorisé.
+
+## Reproduction locale
+
+Sous Linux/macOS : `python3 -m pip install -r backend/requirements.txt`, puis `bash scripts/run_all_tests.sh` depuis la racine extraite. Windows : `py -3 -m pip install -r backend/requirements.txt`, puis `powershell -ExecutionPolicy Bypass -File scripts/run_all_tests_windows.ps1`. **Node.js installé** est nécessaire aux vérifications JavaScript. Les scripts HTTP créent une base dans un répertoire temporaire, l'utilisent avec des comptes réservés `.example` et la détruisent à la sortie ; ils n'accèdent à aucun serveur public.
+
+Pour une inspection manuelle de l'interface, démarrer `python3 -m uvicorn app:app --host 127.0.0.1 --port 8765` depuis `backend`, sur une machine autorisant le navigateur. Ce laboratoire fonctionne uniquement en HTTP local, jamais sur une interface réseau publique.
+
+## Dépendances et limites bloquantes pour une vraie bêta
+
+- **Le filtrage est volontairement limité** : des coordonnées obfusquées, des images, fichiers et variantes non reconnues peuvent contourner des expressions régulières. Avant la mise en service, il faudra une stratégie complète de minimisation, modération, sécurité des pièces jointes, audit des droits serveur et tests contre la divulgation indirecte.
+- Les identités et SIREN ne sont **pas vérifiés** dans un registre officiel. Les badges et assurances ne peuvent être émis par cette version.
+- L'administrateur Entreprise n'est compté comme artisan que sur la base d'un **choix explicite de démonstration** ; il faut faire approuver la clause correspondante et réconcilier backend, interface, CGV et Stripe. Aucun paiement, prorata, facture, webhook, crédit après panne, remboursement ou dunning n'est implémenté.
+- Absence de véritable hébergement HTTPS, cookies Secure en production, MFA admin, réinitialisation de mot de passe, plan de sauvegarde, suppression des données relationnelles et journalisation d'incident. Les mécanismes de sécurité de laboratoire ne sont pas prêts pour des personnes réelles.
+- Aucun artisan, particulier, chantier ou abonnement réel n'a été créé. Ouverture publique strictement **NO GO**.

@@ -1,0 +1,185 @@
+{
+  "status": "PASS",
+  "pages": [
+    {
+      "page": "index.html",
+      "checks": 101,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "projet.html",
+      "checks": 71,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "informations.html",
+      "checks": 64,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "404.html",
+      "checks": 64,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "en/index.html",
+      "checks": 68,
+      "h1": 1,
+      "lang": "en"
+    }
+  ],
+  "contrasts": [
+    {
+      "foreground": "#171a2a",
+      "background": "#f5f0ea",
+      "ratio": 15.22
+    },
+    {
+      "foreground": "#555867",
+      "background": "#f5f0ea",
+      "ratio": 6.22
+    },
+    {
+      "foreground": "#505dc1",
+      "background": "#f5f0ea",
+      "ratio": 5.04
+    },
+    {
+      "foreground": "#171a2a",
+      "background": "#ff791d",
+      "ratio": 6.57
+    },
+    {
+      "foreground": "#ffffff",
+      "background": "#505dc1",
+      "ratio": 5.71
+    },
+    {
+      "foreground": "#555867",
+      "background": "#f0eff8",
+      "ratio": 6.18
+    },
+    {
+      "foreground": "#b5bdfb",
+      "background": "#171a2a",
+      "ratio": 9.56
+    },
+    {
+      "foreground": "#d2d3df",
+      "background": "#171a2a",
+      "ratio": 11.6
+    }
+  ],
+  "assets": [
+    {
+      "file": "index.html",
+      "bytes": 19698,
+      "gzip_bytes": 6240
+    },
+    {
+      "file": "robots.txt",
+      "bytes": 26,
+      "gzip_bytes": 46
+    },
+    {
+      "file": "projet.html",
+      "bytes": 10689,
+      "gzip_bytes": 4024
+    },
+    {
+      "file": "_headers",
+      "bytes": 680,
+      "gzip_bytes": 467
+    },
+    {
+      "file": "informations.html",
+      "bytes": 7658,
+      "gzip_bytes": 2880
+    },
+    {
+      "file": "404.html",
+      "bytes": 4385,
+      "gzip_bytes": 1631
+    },
+    {
+      "file": "assets/app.js",
+      "bytes": 3925,
+      "gzip_bytes": 1476
+    },
+    {
+      "file": "assets/logo.svg",
+      "bytes": 159256,
+      "gzip_bytes": 28162
+    },
+    {
+      "file": "assets/house.svg",
+      "bytes": 2990,
+      "gzip_bytes": 1208
+    },
+    {
+      "file": "assets/social.svg",
+      "bytes": 35915,
+      "gzip_bytes": 7514
+    },
+    {
+      "file": "assets/style.css",
+      "bytes": 18876,
+      "gzip_bytes": 4883
+    },
+    {
+      "file": "assets/social.png",
+      "bytes": 109312,
+      "gzip_bytes": 99847
+    },
+    {
+      "file": "assets/brief.js",
+      "bytes": 2889,
+      "gzip_bytes": 1349
+    },
+    {
+      "file": "en/index.html",
+      "bytes": 10835,
+      "gzip_bytes": 3826
+    },
+    {
+      "file": "assets/fonts/montserrat-700.woff2",
+      "bytes": 63596,
+      "gzip_bytes": 63634
+    },
+    {
+      "file": "assets/fonts/anton.woff2",
+      "bytes": 47088,
+      "gzip_bytes": 47121
+    },
+    {
+      "file": "assets/fonts/montserrat-OFL.txt",
+      "bytes": 4400,
+      "gzip_bytes": 1964
+    },
+    {
+      "file": "assets/fonts/montserrat-400.woff2",
+      "bytes": 61868,
+      "gzip_bytes": 61906
+    },
+    {
+      "file": "assets/fonts/montserrat-600.woff2",
+      "bytes": 62784,
+      "gzip_bytes": 62822
+    },
+    {
+      "file": "assets/fonts/anton-OFL.txt",
+      "bytes": 4484,
+      "gzip_bytes": 2008
+    }
+  ],
+  "errors": [],
+  "limitations": [
+    "Pas de navigateur de test disponible : rendu responsive et interactions DOM non vérifiés en navigateur.",
+    "Aucune mesure Lighthouse, Core Web Vitals terrain, test lecteur d’écran ou audit WCAG exhaustif.",
+    "Contrastes mesurés sur les principales paires déclarées, pas un inventaire de styles calculés."
+  ]
+}

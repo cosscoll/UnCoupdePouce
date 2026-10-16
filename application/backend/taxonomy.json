@@ -1,0 +1,615 @@
+[
+  {
+    "id": "maconnerie",
+    "label": "Maçonnerie",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "fondations",
+    "label": "Fondations",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "beton",
+    "label": "Béton",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "terrassement",
+    "label": "Terrassement",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "demolition",
+    "label": "Démolition",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "assainissement",
+    "label": "Assainissement",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "structures",
+    "label": "Structures",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "travaux-publics",
+    "label": "Travaux publics",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "extension",
+    "label": "Extension",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "surelevation",
+    "label": "Surélévation",
+    "group": "Construction et gros œuvre",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "renovation",
+    "label": "Rénovation",
+    "group": "Rénovation et intérieur",
+    "synonyms": [
+      "travaux",
+      "refaire"
+    ],
+    "active": true
+  },
+  {
+    "id": "peinture",
+    "label": "Peinture",
+    "group": "Rénovation et intérieur",
+    "synonyms": [
+      "repeindre",
+      "mur"
+    ],
+    "active": true
+  },
+  {
+    "id": "platrerie",
+    "label": "Plâtrerie",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "cloisons",
+    "label": "Cloisons",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "carrelage",
+    "label": "Carrelage",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "parquet",
+    "label": "Parquet",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "sols-souples",
+    "label": "Sols souples",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "cuisine",
+    "label": "Cuisine",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "salle-de-bains",
+    "label": "Salle de bains",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "agencement",
+    "label": "Agencement",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "decoration",
+    "label": "Décoration",
+    "group": "Rénovation et intérieur",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "plomberie",
+    "label": "Plomberie",
+    "group": "Eau, chauffage et air",
+    "synonyms": [
+      "fuite",
+      "robinet",
+      "douche",
+      "tuyau",
+      "évier",
+      "wc"
+    ],
+    "active": true
+  },
+  {
+    "id": "sanitaires",
+    "label": "Sanitaires",
+    "group": "Eau, chauffage et air",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "chauffage",
+    "label": "Chauffage",
+    "group": "Eau, chauffage et air",
+    "synonyms": [
+      "radiateur",
+      "chaudière"
+    ],
+    "active": true
+  },
+  {
+    "id": "pompe-a-chaleur",
+    "label": "Pompe à chaleur",
+    "group": "Eau, chauffage et air",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "climatisation",
+    "label": "Climatisation",
+    "group": "Eau, chauffage et air",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "ventilation",
+    "label": "Ventilation",
+    "group": "Eau, chauffage et air",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "reseaux-hydrauliques",
+    "label": "Réseaux hydrauliques",
+    "group": "Eau, chauffage et air",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "ramonage",
+    "label": "Ramonage",
+    "group": "Eau, chauffage et air",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "electricite",
+    "label": "Électricité",
+    "group": "Électricité et énergie",
+    "synonyms": [
+      "prise",
+      "tableau électrique",
+      "courant",
+      "disjoncteur"
+    ],
+    "active": true
+  },
+  {
+    "id": "eclairage",
+    "label": "Éclairage",
+    "group": "Électricité et énergie",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "domotique",
+    "label": "Domotique",
+    "group": "Électricité et énergie",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "reseaux-informatiques",
+    "label": "Réseaux informatiques",
+    "group": "Électricité et énergie",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "alarme",
+    "label": "Alarme",
+    "group": "Électricité et énergie",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "photovoltaique",
+    "label": "Photovoltaïque",
+    "group": "Électricité et énergie",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "borne-de-recharge",
+    "label": "Borne de recharge",
+    "group": "Électricité et énergie",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "equipements-energetiques",
+    "label": "Équipements énergétiques",
+    "group": "Électricité et énergie",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "charpente",
+    "label": "Charpente",
+    "group": "Toiture et façade",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "couverture",
+    "label": "Couverture",
+    "group": "Toiture et façade",
+    "synonyms": [
+      "toit",
+      "tuile"
+    ],
+    "active": true
+  },
+  {
+    "id": "zinguerie",
+    "label": "Zinguerie",
+    "group": "Toiture et façade",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "facade",
+    "label": "Façade",
+    "group": "Toiture et façade",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "ravalement",
+    "label": "Ravalement",
+    "group": "Toiture et façade",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "etancheite",
+    "label": "Étanchéité",
+    "group": "Toiture et façade",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "isolation",
+    "label": "Isolation",
+    "group": "Toiture et façade",
+    "synonyms": [
+      "combles",
+      "froid"
+    ],
+    "active": true
+  },
+  {
+    "id": "bardage",
+    "label": "Bardage",
+    "group": "Toiture et façade",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "menuiserie",
+    "label": "Menuiserie",
+    "group": "Menuiserie et métal",
+    "synonyms": [
+      "bois"
+    ],
+    "active": true
+  },
+  {
+    "id": "fenetres",
+    "label": "Fenêtres",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "portes",
+    "label": "Portes",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "escaliers",
+    "label": "Escaliers",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "volets",
+    "label": "Volets",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "serrurerie",
+    "label": "Serrurerie",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "portails",
+    "label": "Portails",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "metallerie",
+    "label": "Métallerie",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "ferronnerie",
+    "label": "Ferronnerie",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "vitrerie",
+    "label": "Vitrerie",
+    "group": "Menuiserie et métal",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "terrasse",
+    "label": "Terrasse",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "cloture",
+    "label": "Clôture",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "piscine",
+    "label": "Piscine",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "allees",
+    "label": "Allées",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "voirie",
+    "label": "Voirie",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "paysagisme",
+    "label": "Paysagisme",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "jardin",
+    "label": "Jardin",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "drainage",
+    "label": "Drainage",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "arrosage",
+    "label": "Arrosage",
+    "group": "Extérieurs",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "maintenance",
+    "label": "Maintenance",
+    "group": "Entretien et dépannage",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "depannage-plomberie",
+    "label": "Dépannage plomberie",
+    "group": "Entretien et dépannage",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "depannage-electrique",
+    "label": "Dépannage électrique",
+    "group": "Entretien et dépannage",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "depannage-chauffage",
+    "label": "Dépannage chauffage",
+    "group": "Entretien et dépannage",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "ouverture-de-porte",
+    "label": "Ouverture de porte",
+    "group": "Entretien et dépannage",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "recherche-de-fuite",
+    "label": "Recherche de fuite",
+    "group": "Entretien et dépannage",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "nettoyage-batiment",
+    "label": "Nettoyage bâtiment",
+    "group": "Entretien et dépannage",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "traitement-nuisibles",
+    "label": "Traitement nuisibles",
+    "group": "Entretien et dépannage",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "architecture",
+    "label": "Architecture",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "diagnostics",
+    "label": "Diagnostics",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "maitrise-d-oeuvre",
+    "label": "Maîtrise d’œuvre",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "bureau-d-etudes",
+    "label": "Bureau d’études",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "ingenierie",
+    "label": "Ingénierie",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "geometre",
+    "label": "Géomètre",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "etude-de-sol",
+    "label": "Étude de sol",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "accessibilite",
+    "label": "Accessibilité",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "desamiantage",
+    "label": "Désamiantage",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "patrimoine",
+    "label": "Patrimoine",
+    "group": "Études et expertise",
+    "synonyms": [],
+    "active": true
+  },
+  {
+    "id": "inconnu",
+    "label": "Je ne sais pas quel professionnel contacter",
+    "group": "Besoin à préciser",
+    "synonyms": [
+      "aide",
+      "conseil"
+    ],
+    "active": true
+  }
+]

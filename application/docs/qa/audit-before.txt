@@ -1,0 +1,94 @@
+FFFFFFFFFFF                                                              [100%]
+=================================== FAILURES ===================================
+_____ test_moderated_conversation_is_absent_from_lists_and_photos[hidden] ______
+ucp-v4-2/backend/tests/test_access_audit.py:25: in test_moderated_conversation_is_absent_from_lists_and_photos
+    assert peer.get('/api/conversations').json()['items']==[]
+E   AssertionError: assert [{'applicatio...ive': 1, ...}] == []
+E     
+E     Left contains one more item: {'application_id': 1, 'title': 'Rénover la salle de bains', 'peer': 'demo-occupant', 'subscription_active': 1, ...}
+E     Use -v to get more diff
+_ test_moderated_conversation_is_absent_from_lists_and_photos[requester_suspended] _
+ucp-v4-2/backend/tests/test_access_audit.py:25: in test_moderated_conversation_is_absent_from_lists_and_photos
+    assert peer.get('/api/conversations').json()['items']==[]
+E   AssertionError: assert [{'applicatio...ive': 1, ...}] == []
+E     
+E     Left contains one more item: {'application_id': 1, 'title': 'Rénover la salle de bains', 'peer': 'demo-occupant', 'subscription_active': 1, ...}
+E     Use -v to get more diff
+__ test_moderated_conversation_is_absent_from_lists_and_photos[pro_suspended] __
+ucp-v4-2/backend/tests/test_access_audit.py:25: in test_moderated_conversation_is_absent_from_lists_and_photos
+    assert peer.get('/api/conversations').json()['items']==[]
+E   AssertionError: assert [{'applicatio...ive': 1, ...}] == []
+E     
+E     Left contains one more item: {'application_id': 1, 'title': 'Rénover la salle de bains', 'peer': 'demo-plombier', 'subscription_active': 1, ...}
+E     Use -v to get more diff
+___ test_moderated_conversation_is_absent_from_lists_and_photos[unapproved] ____
+ucp-v4-2/backend/tests/test_access_audit.py:25: in test_moderated_conversation_is_absent_from_lists_and_photos
+    assert peer.get('/api/conversations').json()['items']==[]
+E   AssertionError: assert [{'applicatio...ive': 0, ...}] == []
+E     
+E     Left contains one more item: {'application_id': 1, 'title': 'Rénover la salle de bains', 'peer': 'demo-occupant', 'subscription_active': 0, ...}
+E     Use -v to get more diff
+__ test_revoked_session_cannot_write_after_dependency_authentication[message] __
+ucp-v4-2/backend/tests/test_access_audit.py:46: in test_revoked_session_cannot_write_after_dependency_authentication
+    assert v['call'](client,csrf,method,path,json=body).status_code==401
+E   AssertionError: assert 201 == 401
+E    +  where 201 = <Response [201 Created]>.status_code
+E    +    where <Response [201 Created]> = <function env.<locals>.call at 0x7f9e17961f80>(<starlette.testclient.TestClient object at 0x7f9e17722f00>, 'p1YORw4Jeg5ctPcMr3bB2FLdI7ehL2Lg1mx3uuUSHdI', 'post', '/api/conversations/1/messages', json={'body': 'Ce message ne doit pas être enregistré.'})
+__ test_revoked_session_cannot_write_after_dependency_authentication[project] __
+ucp-v4-2/backend/tests/test_access_audit.py:46: in test_revoked_session_cannot_write_after_dependency_authentication
+    assert v['call'](client,csrf,method,path,json=body).status_code==401
+E   AssertionError: assert 201 == 401
+E    +  where 201 = <Response [201 Created]>.status_code
+E    +    where <Response [201 Created]> = <function env.<locals>.call at 0x7f9e17650d60>(<starlette.testclient.TestClient object at 0x7f9e177631a0>, 'QvzTtu-gk-2HTv-vys9i9rP3qEV-wN34msbmzZRQyrg', 'post', '/api/projects', json={'title': 'Projet rejeté', 'description': 'Ce projet de test ne doit jamais être enregistré.', 'town': 'Toulouse', 'trade': 'plomberie'})
+___ test_revoked_session_cannot_write_after_dependency_authentication[draft] ___
+ucp-v4-2/backend/tests/test_access_audit.py:46: in test_revoked_session_cannot_write_after_dependency_authentication
+    assert v['call'](client,csrf,method,path,json=body).status_code==401
+E   AssertionError: assert 201 == 401
+E    +  where 201 = <Response [201 Created]>.status_code
+E    +    where <Response [201 Created]> = <function env.<locals>.call at 0x7f9e178939c0>(<starlette.testclient.TestClient object at 0x7f9e17658710>, 'LnSjGGi_npLf07DQdssofTiOwCDO1yuQqhCeKdlUhBQ', 'post', '/api/v4/drafts', json={'title': 'Brouillon rejeté'})
+__ test_revoked_session_cannot_write_after_dependency_authentication[account] __
+ucp-v4-2/backend/tests/test_access_audit.py:46: in test_revoked_session_cannot_write_after_dependency_authentication
+    assert v['call'](client,csrf,method,path,json=body).status_code==401
+E   AssertionError: assert 200 == 401
+E    +  where 200 = <Response [200 OK]>.status_code
+E    +    where <Response [200 OK]> = <function env.<locals>.call at 0x7f9e179bbf60>(<starlette.testclient.TestClient object at 0x7f9e17a7b5c0>, '0E-6946JMpzINqrTWQSPzBk7aQwTgzJ9kJVI6XQOI68', 'put', '/api/v4/account', json={'name': 'Nom non autorisé'})
+___________ test_login_rechecks_identity_after_password_work[reset] ____________
+ucp-v4-2/backend/tests/test_access_audit.py:69: in test_login_rechecks_identity_after_password_work
+    assert fresh.post('/api/login',json={'email':'login-race@ucp-lab.example','password':'Laboratoire-Test!9326'}).status_code==401
+E   AssertionError: assert 200 == 401
+E    +  where 200 = <Response [200 OK]>.status_code
+E    +    where <Response [200 OK]> = post('/api/login', json={'email': 'login-race@ucp-lab.example', 'password': 'Laboratoire-Test!9326'})
+E    +      where post = <starlette.testclient.TestClient object at 0x7f9e1778bc50>.post
+__________ test_login_rechecks_identity_after_password_work[suspend] ___________
+ucp-v4-2/backend/tests/test_access_audit.py:69: in test_login_rechecks_identity_after_password_work
+    assert fresh.post('/api/login',json={'email':'login-race@ucp-lab.example','password':'Laboratoire-Test!9326'}).status_code==401
+E   AssertionError: assert 200 == 401
+E    +  where 200 = <Response [200 OK]>.status_code
+E    +    where <Response [200 OK]> = post('/api/login', json={'email': 'login-race@ucp-lab.example', 'password': 'Laboratoire-Test!9326'})
+E    +      where post = <starlette.testclient.TestClient object at 0x7f9e17b033b0>.post
+_______________ test_session_is_expired_at_its_expiration_second _______________
+ucp-v4-2/backend/tests/test_access_audit.py:77: in test_session_is_expired_at_its_expiration_second
+    assert client.get('/api/me').status_code==401
+E   AssertionError: assert 200 == 401
+E    +  where 200 = <Response [200 OK]>.status_code
+E    +    where <Response [200 OK]> = get('/api/me')
+E    +      where get = <starlette.testclient.TestClient object at 0x7f9e17a88d70>.get
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/starlette/testclient.py:45
+  /workspace/scratch/7ba017b1957d/.venv/lib/python3.12/site-packages/starlette/testclient.py:45: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_moderated_conversation_is_absent_from_lists_and_photos[hidden]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_moderated_conversation_is_absent_from_lists_and_photos[requester_suspended]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_moderated_conversation_is_absent_from_lists_and_photos[pro_suspended]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_moderated_conversation_is_absent_from_lists_and_photos[unapproved]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_revoked_session_cannot_write_after_dependency_authentication[message]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_revoked_session_cannot_write_after_dependency_authentication[project]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_revoked_session_cannot_write_after_dependency_authentication[draft]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_revoked_session_cannot_write_after_dependency_authentication[account]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_login_rechecks_identity_after_password_work[reset]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_login_rechecks_identity_after_password_work[suspend]
+FAILED ucp-v4-2/backend/tests/test_access_audit.py::test_session_is_expired_at_its_expiration_second
+11 failed, 1 warning in 16.09s

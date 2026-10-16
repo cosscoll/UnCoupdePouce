@@ -1,0 +1,645 @@
+--- a/backend/app.py
++++ b/backend/app.py
+@@ -187,10 +187,10 @@
+     t = request.cookies.get('ucp_lab_sid','')
+     if not t: error(401,'Connexion requise')
+     with connect() as c:
+-        user=c.execute('''SELECT users.id,users.name,users.email,users.role,users.suspended,sessions.csrf_hash,sessions.expires
++        user=c.execute('''SELECT users.id,users.name,users.email,users.role,users.suspended,sessions.csrf_hash,sessions.expires,sessions.token_hash AS session_token_hash
+                FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash=?''',(hash_token(t),)).fetchone()
+     if user and user['suspended']: error(403,'Compte suspendu')
+-    if not user or user['expires'] < int(time.time()): error(401,'Session expirée')
++    if not user or user['expires'] <= int(time.time()): error(401,'Session expirée')
+     if request.method not in ('GET','HEAD','OPTIONS'):
+         csrf=request.headers.get('x-ucp-csrf','')
+         if not csrf or not hmac.compare_digest(hash_token(csrf),user['csrf_hash']): error(403,'Protection CSRF : jeton invalide')
+@@ -199,9 +199,31 @@
+             error(403,'Origine non autorisée')
+     return user
+ 
++@contextmanager
++def authenticated_db(user,write=False):
++    """Recheck the authenticated session within the operation's SQL transaction.
++
++    A revocation committed while an operation waits for the write lock must win.
++    Read operations use a consistent snapshot for permission and data reads.
++    """
++    with connect() as c:
++        c.execute('BEGIN IMMEDIATE' if write else 'BEGIN')
++        try:
++            current=c.execute('''SELECT users.role,users.suspended,sessions.csrf_hash,sessions.expires
++                FROM sessions JOIN users ON users.id=sessions.user_id
++                WHERE sessions.token_hash=? AND users.id=?''',(user['session_token_hash'],user['id'])).fetchone()
++            if not current or current['expires']<=int(time.time()):error(401,'Session expirée ou révoquée')
++            if current['suspended'] or current['role']!=user['role']:error(403,'Accès au compte modifié')
++            if write and not hmac.compare_digest(current['csrf_hash'],user['csrf_hash']):error(403,'Session modifiée, rechargez cette page')
++            yield c
++            if c.in_transaction:c.commit()
++        except BaseException:
++            c.rollback()
++            raise
++
+ @app.get('/api/notifications')
+ def list_notifications(user=Depends(get_user)):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         records=c.execute('SELECT id,event_type,entity_id,created_at,read_at FROM notifications WHERE recipient_id=? ORDER BY id DESC LIMIT 100',
+                           (user['id'],)).fetchall()
+         unread=c.execute('SELECT COUNT(*) FROM notifications WHERE recipient_id=? AND read_at IS NULL',
+@@ -211,7 +233,7 @@
+ 
+ @app.post('/api/notifications/{notification_id}/read')
+ def mark_notification_read(notification_id:int,user=Depends(get_user)):
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         row=c.execute('SELECT read_at FROM notifications WHERE id=? AND recipient_id=?',
+                       (notification_id,user['id'])).fetchone()
+         if row is None:error(404,'Notification introuvable')
+@@ -222,7 +244,7 @@
+ 
+ @app.post('/api/notifications/read-all')
+ def mark_all_notifications_read(user=Depends(get_user)):
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         result=c.execute('UPDATE notifications SET read_at=? WHERE recipient_id=? AND read_at IS NULL',
+                          (now(),user['id']))
+     return {'ok':True,'count':result.rowcount}
+@@ -374,12 +396,11 @@
+ 
+ @app.post('/api/enterprise',status_code=201)
+ def create_enterprise(body:EnterpriseAccountCreate,user=Depends(require('professional'))):
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         profile=c.execute('SELECT approved FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
+         if not profile or not profile['approved']:
+             error(403,'Seul un gestionnaire de test approuvé peut créer un compte Entreprise fictif')
+         try:
+-            c.execute('BEGIN IMMEDIATE')
+             cur=c.execute('INSERT INTO enterprise_accounts(owner_id,label,created_at) VALUES(?,?,?)',
+                           (user['id'],body.label,now()))
+             c.execute('COMMIT')
+@@ -390,7 +411,7 @@
+ 
+ @app.get('/api/enterprise')
+ def my_enterprise(user=Depends(require('professional'))):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         account=c.execute('SELECT id,label,manager_artisan_active FROM enterprise_accounts WHERE owner_id=?',(user['id'],)).fetchone()
+         if not account:return {'enterprise':None,'members':[],'pricing':None}
+         items=c.execute('''SELECT id,alias,service_trades,service_areas,is_active FROM enterprise_artisans
+@@ -414,8 +435,7 @@
+ @app.post('/api/enterprise/manager-profile')
+ def set_enterprise_manager_artisan(body:ManagerArtisanMode,user=Depends(require('professional'))):
+     # Explicit opt-in to an ACTIVE artisan seat; an administrative login alone is free.
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         row=c.execute('''SELECT e.id,e.manager_artisan_active,p.approved
+             FROM enterprise_accounts e JOIN profiles p ON p.user_id=e.owner_id
+             WHERE e.owner_id=?''',(user['id'],)).fetchone()
+@@ -432,8 +452,7 @@
+ 
+ @app.post('/api/enterprise/artisans',status_code=201)
+ def create_linked_artisan(body:LinkedArtisanCreate,user=Depends(require('professional'))):
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         owner=c.execute('''SELECT e.id, p.approved FROM enterprise_accounts e
+             JOIN profiles p ON p.user_id=e.owner_id WHERE e.owner_id=?''',(user['id'],)).fetchone()
+         if not owner or not owner['approved']:error(403,'Compte gestionnaire de test non approuvé')
+@@ -449,8 +468,7 @@
+ @app.post('/api/enterprise/artisans/{linked_id}/set-active')
+ def set_linked_artisan_active(linked_id:int,body:dict,user=Depends(require('professional'))):
+     if type(body.get('active')) is not bool:error(422,'Paramètre booléen active obligatoire')
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         row=c.execute('''SELECT a.id,a.is_active,e.owner_id FROM enterprise_artisans a
+              JOIN enterprise_accounts e ON e.id=a.enterprise_id WHERE a.id=?''',(linked_id,)).fetchone()
+         if not row:error(404,'Profil lié introuvable')
+@@ -466,8 +484,7 @@
+ 
+ @app.post('/api/projects/{project_id}/apply-linked/{linked_id}',status_code=201)
+ def apply_with_enterprise_profile(project_id:int,linked_id:int,user=Depends(require('professional'))):
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         profile=c.execute('SELECT approved FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
+         if not profile or not profile['approved']:error(403,'Gestionnaire non approuvé')
+         linked=c.execute('''SELECT a.*,e.owner_id FROM enterprise_artisans a JOIN enterprise_accounts e
+@@ -499,7 +516,7 @@
+     return {'id':cur.lastrowid,'status':'pending','linked_profile_id':linked_id}
+ 
+ @app.get('/api/health')
+-def health(): return {'ok':True,'mode':'local_only','production':False,'release':'v4.0.1-prive-local'}
++def health(): return {'ok':True,'mode':'local_only','production':False,'release':'v4.0.2-prive-local'}
+ 
+ @app.post('/api/register',status_code=201)
+ def register(body:Register):
+@@ -541,6 +558,15 @@
+             if lock:error(429,'Trop de tentatives de démonstration. Réessayez plus tard.')
+             error(401,'Identifiants invalides')
+         c.execute('BEGIN IMMEDIATE')
++        current=c.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone()
++        # Password work happens before the write lock; reset/suspension must not
++        # let an earlier credential snapshot mint a fresh session afterwards.
++        if not current or current['suspended'] or not hmac.compare_digest(current['pw_hash'],digest) or current['pw_salt']!=user['pw_salt']:
++            error(401,'Identifiants invalides')
++        locked=c.execute('SELECT locked_until FROM auth_failures WHERE email=?',(email,)).fetchone()
++        stamp=int(time.time())
++        if locked and locked['locked_until']>stamp:error(429,'Trop de tentatives de démonstration. Réessayez plus tard.')
++        user=current
+         c.execute('DELETE FROM auth_failures WHERE email=?',(email,))
+         t=secrets.token_urlsafe(32); csrf=secrets.token_urlsafe(32)
+         c.execute('INSERT INTO sessions(token_hash,user_id,csrf_hash,expires) VALUES(?,?,?,?)',
+@@ -551,12 +577,14 @@
+ 
+ @app.get('/api/me')
+ def me(user=Depends(get_user)):
+-    return {'id':user['id'],'email':user['email'],'name':user['name'],'role':user['role']}
++    with authenticated_db(user) as c:
++        current=c.execute('SELECT id,email,name,role FROM users WHERE id=?',(user['id'],)).fetchone()
++        return dict(current)
+ 
+ @app.get('/api/account/sessions')
+ def own_sessions(request:Request,user=Depends(get_user)):
+     # Only counts are shared; session tokens, hashes, IP addresses are never returned.
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         total=c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',
+                         (user['id'],int(time.time()))).fetchone()[0]
+     return {'active_sessions':total,'current':True,'laboratory':True}
+@@ -564,7 +592,7 @@
+ @app.post('/api/account/sessions/revoke-others')
+ def revoke_other_sessions(request:Request,user=Depends(get_user)):
+     current=hash_token(request.cookies['ucp_lab_sid'])
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         deleted=c.execute('DELETE FROM sessions WHERE user_id=? AND token_hash!=?',
+                           (user['id'],current)).rowcount
+     return {'ok':True,'revoked':deleted,'current_session_preserved':True}
+@@ -572,14 +600,14 @@
+ @app.get('/api/account/activity')
+ def own_activity(user=Depends(get_user)):
+     # No cross-account audit visibility: only actions actually performed by this user.
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         records=c.execute('''SELECT action,target_type,target_id,created_at FROM audit
+             WHERE actor_id=? ORDER BY id DESC LIMIT 50''',(user['id'],)).fetchall()
+     return {'laboratory':True,'items':[dict(r) for r in records]}
+ 
+ @app.get('/api/admin/audit')
+ def admin_audit(user=Depends(require('admin'))):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         records=c.execute('''SELECT id,actor_id,action,target_type,target_id,created_at
+             FROM audit ORDER BY id DESC LIMIT 100''').fetchall()
+     return {'laboratory':True,'items':[dict(r) for r in records]}
+@@ -588,13 +616,13 @@
+ @app.get('/api/session')
+ def renew_csrf(request:Request,user=Depends(get_user)):
+     token=secrets.token_urlsafe(32)
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         c.execute('UPDATE sessions SET csrf_hash=? WHERE token_hash=?',(hash_token(token),hash_token(request.cookies['ucp_lab_sid'])))
+     return {'id':user['id'],'name':user['name'],'email':user['email'],'role':user['role'],'csrf':token}
+ 
+ @app.post('/api/logout')
+ def logout(response:Response,request:Request,user=Depends(get_user)):
+-    with connect() as c:c.execute('DELETE FROM sessions WHERE token_hash=?',(hash_token(request.cookies['ucp_lab_sid']),))
++    with authenticated_db(user,write=True) as c:c.execute('DELETE FROM sessions WHERE token_hash=?',(hash_token(request.cookies['ucp_lab_sid']),))
+     response.delete_cookie('ucp_lab_sid',path='/')
+     return {'ok':True}
+ 
+@@ -609,8 +637,7 @@
+     for trade in body.additional_trades:
+         if trade!=body.trade and trade not in secondary: secondary.append(trade)
+     if len(secondary)>4:error(422,'Maximum 5 métiers avec métier principal')
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         # Do not let a verified profile modify identity and keep approval.
+         c.execute('''INSERT INTO profiles(user_id,trade,town,siren,service_areas,service_trades,approved,subscription_active)
+                VALUES(?,?,?,?,?,?,0,0) ON CONFLICT(user_id) DO UPDATE SET
+@@ -626,7 +653,7 @@
+ 
+ @app.post('/api/beta-interest')
+ def record_interest(body:BetaInterest,user=Depends(require('professional'))):
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         profile=c.execute('SELECT 1 FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
+         if not profile:error(409,'Complétez le profil professionnel')
+         c.execute('''INSERT INTO beta_interest(user_id,wants_interview,consent,consent_version,consent_at)
+@@ -637,7 +664,7 @@
+ 
+ @app.get('/api/my-profile')
+ def my_profile(user=Depends(require('professional'))):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         p=c.execute('SELECT trade,town,siren,service_areas,service_trades,approved,subscription_active FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
+         b=c.execute('SELECT wants_interview,consent_at FROM beta_interest WHERE user_id=?',(user['id'],)).fetchone()
+     profile=dict(p) if p else None
+@@ -648,8 +675,7 @@
+ 
+ @app.post('/api/projects',status_code=201)
+ def create_project(body:Project,user=Depends(require('requester'))):
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at) VALUES(?,?,?,?,?,?)',
+                   (user['id'],body.title.strip(),body.description.strip(),body.trade,body.town.strip(),now()))
+         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
+@@ -660,8 +686,7 @@
+ @app.put('/api/projects/{project_id}')
+ def edit_project(project_id:int,body:EditProject,user=Depends(require('requester'))):
+     # Do not allow changing an advertised job after any professional applied.
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         project=c.execute('SELECT requester_id,status,trade,trades_json FROM projects WHERE id=?',(project_id,)).fetchone()
+         if not project:error(404,'Projet inconnu')
+         if project['requester_id']!=user['id']:error(403,'Projet appartenant à un autre demandeur')
+@@ -679,8 +704,7 @@
+ @app.post('/api/projects/{project_id}/close')
+ def close_project(project_id:int,user=Depends(require('requester'))):
+     # Closing a project also shuts down its chat (see check_conversation).
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         project=c.execute('SELECT requester_id,status,trade,trades_json FROM projects WHERE id=?',(project_id,)).fetchone()
+         if not project:error(404,'Projet inconnu')
+         if project['requester_id']!=user['id']:error(403,'Projet appartenant à un autre demandeur')
+@@ -697,7 +721,7 @@
+ 
+ @app.get('/api/projects')
+ def projects(user=Depends(get_user)):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         if user['role']=='requester':
+             rs=c.execute('SELECT id,title,description,trade,town,status,trades_json,hidden,created_at FROM projects WHERE requester_id=? ORDER BY id DESC',(user['id'],)).fetchall()
+         elif user['role']=='professional':
+@@ -734,8 +758,7 @@
+ 
+ @app.post('/api/projects/{project_id}/apply',status_code=201)
+ def apply(project_id:int,user=Depends(require('professional'))):
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         p=c.execute('SELECT * FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
+         if not p or not p['approved']:error(403,'Profil professionnel non vérifié')
+         project=c.execute('SELECT * FROM projects WHERE id=?',(project_id,)).fetchone()
+@@ -764,8 +787,7 @@
+ 
+ @app.post('/api/applications/{application_id}/withdraw')
+ def withdraw_application(application_id:int,user=Depends(require('professional'))):
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         row=c.execute('''SELECT a.professional_id,a.status,p.requester_id FROM applications a
+             JOIN projects p ON p.id=a.project_id WHERE a.id=?''',(application_id,)).fetchone()
+         if not row:error(404,'Candidature inconnue')
+@@ -780,8 +802,7 @@
+ 
+ @app.post('/api/applications/{application_id}/reject')
+ def reject_application(application_id:int,user=Depends(require('requester'))):
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         row=c.execute('''SELECT applications.status,applications.professional_id,projects.requester_id FROM applications
+           JOIN projects ON projects.id=applications.project_id WHERE applications.id=?''',(application_id,)).fetchone()
+         if not row:error(404,'Candidature inconnue')
+@@ -796,7 +817,7 @@
+ 
+ @app.get('/api/my-applications')
+ def my_applications(user=Depends(require('professional'))):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         rows=c.execute('''SELECT applications.id,applications.status,projects.title,projects.trade,projects.town,
+         linked.alias AS linked_artisan_alias FROM applications JOIN projects ON projects.id=applications.project_id
+         LEFT JOIN enterprise_artisans linked ON linked.id=applications.linked_profile_id
+@@ -805,7 +826,7 @@
+ 
+ @app.get('/api/projects/{project_id}/applications')
+ def get_applications(project_id:int,user=Depends(require('requester'))):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         pr=c.execute('SELECT requester_id FROM projects WHERE id=?',(project_id,)).fetchone()
+         if not pr:error(404,'Projet inconnu')
+         if pr['requester_id']!=user['id']:error(403,'Vous ne possédez pas ce projet')
+@@ -819,8 +840,7 @@
+ 
+ @app.post('/api/applications/{application_id}/accept')
+ def accept(application_id:int,user=Depends(require('requester'))):
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         item=c.execute('''SELECT applications.*,projects.requester_id,projects.status AS project_status,projects.hidden
+               FROM applications JOIN projects ON projects.id=applications.project_id WHERE applications.id=?''',(application_id,)).fetchone()
+         if not item:error(404,'Candidature inconnue')
+@@ -845,7 +865,7 @@
+ 
+ @app.get('/api/conversations')
+ def conversations(user=Depends(get_user)):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         if user['role']=='requester':
+             items=c.execute('''SELECT applications.id AS application_id,projects.title,users.name AS peer,
+                    profiles.subscription_active,applications.linked_profile_id,linked.is_active AS linked_active
+@@ -861,9 +881,15 @@
+                    LEFT JOIN enterprise_artisans linked ON linked.id=applications.linked_profile_id
+                    WHERE applications.status=? AND applications.professional_id=? AND projects.status!='closed' ''',('accepted',user['id'])).fetchall()
+         else:items=[]
+-    return {'items':[dict(x) for x in items]}
+-
+-def check_conversation(c,aid,uid):
++        visible=[]
++        for item in items:
++            try:check_conversation(c,item['application_id'],user['id'],allow_locked=True)
++            except HTTPException as exc:
++                if exc.status_code not in (403,404):raise
++            else:visible.append(dict(item))
++    return {'items':visible}
++
++def check_conversation(c,aid,uid,allow_locked=False):
+     row=c.execute('''SELECT applications.status,applications.professional_id,projects.requester_id,projects.status AS project_status,projects.hidden,profiles.approved,profiles.subscription_active
+       ,applications.linked_profile_id,linked.is_active AS linked_active
+       FROM applications JOIN projects ON applications.project_id=projects.id
+@@ -875,14 +901,14 @@
+     if c.execute('SELECT 1 FROM users WHERE id IN (?,?) AND suspended=1',(row['professional_id'],row['requester_id'])).fetchone():error(403,'Compte participant suspendu')
+     if row['hidden'] or not row['approved']:error(403,'Accès suspendu par modération')
+     if row['status']!='accepted' or row['project_status']=='closed':error(403,'Conversation fermée')
+-    if row['linked_profile_id'] and not row['linked_active']:
++    if not allow_locked and row['linked_profile_id'] and not row['linked_active']:
+         error(403,'Accès chat suspendu : artisan lié inactif')
+-    if not row['subscription_active']:error(403,'Accès chat suspendu : abonnement de test inactif')
++    if not allow_locked and not row['subscription_active']:error(403,'Accès chat suspendu : abonnement de test inactif')
+     return row
+ 
+ @app.get('/api/conversations/{aid}/messages')
+ def read_messages(aid:int,user=Depends(get_user)):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         check_conversation(c,aid,user['id'])
+         items=c.execute('SELECT sender_id,body,created_at FROM messages WHERE application_id=? ORDER BY id',(aid,)).fetchall()
+     return {'items':[dict(x) for x in items]}
+@@ -894,8 +920,7 @@
+     content=body.body.strip()
+     if not content:error(422,'Le message ne peut pas être vide')
+     digest=hashlib.sha256(content.encode()).hexdigest()
+-    with connect() as c:
+-        c.execute('BEGIN IMMEDIATE')
++    with authenticated_db(user,write=True) as c:
+         row=check_conversation(c,aid,user['id'])
+         if key:
+             previous=c.execute('SELECT message_id,body_hash FROM message_retries WHERE application_id=? AND sender_id=? AND retry_key=?',
+@@ -916,7 +941,7 @@
+ @app.get('/api/account/export')
+ def account_export(user=Depends(get_user)):
+     # Limited lab export: only the authenticated participant's records, never another user's messages.
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at FROM projects WHERE requester_id=?',(user['id'],))]
+         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
+         import base64
+@@ -939,7 +964,7 @@
+ 
+ @app.delete('/api/beta-interest')
+ def revoke_interest(user=Depends(require('professional'))):
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         c.execute('DELETE FROM beta_interest WHERE user_id=?',(user['id'],))
+     return {'ok':True,'recontact_interest':False,'note':'Donnée de bêta laboratoire effacée'}
+ 
+@@ -961,7 +986,7 @@
+ @app.get('/api/admin/metrics')
+ def admin_metrics(user=Depends(require('admin'))):
+     """Only aggregated, synthetic laboratory metrics; no personal data."""
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         counts = {
+             'requesters': c.execute("SELECT COUNT(*) FROM users WHERE role='requester'").fetchone()[0],
+             'professionals': c.execute("SELECT COUNT(*) FROM users WHERE role='professional'").fetchone()[0],
+@@ -981,7 +1006,7 @@
+ 
+ @app.get('/api/admin/queue')
+ def admin_queue(user=Depends(require('admin'))):
+-    with connect() as c:
++    with authenticated_db(user,write=False) as c:
+         items=c.execute('''SELECT users.id,users.name,profiles.trade,profiles.town,profiles.siren,
+            profiles.approved,profiles.subscription_active,beta_interest.wants_interview,
+            beta_interest.consent_at FROM profiles JOIN users ON profiles.user_id=users.id
+@@ -990,7 +1015,7 @@
+ 
+ @app.post('/api/admin/professionals/{uid}/approve')
+ def approve(uid:int,user=Depends(require('admin'))):
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         p=c.execute('SELECT * FROM profiles WHERE user_id=?',(uid,)).fetchone()
+         if not p:error(404,'Profil introuvable')
+         c.execute('UPDATE profiles SET approved=1,approved_at=? WHERE user_id=?',(now(),uid))
+@@ -1000,7 +1025,7 @@
+ 
+ @app.post('/api/admin/professionals/{uid}/activate-test-subscription')
+ def activate_subscription(uid:int,user=Depends(require('admin'))):
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         p=c.execute('SELECT approved FROM profiles WHERE user_id=?',(uid,)).fetchone()
+         if not p or not p['approved']:error(409,'Artisan non approuvé')
+         c.execute('UPDATE profiles SET subscription_active=1 WHERE user_id=?',(uid,))
+@@ -1010,7 +1035,7 @@
+ 
+ @app.post('/api/admin/professionals/{uid}/suspend')
+ def suspend(uid:int,user=Depends(require('admin'))):
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         r=c.execute('UPDATE profiles SET approved=0,subscription_active=0 WHERE user_id=?',(uid,))
+         if r.rowcount==0:error(404,'Profil introuvable')
+         c.execute('UPDATE enterprise_accounts SET manager_artisan_active=0 WHERE owner_id=?',(uid,))
+@@ -1021,7 +1046,7 @@
+ @app.delete('/api/account')
+ def delete_own_account(user=Depends(get_user)):
+     # Explicitly not supported while connected projects/messages exist: preserves integrity and requires manual review.
+-    with connect() as c:
++    with authenticated_db(user,write=True) as c:
+         children=c.execute('SELECT COUNT(*) FROM projects WHERE requester_id=?',(user['id'],)).fetchone()[0]
+         apps=c.execute('SELECT COUNT(*) FROM applications WHERE professional_id=?',(user['id'],)).fetchone()[0]
+         msgs=c.execute('SELECT COUNT(*) FROM messages WHERE sender_id=?',(user['id'],)).fetchone()[0]
+--- a/backend/features_v4.py
++++ b/backend/features_v4.py
+@@ -99,12 +99,12 @@
+ 
+     @app.get('/api/v4/drafts')
+     def drafts(user=Depends(m.require('requester'))):
+-        with connect() as c:return {'items':[draft_json(c,r) for r in c.execute('SELECT * FROM drafts WHERE owner_id=? AND project_id IS NULL ORDER BY updated_at DESC',(user['id'],))]}
++        with m.authenticated_db(user,write=False) as c:return {'items':[draft_json(c,r) for r in c.execute('SELECT * FROM drafts WHERE owner_id=? AND project_id IS NULL ORDER BY updated_at DESC',(user['id'],))]}
+ 
+     @app.post('/api/v4/drafts',status_code=201)
+     def create_draft(body:Draft,user=Depends(m.require('requester'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE');validate_draft(c,body)
++        with m.authenticated_db(user,write=True) as c:
++            validate_draft(c,body)
+             if c.execute('SELECT count(*) FROM drafts WHERE owner_id=? AND project_id IS NULL',(user['id'],)).fetchone()[0]>=30:error(409,'Vous avez déjà 30 brouillons')
+             cur=c.execute('INSERT INTO drafts(owner_id,payload,updated_at) VALUES(?,?,?)',(user['id'],body.model_dump_json(exclude={'version'}),now()))
+             audit(c,user,'draft_created','draft',cur.lastrowid);c.execute('COMMIT')
+@@ -112,8 +112,8 @@
+ 
+     @app.put('/api/v4/drafts/{id}')
+     def save_draft(id:int,body:Draft,user=Depends(m.require('requester'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE');r=owned_draft(c,id,user)
++        with m.authenticated_db(user,write=True) as c:
++            r=owned_draft(c,id,user)
+             if r['project_id']:error(409,'Demande déjà publiée')
+             if r['version']!=body.version:error(409,'Ce brouillon a changé dans une autre fenêtre. Rechargez-le avant de continuer.')
+             validate_draft(c,body)
+@@ -123,9 +123,12 @@
+ 
+     @app.post('/api/v4/drafts/{id}/publish',status_code=201)
+     def publish(id:int,body:dict,user=Depends(m.require('requester'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE');r=owned_draft(c,id,user)
+-            if r['project_id']:return {'id':r['project_id'],'status':'open','already_published':True}
++        with m.authenticated_db(user,write=True) as c:
++            r=owned_draft(c,id,user)
++            if r['project_id']:
++                current=c.execute('SELECT status FROM projects WHERE id=?',(r['project_id'],)).fetchone()
++                if not current:error(404,'Projet publié introuvable')
++                return {'id':r['project_id'],'status':current['status'],'already_published':True}
+             if r['version']!=body.get('version'):error(409,'Le brouillon a changé. Rechargez le récapitulatif.')
+             d=Draft(**json.loads(r['payload']));validate_draft(c,d,True)
+             cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at,trades_json) VALUES(?,?,?,?,?,?,?)',(user['id'],d.title.strip(),d.description.strip(),d.trades[0],d.town.strip(),now(),json.dumps(list(dict.fromkeys(d.trades)))))
+@@ -135,8 +138,8 @@
+ 
+     @app.delete('/api/v4/drafts/{id}')
+     def delete_draft(id:int,user=Depends(m.require('requester'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE');r=owned_draft(c,id,user)
++        with m.authenticated_db(user,write=True) as c:
++            r=owned_draft(c,id,user)
+             if r['project_id']:error(409,'Une demande publiée ne peut plus être supprimée comme brouillon')
+             c.execute('DELETE FROM drafts WHERE id=?',(id,));audit(c,user,'draft_deleted','draft',id);c.execute('COMMIT')
+         return {'ok':True}
+@@ -151,8 +154,8 @@
+             im.load();im=ImageOps.exif_transpose(im).convert('RGB');im.thumbnail((1600,1600));out=io.BytesIO();im.save(out,format='JPEG',quality=85)
+             # Reencoding strips EXIF, GPS and embedded non-image payloads.
+         except (ValueError,binascii.Error,UnidentifiedImageError,OSError,Image.DecompressionBombError):error(422,'Photo illisible')
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE');r=owned_draft(c,id,user)
++        with m.authenticated_db(user,write=True) as c:
++            r=owned_draft(c,id,user)
+             if r['project_id']:error(409,'Photos figées après publication')
+             if c.execute('SELECT count(*) FROM photos WHERE draft_id=?',(id,)).fetchone()[0]>=5:error(409,'Maximum 5 photos par projet')
+             cur=c.execute('INSERT INTO photos(draft_id,body,created_at) VALUES(?,?,?)',(id,out.getvalue(),now()));c.execute('UPDATE drafts SET version=version+1 WHERE id=?',(id,));c.execute('COMMIT')
+@@ -160,7 +163,7 @@
+ 
+     @app.get('/api/v4/photos/{id}')
+     def get_photo(id:int,user=Depends(m.get_user)):
+-        with connect() as c:
++        with m.authenticated_db(user,write=False) as c:
+             r=c.execute('SELECT photos.body,drafts.owner_id,drafts.project_id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE photos.id=?',(id,)).fetchone()
+             if not r:error(404,'Photo introuvable')
+             # Conservative privacy default: images only after explicit selection, never in discovery.
+@@ -172,8 +175,7 @@
+ 
+     @app.delete('/api/v4/photos/{id}')
+     def remove_photo(id:int,user=Depends(m.require('requester'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE')
++        with m.authenticated_db(user,write=True) as c:
+             r=c.execute('SELECT draft_id FROM photos WHERE id=?',(id,)).fetchone()
+             if not r:error(404,'Photo introuvable')
+             d=owned_draft(c,r['draft_id'],user)
+@@ -183,7 +185,7 @@
+ 
+     @app.get('/api/v4/projects/{id}')
+     def project_detail(id:int,user=Depends(m.get_user)):
+-        with connect() as c:
++        with m.authenticated_db(user,write=False) as c:
+             r=visible_project(c,id,user)
+             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
+             row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at')};row['trades']=list(m.project_trades(r))
+@@ -194,22 +196,20 @@
+ 
+     @app.post('/api/v4/reports',status_code=201)
+     def report(body:Report,user=Depends(m.get_user)):
+-        with connect() as c:
++        with m.authenticated_db(user,write=True) as c:
+             if body.kind=='project':visible_project(c,body.target_id,user)
+             else:m.check_conversation(c,body.target_id,user['id'])
+-            c.execute('BEGIN IMMEDIATE')
+             if c.execute("SELECT 1 FROM reports WHERE reporter_id=? AND kind=? AND target_id=? AND status='open'",(user['id'],body.kind,body.target_id)).fetchone():error(409,'Un signalement est déjà en cours')
+             cur=c.execute('INSERT INTO reports(reporter_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',(user['id'],body.kind,body.target_id,body.reason.strip(),now()));audit(c,user,'report_created','report',cur.lastrowid);c.execute('COMMIT')
+             return {'id':cur.lastrowid,'status':'open'}
+ 
+     @app.get('/api/v4/admin')
+     def admin(user=Depends(m.require('admin'))):
+-        with connect() as c:return {'users':[dict(x) for x in c.execute('SELECT id,name,role,suspended FROM users')], 'projects':[dict(x) for x in c.execute('SELECT id,title,description,trade,trades_json,town,status,hidden FROM projects ORDER BY id DESC')], 'reports':[dict(x) for x in c.execute('SELECT * FROM reports ORDER BY id DESC')], 'taxonomy':[dict(x) for x in c.execute('SELECT * FROM taxonomy ORDER BY group_name,label')]}
++        with m.authenticated_db(user,write=False) as c:return {'users':[dict(x) for x in c.execute('SELECT id,name,role,suspended FROM users')], 'projects':[dict(x) for x in c.execute('SELECT id,title,description,trade,trades_json,town,status,hidden FROM projects ORDER BY id DESC')], 'reports':[dict(x) for x in c.execute('SELECT * FROM reports ORDER BY id DESC')], 'taxonomy':[dict(x) for x in c.execute('SELECT * FROM taxonomy ORDER BY group_name,label')]}
+ 
+     @app.post('/api/v4/admin/projects/{id}/classify')
+     def classify(id:int,body:Classification,user=Depends(m.require('admin'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE')
++        with m.authenticated_db(user,write=True) as c:
+             r=c.execute('SELECT * FROM projects WHERE id=?',(id,)).fetchone()
+             if not r:error(404,'Projet introuvable')
+             if r['status']!='open' or m.project_trades(r)!={'inconnu'}:error(409,'Seules les demandes sans métier peuvent être classées ici')
+@@ -226,15 +226,15 @@
+             name=m.precontact_safe(body.name)
+             if len(name)<2:raise ValueError('Nom trop court')
+         except ValueError:error(422,'Nom invalide ou contenant des coordonnées')
+-        with connect() as c:
++        with m.authenticated_db(user,write=True) as c:
+             c.execute('UPDATE users SET name=? WHERE id=?',(name,user['id']))
+             audit(c,user,'account_updated','user',user['id'])
+         return {'ok':True,'name':name}
+ 
+     @app.post('/api/v4/admin/users/{id}/suspend')
+     def suspend(id:int,body:Decision,user=Depends(m.require('admin'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE');r=c.execute('SELECT role FROM users WHERE id=?',(id,)).fetchone()
++        with m.authenticated_db(user,write=True) as c:
++            r=c.execute('SELECT role FROM users WHERE id=?',(id,)).fetchone()
+             if not r:error(404,'Compte introuvable')
+             if r['role']=='admin':error(409,'La suspension d’un administrateur nécessite une procédure opérateur')
+             c.execute('UPDATE users SET suspended=? WHERE id=?',(int(body.value),id))
+@@ -244,8 +244,7 @@
+ 
+     @app.post('/api/v4/admin/projects/{id}/hide')
+     def hide(id:int,body:Decision,user=Depends(m.require('admin'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE')
++        with m.authenticated_db(user,write=True) as c:
+             if not c.execute('SELECT 1 FROM projects WHERE id=?',(id,)).fetchone():error(404,'Projet introuvable')
+             c.execute('UPDATE projects SET hidden=? WHERE id=?',(int(body.value),id));audit(c,user,'hide_project' if body.value else 'restore_project','project',id)
+             c.execute('INSERT INTO admin_decisions(actor_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',(user['id'],'hide' if body.value else 'unhide',id,body.reason,now()));c.execute('COMMIT')
+@@ -253,8 +252,7 @@
+ 
+     @app.post('/api/v4/admin/reports/{id}/resolve')
+     def resolve(id:int,body:Decision,user=Depends(m.require('admin'))):
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE')
++        with m.authenticated_db(user,write=True) as c:
+             if not c.execute("SELECT 1 FROM reports WHERE id=? AND status='open'",(id,)).fetchone():error(409,'Signalement absent ou déjà traité')
+             c.execute("UPDATE reports SET status='resolved',resolution=? WHERE id=?",(body.reason,id));audit(c,user,'resolve_report','report',id);c.execute('COMMIT')
+         return {'ok':True}
+@@ -262,8 +260,7 @@
+     @app.put('/api/v4/admin/catalog')
+     def save_trade(body:Trade,user=Depends(m.require('admin'))):
+         if any(len(s)>80 for s in body.synonyms):error(422,'Synonyme trop long')
+-        with connect() as c:
+-            c.execute('BEGIN IMMEDIATE')
++        with m.authenticated_db(user,write=True) as c:
+             c.execute('INSERT INTO taxonomy VALUES(?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET label=excluded.label,group_name=excluded.group_name,synonyms=excluded.synonyms,active=excluded.active',(body.id,body.label,body.group,json.dumps(body.synonyms),int(body.active)))
+             audit(c,user,'catalog_changed','catalog',0);c.execute('COMMIT')
+         m.TRADES.add(body.id)
+@@ -273,7 +270,7 @@
+     def reset(body:Reset):
+         with connect() as c:
+             c.execute('BEGIN IMMEDIATE');r=c.execute('SELECT * FROM resets WHERE token_hash=?',(m.hash_token(body.token),)).fetchone()
+-            if not r or r['expires']<time.time():error(400,'Lien invalide ou expiré')
++            if not r or r['expires']<=time.time():error(400,'Lien invalide ou expiré')
+             salt=secrets.token_hex(16)
+             c.execute('UPDATE users SET pw_salt=?,pw_hash=? WHERE id=?',(salt,m.pw(body.password,salt),r['user_id']))
+             c.execute('DELETE FROM resets WHERE user_id=?',(r['user_id'],));c.execute('DELETE FROM sessions WHERE user_id=?',(r['user_id'],));c.execute('COMMIT')

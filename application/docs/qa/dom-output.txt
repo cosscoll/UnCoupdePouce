@@ -1,0 +1,16 @@
+✔ chat retry preserves idempotency key after lost response (315.473204ms)
+✔ guided publication uses three steps, CSRF, version and one publish (192.085313ms)
+✔ network failure retains the draft and permits retry (112.056563ms)
+✔ professional picker excludes unknown and permits keyboard continuation (101.869544ms)
+✔ project text stays text even when it resembles executable markup (64.243255ms)
+✔ enterprise matching sends the linked application route (79.681457ms)
+✔ catalog selection cannot mix unknown with precise trades (100.111651ms)
+✔ analytics is off by default and strips private properties (61.339837ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2689.657642
