@@ -16,7 +16,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 ROOT = Path(__file__).parent
 DB = Path(os.getenv('UCP_LOCAL_DB', str(ROOT / 'ucp_local.sqlite3')))
 ROLES = {'requester', 'professional'}
-TRADES = {row['id'] for row in json.loads((ROOT/'taxonomy.json').read_text())}
+TRADES = {row['id'] for row in json.loads((ROOT/'taxonomy.json').read_text(encoding='utf-8'))}
 def project_trades(row):
     return set(json.loads(row['trades_json'] or '[]') or [row['trade']])
 def active_trade(value):
@@ -516,7 +516,7 @@ def apply_with_enterprise_profile(project_id:int,linked_id:int,user=Depends(requ
     return {'id':cur.lastrowid,'status':'pending','linked_profile_id':linked_id}
 
 @app.get('/api/health')
-def health(): return {'ok':True,'mode':'local_only','production':False,'release':'v4.0.2-prive-local'}
+def health(): return {'ok':True,'mode':'local_only','production':False,'release':'v4.0.2-prive-local','presentation':getattr(app.state,'presentation',False)}
 
 @app.post('/api/register',status_code=201)
 def register(body:Register):
@@ -818,7 +818,7 @@ def reject_application(application_id:int,user=Depends(require('requester'))):
 @app.get('/api/my-applications')
 def my_applications(user=Depends(require('professional'))):
     with authenticated_db(user,write=False) as c:
-        rows=c.execute('''SELECT applications.id,applications.status,projects.title,projects.trade,projects.town,
+        rows=c.execute('''SELECT applications.id,applications.project_id,applications.status,projects.title,projects.trade,projects.town,
         linked.alias AS linked_artisan_alias FROM applications JOIN projects ON projects.id=applications.project_id
         LEFT JOIN enterprise_artisans linked ON linked.id=applications.linked_profile_id
         WHERE applications.professional_id=? ORDER BY applications.id DESC''',(user['id'],)).fetchall()

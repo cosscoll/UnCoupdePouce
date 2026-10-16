@@ -55,7 +55,7 @@ def install(m):
         CREATE INDEX IF NOT EXISTS idx_photos_draft ON photos(draft_id);
         CREATE TABLE IF NOT EXISTS message_retries(application_id INTEGER NOT NULL REFERENCES applications(id),sender_id INTEGER NOT NULL REFERENCES users(id),retry_key TEXT NOT NULL,message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,body_hash TEXT NOT NULL,PRIMARY KEY(application_id,sender_id,retry_key));
         ''')
-        for t in json.loads((m.ROOT/'taxonomy.json').read_text()):
+        for t in json.loads((m.ROOT/'taxonomy.json').read_text(encoding='utf-8')):
             c.execute('INSERT OR IGNORE INTO taxonomy VALUES(?,?,?,?,?)',(t['id'],t['label'],t['group'],json.dumps(t['synonyms']),1))
         m.TRADES.update(r[0] for r in c.execute('SELECT id FROM taxonomy'))
     def audit(c,user,action,kind,id):

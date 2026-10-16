@@ -4,6 +4,8 @@ Application de développement privée, locale et persistante, issue du laboratoi
 
 ## Utiliser la version
 
+Pour une présentation interactive avec des projets et comptes entièrement fictifs, utiliser `PRESENTATION.bat` sous Windows avec un environnement Python déjà préparé. Le serveur reste sur `127.0.0.1:8876` et crée une nouvelle base isolée. Les boutons demandeur/artisan/administration permettent de parcourir le produit sans saisir de mot de passe. Voir [le guide de présentation](docs/PRESENTATION.md) pour le scénario, les protections et les limites.
+
 Python 3.12 est la version vérifiée. Depuis le dossier extrait : `sh DEMARRER.sh` (macOS/Linux) ou `DEMARRER.bat` (Windows). Le lanceur installe les dépendances verrouillées puis démarre sur http://127.0.0.1:8765. Les dépendances nécessitent un accès réseau lors de la première installation ; aucun service payant ou clé API n'est utilisé.
 
 Pour préparer une démonstration, arrêter le serveur puis exécuter depuis `backend/` : `../.venv/bin/python demo.py` (Windows : `..\.venv\Scripts\python.exe demo.py`). La commande refuse toute base contenant déjà des utilisateurs. Elle crée trois comptes fictifs et affiche un mot de passe aléatoire à conserver uniquement sur la machine : `admin@ucp.test`, `camille@ucp.test`, `atelier@ucp.test`. Aucun identifiant généré n'est inclus dans cette archive. Relancer ensuite le serveur.

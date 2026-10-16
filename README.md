@@ -19,6 +19,8 @@ Ouvrez ensuite `site-vitrine/dist/index.html`.
 
 ## Lancer l'application
 
+Pour découvrir une présentation interactive préremplie avec des données fictives, utiliser `application/PRESENTATION.bat` sous Windows, puis ouvrir `http://127.0.0.1:8876/`. Les boutons du bandeau permettent de passer entre demandeur, artisan et administration. Aucun paquet n'est installé automatiquement. Voir [le guide de présentation](application/docs/PRESENTATION.md).
+
 ```bash
 cd application
 ./DEMARRER.sh

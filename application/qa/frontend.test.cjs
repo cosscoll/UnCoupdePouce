@@ -14,7 +14,7 @@ async function boot(overrides={}){
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};
  w.HTMLDialogElement.prototype.close=function(){this.open=false};
  w.crypto.randomUUID=crypto.randomUUID;
- const defaults={'/api/catalog':{items:JSON.parse(fs.readFileSync(path.join(root,'../taxonomy.json'),'utf8'))},'/api/session':{id:1,name:'Camille',role:'requester',csrf:'test-token'},'/api/projects':{items:[]},'/api/v4/drafts':{items:[]},'/api/my-profile':{profile:null}};
+ const defaults={'/api/catalog':{items:JSON.parse(fs.readFileSync(path.join(root,'../taxonomy.json'),'utf8'))},'/api/session':{id:1,name:'Camille',role:'requester',csrf:'test-token'},'/api/projects':{items:[]},'/api/v4/drafts':{items:[]},'/api/my-profile':{profile:null},'/api/my-applications':{items:[]},'/api/health':{presentation:false}};
  w.fetch=async(url,opts={})=>{
   const call={url,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null,headers:opts.headers};calls.push(call);
   let r=overrides[call.method+' '+url]??overrides[url]??defaults[url];
@@ -107,4 +107,94 @@ test('analytics is off by default and strips private properties',async()=>{
   assert.deepEqual(Object.keys(got[0].properties).sort(),['$geoip_disable','$process_person_profile','distinct_id','environment','step','viewport'].sort());
   assert.equal(a.track('unknown_event'),false);a.reset();assert.equal(a.enabled(),false);
  }finally{x.close()}
+});
+
+test('project overview counts only the current requester projects and drafts',async()=>{
+ const x=await boot({'/api/projects':{items:[{id:1,title:'Projet ouvert',town:'Toulouse',trade:'plomberie',status:'open'},{id:2,title:'Projet en relation',town:'Toulouse',trade:'peinture',status:'selected'},{id:3,title:'Projet terminé',town:'Toulouse',trade:'peinture',status:'closed'}]},'/api/v4/drafts':{items:[{id:4,title:'Brouillon fictif'}]}});
+ try{const overview=x.w.document.querySelector('.project-overview');assert.ok(overview);assert.deepEqual([...overview.querySelectorAll('strong')].map(n=>n.textContent),['1','1','1']);}finally{x.close()}
+});
+
+test('password visibility changes only the selected form and preserves the value',async()=>{
+ const x=await boot();try{
+  const login=x.w.document.querySelector('#login-form [name=password]');login.value='Fictive-Password!2026';
+  const toggle=x.w.document.querySelector('#login-form .password-toggle');toggle.click();
+  assert.equal(login.type,'text');assert.equal(login.value,'Fictive-Password!2026');assert.equal(toggle.getAttribute('aria-pressed'),'true');
+  assert.equal(x.w.document.querySelector('#register-form [name=password]').type,'password');
+  toggle.click();assert.equal(login.type,'password');assert.equal(toggle.getAttribute('aria-pressed'),'false');
+ }finally{x.close()}
+});
+
+test('account access buttons expose the selected form to assistive technology',async()=>{
+ const x=await boot();try{
+  x.w.document.querySelector('#tab-register').click();assert.equal(x.w.document.querySelector('#tab-register').getAttribute('aria-pressed'),'true');assert.equal(x.w.document.querySelector('#login-form').hidden,true);
+  x.w.document.querySelector('#tab-login').click();assert.equal(x.w.document.querySelector('#tab-register').getAttribute('aria-pressed'),'false');assert.equal(x.w.document.querySelector('#register-form').hidden,true);
+ }finally{x.close()}
+});
+
+test('a suggested trade replaces the unknown choice before publication',async()=>{
+ const x=await boot();try{
+  x.w.startWizard();input(x.w,'.wizard [name=title]','Travaux de plomberie');input(x.w,'.wizard [name=description]','Refaire la plomberie dans une pièce fictive.');
+  const unknown=x.w.document.querySelector('input[value=inconnu]');unknown.checked=true;unknown.dispatchEvent(new x.w.Event('change',{bubbles:true}));
+  [...x.w.document.querySelectorAll('button')].find(b=>b.textContent==='Me suggérer des métiers').click();
+  [...x.w.document.querySelectorAll('#dialog button')].find(b=>b.textContent==='Plomberie').click();
+  assert.equal(x.w.document.querySelector('input[value=plomberie]').checked,true);assert.equal(x.w.document.querySelector('input[value=inconnu]').checked,false);
+ }finally{x.close()}
+});
+
+test('successful login clears and hides the submitted password',async()=>{
+ const x=await boot({'POST /api/login':{user_id:1,name:'Camille',role:'requester',csrf:'test-token'}});try{
+  const password=x.w.document.querySelector('#login-form [name=password]');password.value='Fictive-Password!2026';
+  const toggle=x.w.document.querySelector('#login-form .password-toggle');toggle.click();submit(x.w,'#login-form');await tick();
+  assert.equal(password.value,'');assert.equal(password.type,'password');assert.equal(toggle.getAttribute('aria-pressed'),'false');
+ }finally{x.close()}
+});
+
+test('project filters combine town, trade and search, and reset to the full list',async()=>{
+ const x=await boot({'/api/projects':{items:[{id:1,title:'Salle de bains',description:'Travaux fictifs',town:'Toulouse',trade:'plomberie',trades_json:'["plomberie","carrelage"]',status:'open'},{id:2,title:'Une cuisine',town:'Blagnac',trade:'plomberie',status:'open'}]}});try{
+  const select=x.w.document.querySelector('[aria-label="Filtrer par commune"]');select.value='Toulouse';select.dispatchEvent(new x.w.Event('change'));assert.equal(x.w.document.querySelectorAll('.project-card').length,1);
+  const trade=x.w.document.querySelector('[aria-label="Filtrer par métier"]');trade.value='carrelage';trade.dispatchEvent(new x.w.Event('change'));assert.match(x.w.document.querySelector('.project-card').textContent,/Salle de bains/);
+  input(x.w,'[aria-label="Rechercher un projet"]','aucun résultat');assert.equal(x.w.document.querySelectorAll('.project-card').length,0);
+  [...x.w.document.querySelectorAll('button')].find(b=>b.textContent==='Réinitialiser').click();assert.equal(x.w.document.querySelectorAll('.project-card').length,2);
+ }finally{x.close()}
+});
+
+test('project pagination limits rendered cards without dropping results',async()=>{
+ const x=await boot({'/api/projects':{items:Array.from({length:8},(_,i)=>({id:i+1,title:'Projet fictif '+i,town:'Toulouse',trade:'plomberie',status:'open'}))}});try{
+  assert.equal(x.w.document.querySelectorAll('.project-card').length,6);[...x.w.document.querySelectorAll('button')].find(b=>b.textContent==='Suivant').click();assert.equal(x.w.document.querySelectorAll('.project-card').length,2);
+  assert.match(x.w.document.querySelector('.project-pagination').textContent,/Page 2 sur 2/);
+ }finally{x.close()}
+});
+
+test('an existing application shows follow-up instead of another apply button',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Artisan',role:'professional',csrf:'abc'},'/api/my-applications':{items:[{id:12,project_id:8,status:'pending',title:'Projet fictif',town:'Toulouse',trade:'plomberie'}]},'/api/v4/projects/8':{id:8,title:'Projet fictif',description:'Travaux fictifs',town:'Toulouse',trades:['plomberie'],status:'open',photos:[]}});try{
+  await x.w.projectDetail({id:8});assert.ok([...x.w.document.querySelectorAll('button')].some(b=>b.textContent==='Suivre ma candidature'));assert.ok(![...x.w.document.querySelectorAll('button')].some(b=>b.textContent==='Proposer ma candidature'));
+ }finally{x.close()}
+});
+
+test('a notification can be marked read individually with CSRF',async()=>{
+ const x=await boot({'/api/notifications':{unread:1,items:[{id:7,message:'Une candidature fictive',created_at:'2026-10-16T12:00:00Z',read_at:null}]},'POST /api/notifications/7/read':{ok:true}});try{
+  const host=x.w.document.createElement('div');x.w.document.body.append(host);await x.w.renderNotifications(host);[...host.querySelectorAll('button')].find(b=>b.textContent==='Marquer comme lu').click();await tick();
+  assert.ok(x.calls.some(c=>c.url==='/api/notifications/7/read'&&c.headers['x-ucp-csrf']==='test-token'));
+ }finally{x.close()}
+});
+
+test('presentation controls remain absent on a normal server',async()=>{
+ const x=await boot();try{assert.equal(x.w.document.querySelector('.demo-toolbar'),null);assert.ok(!x.calls.some(c=>c.url.startsWith('/api/presentation/')))}finally{x.close()}
+});
+
+test('targeted conversations select the matching participant thread',async()=>{
+ const x=await boot({'/api/conversations':{items:[{application_id:11,title:'Premier projet',peer:'Atelier A'},{application_id:12,title:'Second projet',peer:'Atelier B'}]},'/api/conversations/12/messages':{items:[]}});try{
+  await x.w.openConversation(12);assert.match(x.w.document.querySelector('.chat h3').textContent,/Atelier B/);assert.equal(x.w.document.querySelector('.conversation-list button[aria-pressed=true]').textContent,'Second projet · Atelier B');
+ }finally{x.close()}
+});
+
+test('legacy projects retain their primary trade when the multi-trade array is empty',async()=>{
+ const x=await boot({'/api/projects':{items:[{id:1,title:'Projet ancien fictif',town:'Toulouse',trade:'plomberie',trades_json:'[]',status:'open'}]}});try{
+  assert.match(x.w.document.querySelector('.project-place').textContent,/Plomberie/);const trade=x.w.document.querySelector('[aria-label="Filtrer par métier"]');trade.value='plomberie';trade.dispatchEvent(new x.w.Event('change'));assert.equal(x.w.document.querySelectorAll('.project-card').length,1);
+ }finally{x.close()}
+});
+
+test('initial loading state is released after successful initialization and catalog failure',async()=>{
+ const ready=await boot();try{assert.equal(ready.w.document.body.classList.contains('initializing'),false);assert.equal(ready.w.document.querySelector('#main').getAttribute('aria-busy'),'false')}finally{ready.close()}
+ const failed=await boot({'/api/catalog':()=>{throw Error('network interrupted')}});try{assert.equal(failed.w.document.body.classList.contains('initializing'),false);assert.match(failed.w.document.querySelector('#alert').textContent,/serveur ne répond pas/)}finally{failed.close()}
 });

@@ -1,0 +1,98 @@
+/* UCP: a working space inspired by plans, materials and the official palette. */
+.welcome{max-width:1440px;grid-template-columns:minmax(0,1.25fr) minmax(340px,.85fr);gap:clamp(32px,5vw,80px);padding:48px 5% 64px;align-items:start}
+.welcome-location{font-size:12px;color:var(--violet);font-weight:600}
+.mobile-entry{display:none}
+.initializing #main{visibility:hidden;min-height:calc(100vh - 190px)}
+.initializing>footer{visibility:hidden}
+.initializing .header::after{content:'Chargement de votre espace…';font-size:11px;color:var(--muted)}
+/* Connected workbench: quiet structure, expressive project cards and responsive motion. */
+.dashboard{background:#f5f6fb;max-width:none}
+.sidebar{background:white;position:sticky;top:0;align-self:start;min-height:calc(100vh - 135px)}
+.workspace{background:#f5f6fb;max-width:1440px;width:100%;margin:auto}
+.page-head .eyebrow{display:none}
+.page-head h2{font-size:clamp(30px,3.2vw,46px);margin-top:0}
+.workbench-banner{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:26px 30px;background:var(--violet);color:white;border-radius:16px;margin-bottom:28px;overflow:hidden}
+.workbench-banner h3{font-family:Anton,sans-serif;font-weight:400;font-size:28px}
+.workbench-banner p{max-width:650px;font-size:13px;margin-top:6px;color:#f1f2ff}
+.workbench-banner>svg{width:56px;height:56px;flex:none;color:var(--orange)}
+.draft-shelf{background:var(--beige);border-color:#e6ddd4;margin-top:0}
+.draft-shelf .item>svg{width:24px;height:24px;color:var(--violet)}
+.draft-shelf .item>strong{flex:1;min-width:140px}
+.professional-progress{background:white;padding:24px;border:1px solid var(--line);border-radius:16px;margin-bottom:28px}
+.professional-progress .row{justify-content:space-between}
+.professional-progress ol{display:flex;gap:16px;list-style:none;padding:16px 0;margin:0;flex-wrap:wrap}
+.professional-progress li{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.professional-progress li span{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--soft)}
+.professional-progress .done span{background:#edf4e9;color:var(--green)}
+.professional-progress.ready{padding:18px 22px}
+.professional-progress.ready h3{font-size:17px}
+.professional-progress.ready ol{padding:10px 0}
+.professional-progress.ready>p{font-size:11px}
+.project-filters{background:white;border:1px solid var(--line);border-radius:14px;padding:18px;margin:0 0 16px}
+.search-line{display:grid;grid-template-columns:1fr 200px;gap:12px;margin-bottom:12px}
+.filter-line{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.filter-line select{flex:1;width:auto;min-width:150px;font-size:12px}
+.filter-line .link{flex:none}
+.count{margin:12px 0}
+.project-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;border:0}
+.project-row.project-card{display:flex;flex-direction:column;position:relative;background:white;border:1px solid var(--line);border-radius:16px;padding:24px;gap:16px;transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+.project-card:hover,.project-card:focus-within{border-color:#b4bce8;box-shadow:0 10px 26px #20223b09;transform:translateY(-2px)}
+.project-card .project-icon{position:absolute;right:20px;top:20px;width:38px;height:42px;border-radius:10px}
+.project-card .project-card-content{width:100%}
+.project-card .project-card-content>.line{padding-right:40px;min-height:42px}
+.project-card h3{font-size:20px;max-width:100%;line-height:1.4;margin:12px 0 8px}
+.project-card .project-place{color:var(--violet);font-size:12px}
+.project-card .project-excerpt{margin-top:14px;font-size:12px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.8}
+.project-card .row-actions{margin-top:auto;display:block;width:100%}
+.project-card .row-actions button{width:100%;text-align:left;border-color:#d9dced;color:var(--violet);background:#f8f9ff}
+.project-pagination{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:24px;font-size:12px}
+.candidate-card{display:flex;gap:18px;background:var(--soft);border:1px solid var(--line);border-radius:14px;margin-top:16px;padding:20px;flex-wrap:wrap}
+.candidate-avatar{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--violet);color:white;font-family:Anton,sans-serif;font-size:24px;flex:none}
+.candidate-body{flex:1;min-width:160px}
+.candidate-body .row{margin-top:14px}
+.application-card{margin:0;display:flex;flex-direction:column;align-items:flex-start;gap:14px}
+.application-card>p{margin:0;line-height:1.8}
+.application-card>button{margin-top:auto}
+.notification-item{display:flex;align-items:center;justify-content:space-between;gap:16px;background:white;padding:20px;border:1px solid var(--line);border-radius:12px;margin-top:12px}
+.notification-item p{font-size:13px}
+@media(max-width:680px){.notification-item{flex-wrap:wrap}}
+.project-journey{list-style:none;display:flex;gap:16px;margin:24px 0;padding:18px 22px;background:white;border:1px solid var(--line);border-radius:12px;flex-wrap:wrap;font-size:12px}
+.project-journey .done{color:var(--violet);font-weight:700}
+.view-stage,.wizard{animation:ucp-enter .28s cubic-bezier(.2,.7,.2,1) both}
+dialog[open]{animation:ucp-dialog .2s ease-out both}
+.primary,.secondary,.outline{transition:background-color .18s ease,transform .18s ease}
+.primary:active,.secondary:active{transform:scale(.98)}
+.conversation-list button[aria-pressed=true]{background:var(--violet);color:white}
+.demo-toolbar{background:#20223b;color:white;display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 20px;font-size:12px}
+.demo-toolbar p{margin-right:12px;color:#d9dcf5}
+.demo-toolbar button{font-size:11px;background:#ffffff14;color:white;border:1px solid #ffffff44;min-height:38px;padding:7px 14px}
+.demo-toolbar button[aria-pressed=true]{background:var(--orange);border-color:var(--orange);color:var(--ink)}
+.demo-toolbar .demo-leave{background:transparent}
+@keyframes ucp-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes ucp-dialog{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(min-width:1500px){.project-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:1000px){.project-grid{grid-template-columns:1fr}.workbench-banner{padding:22px}.search-line{grid-template-columns:1fr 170px}}
+@media(max-width:680px){.sidebar{min-height:0;align-self:stretch}.workspace{padding:22px 16px 40px}.workbench-banner{padding:22px 20px}.workbench-banner h3{font-size:25px}.workbench-banner>svg{width:34px;height:34px}.search-line{grid-template-columns:1fr}.filter-line{gap:8px}.filter-line select{min-width:120px}.project-row.project-card{padding:20px}.demo-toolbar{gap:7px;padding:8px}.demo-toolbar p{width:100%;text-align:center;margin:0;font-size:10px}.demo-toolbar button{font-size:10px;padding:7px 10px}.professional-progress{padding:20px}.candidate-card{padding:16px}.project-journey{gap:12px;font-size:11px}}
+@media(prefers-reduced-motion:reduce){.view-stage,.wizard,dialog[open]{animation:none}.project-card,.primary,.secondary,.outline{transition:none}.project-card:hover,.project-card:focus-within{transform:none}}
+.welcome h1{font-size:clamp(38px,4.4vw,66px);line-height:1.15;max-width:720px;margin:18px 0}
+.welcome .lead{font-size:15px;line-height:1.8}
+.project-scene{margin:26px 0 0;position:relative;max-width:640px}
+.project-scene>img{width:100%;height:auto;display:block;border-radius:16px}
+.project-scene figcaption{display:flex;align-items:center;gap:12px;background:white;border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:-22px 20px 0;position:relative;font-size:11px;line-height:1.7}
+.scene-mark{display:grid;place-items:center;width:38px;height:38px;flex:none;background:var(--orange);border-radius:50%;font-size:24px;color:var(--ink)}
+.principles{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:12px 22px;margin:28px 0}
+.principles li{font-size:11px;font-weight:600;display:flex;align-items:center;gap:8px}
+.principles b{display:grid;place-items:center;padding:0;margin:0;width:24px;height:24px;font-size:10px;flex:none}
+.auth-box{margin-top:14px;border:1px solid #E4DDD4;box-shadow:0 14px 40px #20223b08}
+.auth-box h2{font-size:clamp(28px,3vw,38px)}
+.project-overview{display:flex;gap:0;border:1px solid var(--line);border-radius:14px;background:white;margin:0 0 28px;overflow:hidden}
+.project-overview>div{flex:1;padding:16px 22px;border-right:1px solid var(--line)}
+.project-overview>div:last-child{border:0}
+.project-overview strong{font-family:Anton,sans-serif;font-size:30px;color:var(--violet);display:block;line-height:1.2}
+.project-overview span{font-size:11px;color:var(--muted)}
+@media(max-width:680px){.mobile-entry{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;margin-top:20px;min-height:46px;border-radius:9px;background:var(--violet);color:white;font-size:13px;font-weight:700;text-decoration:none}.auth-box{scroll-margin-top:16px}}
+.password-toggle{justify-self:end;padding:0 4px;min-height:32px;font-size:11px;color:var(--violet);text-decoration:underline}
+.workspace,.auth-box,.welcome-copy,.project-row>*{min-width:0}
+.project-row h3,.page-head h2,.accountbar span{overflow-wrap:anywhere}
+@media(max-width:900px){.welcome{gap:32px;grid-template-columns:minmax(0,1fr) minmax(300px,.9fr);padding:32px 24px}.project-scene figcaption{margin:-12px 10px 0;padding:10px}.principles{display:grid;gap:12px}.auth-box{padding:24px}}
+@media(max-width:680px){.welcome{display:flex;flex-direction:column;padding:28px 20px;gap:28px}.welcome h1{font-size:clamp(36px,8.5vw,52px)}.welcome-copy,.auth-box{width:100%}.auth-box{margin-top:0}.project-scene{max-width:440px}.principles{display:grid;gap:12px;margin:24px 0}.project-overview>div{padding:14px 10px}.project-overview strong{font-size:26px}.project-overview span{font-size:10px}.accountbar{gap:12px;flex-wrap:wrap}.navlink{min-height:44px}.brand{gap:10px}.brand-logo{width:32px;height:42px}.brand-name{font-size:18px}.header{gap:10px}.header button{min-height:44px}.project-row .row-actions{flex-wrap:wrap}}
