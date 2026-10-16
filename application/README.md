@@ -48,7 +48,7 @@ La destination doit être un nouveau fichier. La restauration invalide sessions 
 
 ## Sources et continuité
 
-Lire `docs/SYNCHRONISATION.md` avant toute reprise. Le journal Google Docs est la référence commune des priorités et arbitrages ; les archives sont identifiées par leurs empreintes. Aucun dépôt GitHub UCP distant, branche ou commit partagé n'a été identifié. Ne pas inventer de commit ou qualifier cette archive de production.
+Lire `docs/SYNCHRONISATION.md` avant toute reprise. Le journal Google Docs reste la référence commune des priorités et arbitrages ; les archives sont identifiées par leurs empreintes. Le dépôt distant et la branche de développement active sont des supports de travail, pas une preuve de déploiement ou d'ouverture commerciale. Ne pas qualifier cette archive de production.
 
 Le backend est FastAPI/SQLite ; il ne dépend ni de Supabase ni d'une API payante. Les lots classiques 05 à 09 sont des contributions isolées : certains contrôles ont été adaptés, leur serveur n'a pas été fusionné. Voir `docs/RAPPROCHEMENT_LOTS.md`.
 
