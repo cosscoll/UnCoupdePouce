@@ -2,6 +2,12 @@
 
 Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en relation entre particuliers ayant un projet de travaux et professionnels du BTP.
 
+## Suivi du projet
+
+- [Vitrine statique](site-vitrine/dist/index.html)
+- [Tableau d'avancement : fait / reste à faire / blocages](site-vitrine/dist/avancement.html)
+- [Page d'accueil compatible GitHub Pages](index.html) — l'hébergement GitHub Pages doit être activé et vérifié séparément.
+
 ## Contenu
 
 - [`site-vitrine/`](site-vitrine/) : site statique français/anglais présentant le projet. Les fichiers prêts à servir se trouvent dans `site-vitrine/dist/`.
