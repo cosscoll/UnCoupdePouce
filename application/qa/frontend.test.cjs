@@ -26,6 +26,24 @@ async function boot(overrides={}){
  new (require('node:vm').Script)(fs.readFileSync(path.join(root,'app.js'),'utf8')).runInContext(dom.getInternalVMContext());
  await tick();return {dom,w,calls,close:()=>w.close()};
 }
+test('atelier remains useful without loading WebGL or writing API data',async()=>{
+ const x=await boot();try{await x.w.go('atelier');const view=x.w.document.querySelector('#view');assert.match(view.textContent,/Imaginez la suite/);assert.equal(view.querySelector('canvas'),null);const horizon=[...view.querySelectorAll('button')].find(b=>b.textContent==='Horizon');horizon.click();assert.equal(horizon.getAttribute('aria-pressed'),'true');assert.match(view.querySelector('[role=status]').textContent,/Horizon/);assert.equal(x.calls.filter(c=>c.method!=='GET').length,0)}finally{x.close()}
+});
+test('professional atelier directs to opportunities, not requester publication',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Atelier fictif',role:'professional',csrf:'test'}});try{await x.w.go('atelier');const view=x.w.document.querySelector('#view');assert.match(view.textContent,/Trouver des projets/);assert.doesNotMatch(view.textContent,/Préparer ce projet/);assert.equal(x.calls.filter(c=>c.method!=='GET').length,0)}finally{x.close()}
+});
+test('actions and explicit photo consent survive wizard saves',async()=>{
+ let version=0;const x=await boot({'POST /api/v4/drafts':()=>({id:5,version:++version}),'PUT /api/v4/drafts/5':()=>({id:5,version:++version})});
+ try{x.w.startWizard({title:'Travaux fictifs',description:'Refaire les murs et préparer les supports du salon.',town:'Toulouse',trades:['peinture'],timing:'month',version:0,photos:[]});input(x.w,'[name=project_actions]','Préparer les supports\nPeindre les murs');submit(x.w,'.wizard form');await tick();const consent=x.w.document.querySelector('[name=share_photos]');assert.ok(consent);assert.equal(consent.checked,false);consent.checked=true;consent.dispatchEvent(new x.w.Event('change',{bubbles:true}));submit(x.w,'.wizard form');await tick();const sent=x.calls.filter(c=>c.method==='PUT').at(-1).body;assert.deepEqual(sent.actions,['Préparer les supports','Peindre les murs']);assert.equal(sent.photo_visibility,'matched');assert.match(x.w.document.querySelector('.review').textContent,/Partagées dans le fil/)}finally{x.close()}
+});
+test('professional feed ranks real matching trades and never invents photos',async()=>{
+ const items=[{id:1,title:'Salle de bains',description:'Travaux fictifs de plomberie et de carrelage.',trade:'plomberie',trades_json:'["plomberie","carrelage"]',town:'Toulouse',status:'open',actions:['Poser le carrelage'],photos:[]},{id:2,title:'Une fuite',description:'Un raccord à remplacer dans un logement fictif.',trade:'plomberie',town:'Toulouse',status:'open',photos:[]}];
+ const x=await boot({'/api/session':{id:2,name:'Atelier fictif',role:'professional',csrf:'test'},'/api/projects':{items},'/api/my-profile':{profile:{trade:'plomberie',additional_trades:['carrelage'],approved:true,subscription_active:true}}});
+ try{assert.match(x.w.document.querySelector('.chantier-card h3').textContent,/Salle de bains/);assert.match(x.w.document.querySelector('.match-reason').textContent,/Carrelage/);assert.equal(x.w.document.querySelectorAll('.chantier-gallery img').length,0);assert.match(x.w.document.querySelector('.chantier-actions').textContent,/Poser le carrelage/)}finally{x.close()}
+});
+test('gallery renders only numeric authorized photo IDs without autoplay',async()=>{
+ const x=await boot();try{const gallery=x.w.projectGallery({title:'Projet fictif',photos:[1,2,'javascript:alert(1)',-1]});assert.equal(gallery.querySelectorAll('img').length,2);assert.equal(gallery.querySelector('img').getAttribute('src'),'/api/v4/photos/1');assert.equal(gallery.querySelectorAll('button').length,2);assert.match(gallery.textContent,/1 \/ 2/)}finally{x.close()}
+});
 function input(w,selector,value){const n=w.document.querySelector(selector);assert.ok(n,selector);n.value=value;n.dispatchEvent(new w.Event('input',{bubbles:true}));}
 function submit(w,selector){w.document.querySelector(selector).dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));}
 

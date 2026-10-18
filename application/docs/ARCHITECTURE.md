@@ -1,5 +1,11 @@
 # Architecture et exploitation privées
 
+## Découverte et atelier 3D — 17 octobre 2026
+
+Le JSON existant des brouillons accepte `actions` (12 textes de 120 caractères maximum) et `photo_visibility` (`private` par défaut ou `matched` sur consentement explicite). Aucun schéma SQL modifié. Les anciennes données restent compatibles et privées. `/api/projects` enrichit uniquement les projets déjà autorisés avec délai, actions et identifiants des photos partagées. Les fichiers ne sont jamais publics ; leur route vérifie les autorisations. Retrait par `POST /api/v4/projects/{id}/hide-previews`, protégé CSRF et journalisé. Les copies déjà téléchargées ne peuvent pas être rappelées. Le tri compte les métiers correspondants puis la récence, sans IA ni calcul de distance.
+
+`static/atelier.mjs` importe Three.js r180 localement sur activation. Scène procédurale illustrative sans modèle distant ; la demande préremplie reste à compléter. `clear(#view)` détruit renderer, géométries, matériaux, écouteurs et ResizeObserver. Formulaires et fil ne dépendent pas de WebGL. Provenance : `static/vendor/three-r180/README.md`. Preuves/limites : `CHANTIER_03_RESULTATS.md`.
+
 Le navigateur sert HTML/CSS/JavaScript depuis FastAPI. Les appels `/api/` partagent l'origine et la session HttpOnly/SameSite. Les écritures authentifiées exigent un jeton CSRF. Le serveur écoute uniquement sur loopback. Un contrôle d'hôte complémentaire ne remplace jamais une protection réseau.
 
 SQLite conserve utilisateurs, sessions, profils, projets, candidatures, messages, notifications, entreprises, audit, brouillons, photos, catalogue, signalements, décisions de modération et codes de récupération. Chaque opération ouvre sa propre connexion ; les écritures sensibles sont transactionnelles. Les clés étrangères, contraintes d'unicité et BEGIN IMMEDIATE protègent les opérations concernées. Il n'y a pas de RLS PostgreSQL ni de base Supabase connectée.

@@ -42,7 +42,7 @@ async (page) => {
     await responsive('Demandeur');
     await role('Espace artisan', 'Les projets qui vous correspondent.');
     await page.getByLabel('Rechercher un projet', {exact:true}).fill(title);
-    await page.locator('.project-card').filter({hasText:title}).getByRole('button').click();
+    await page.locator('.project-card').filter({hasText:title}).getByRole('button',{name:'Voir le projet →',exact:true}).click();
     await page.getByRole('button', {name:'Proposer ma candidature', exact:true}).click();
     await page.getByRole('heading', {name:'Vos candidatures.', exact:true}).waitFor();
     assert(await page.locator('.application-card').filter({hasText:title}).count() === 1, 'Candidature persistée');

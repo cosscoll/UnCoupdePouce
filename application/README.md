@@ -18,6 +18,8 @@ Sessions revérifiées dans la transaction de chaque accès authentifié, lectur
 
 ## Fonctions développées
 
+Ajouts du 17 octobre : fil artisan avec matching expliqué, carrousels de photos partagées sur consentement, actions attendues dans les demandes et atelier 3D local. Les inscriptions restent fictives, la revue professionnelle obligatoire et l'abonnement simulé. Voir [résultats et limites du chantier 03](docs/CHANTIER_03_RESULTATS.md).
+
 - Comptes demandeur/professionnel, sessions serveur, protection CSRF, récupération opérateur locale, export individuel, révocation de sessions.
 - Catalogue de métiers administrable, recherche de catégories, publication guidée en trois étapes, plusieurs métiers par projet, brouillons versionnés et publication idempotente.
 - Photos privées réencodées sans métadonnées EXIF, contrôle de taille et d'accès.

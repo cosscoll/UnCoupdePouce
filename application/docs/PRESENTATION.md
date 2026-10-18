@@ -10,6 +10,10 @@ Chaque lancement crée une nouvelle base SQLite dans un nouveau dossier temporai
 
 ## Scénario conseillé pour un investisseur
 
+Depuis le chantier 03, le fil artisan comporte carrousels des images partagées, commune, délai, métiers, actions et candidature directe. Les images fournies par la présentation sont des illustrations synthétiques fictives, pas des photos de logements réels. Le demandeur choisit leur visibilité avant publication et peut retirer le partage. Les nouvelles inscriptions utilisent des domaines réservés de test ; la revue du profil artisan reste obligatoire.
+
+**Atelier 3D** permet d'activer un salon interactif, changer l'ambiance, comparer avant/après et préparer un exemple de demande. Ni plan, ni devis. Three.js est servi localement à la demande avec fallback sans WebGL. Voir [le compte rendu du chantier 03](CHANTIER_03_RESULTATS.md).
+
 1. Cliquer sur **Espace demandeur** : voir les projets, reprendre le brouillon de cuisine ou créer une demande en trois étapes.
 2. Ouvrir **Une salle de bains plus confortable** : comparer les deux candidatures fictives. Les informations présentées viennent des profils enregistrés ; aucun avis ni badge de vérification réelle n'est inventé.
 3. Cliquer sur **Espace artisan** : voir les opportunités correspondant à plomberie/carrelage et aux communes déclarées, filtrer et candidater.

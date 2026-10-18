@@ -1,5 +1,7 @@
 # Preuves de contrôle — Work 4.0.2
 
+Mise à jour du 17 octobre 2026 : suite complète 123 tests Python réussis, 29 tests JavaScript/DOM réussis, 61 contrôles navigateur répartis sur trois scénarios. Voir [le chantier 03](CHANTIER_03_RESULTATS.md) pour les commandes et limites. Les résultats du 16 octobre ci-dessous restent une preuve historique, pas les compteurs actuels.
+
 Exécution du 16 octobre 2026, heure de Paris, dans le fil Work existant. Données entièrement fictives et bases temporaires.
 
 | Contrôle | Résultat observé | Portée |

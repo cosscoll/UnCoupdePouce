@@ -754,7 +754,18 @@ def projects(user=Depends(get_user)):
                     rs.append(row)
         else:
             rs=[]
-    return {'items':[dict(x) for x in rs]}
+        items=[dict(x) for x in rs]
+        by_id={row['id']:row for row in items}
+        # Enrich only already-authorized projects; no requester identity/address.
+        for row in items:row.update(timing='flexible',actions=[],photos=[],photo_visibility='private')
+        for draft in c.execute('SELECT id,project_id,payload FROM drafts WHERE project_id IS NOT NULL'):
+            row=by_id.get(draft['project_id'])
+            if row is None:continue
+            payload=json.loads(draft['payload'])
+            row.update(timing=payload.get('timing','flexible'),actions=payload.get('actions',[]),photo_visibility=payload.get('photo_visibility','private'))
+            if user['role']=='requester' or payload.get('photo_visibility')=='matched':
+                row['photos']=[p[0] for p in c.execute('SELECT id FROM photos WHERE draft_id=? ORDER BY id',(draft['id'],))]
+    return {'items':items}
 
 @app.post('/api/projects/{project_id}/apply',status_code=201)
 def apply(project_id:int,user=Depends(require('professional'))):

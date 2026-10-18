@@ -30,7 +30,7 @@ L'application est un laboratoire local Python 3.12, FastAPI, Pydantic, Uvicorn e
 
 SQLite stocke notamment les utilisateurs, sessions, profils, projets, candidatures, messages, notifications, entreprises, brouillons, photos, signalements, décisions de modération, journal d'audit et codes de récupération. Une connexion est ouverte par opération ; les écritures sensibles sont transactionnelles. Les évolutions de schéma locales sont additives au démarrage, mais ne remplacent pas un système de migrations de production.
 
-L'application protège les écritures authentifiées par une session HttpOnly/SameSite et un jeton CSRF. Les accès privés revérifient l'état de session et les autorisations dans la transaction. Les photos restent privées et sont réencodées sans EXIF. Ces protections sont décrites en détail dans `ARCHITECTURE.md` et `AUDIT_SECURITE.md`.
+L'application protège les écritures authentifiées par une session HttpOnly/SameSite et un jeton CSRF. Les accès privés revérifient l'état de session et les autorisations dans la transaction. Les photos sont privées par défaut et réencodées sans EXIF. Depuis le chantier 03, un consentement explicite au stade brouillon permet leur partage aux artisans compatibles ; le demandeur peut retirer ce partage. Les anciennes photos restent privées. Voir `ARCHITECTURE.md`, `AUDIT_SECURITE.md` et `CHANTIER_03_RESULTATS.md`.
 
 ## 4. Fonctionnalités présentes et limites
 

@@ -1,7 +1,7 @@
 """Additive v4 features for the isolated UCP laboratory. No external services."""
 import base64, binascii, io, json, re, secrets, sqlite3, time, unicodedata
 from fastapi import Depends, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 class Draft(BaseModel):
@@ -10,7 +10,18 @@ class Draft(BaseModel):
     town: str = Field(default='',max_length=90)
     trades: list[str] = Field(default_factory=list,max_length=12)
     timing: str = Field(default='flexible',pattern='^(flexible|month|quarter|urgent)$')
+    actions: list[str] = Field(default_factory=list,max_length=12)
+    photo_visibility: str = Field(default='private',pattern='^(private|matched)$')
     version: int = Field(default=0,ge=0)
+    @field_validator('actions')
+    @classmethod
+    def actions_valid(cls,values):
+        cleaned=[]
+        for value in values:
+            value=value.strip()
+            if not value or len(value)>120:raise ValueError('Chaque action doit contenir entre 1 et 120 caractères')
+            if value not in cleaned:cleaned.append(value)
+        return cleaned
 class Photo(BaseModel):
     data: str = Field(max_length=6_000_000)
 class Report(BaseModel):
@@ -73,7 +84,9 @@ def install(m):
         if publishing:
             if not body.trades:error(422,'Choisissez un métier ou « Je ne sais pas »')
             # Reuse the tested v3 input/contact guards.
-            try:m.Project(title=body.title,description=body.description,town=body.town,trade=body.trades[0])
+            try:
+                m.Project(title=body.title,description=body.description,town=body.town,trade=body.trades[0])
+                if body.actions:m.precontact_safe(' '.join(body.actions))
             except ValueError:error(422,'Complétez le titre (5 caractères), la description (20) et la commune. Ne donnez pas de coordonnées directes.')
     def visible_project(c,id,user):
         row=c.execute('SELECT * FROM projects WHERE id=?',(id,)).fetchone()
@@ -166,12 +179,27 @@ def install(m):
         with m.authenticated_db(user,write=False) as c:
             r=c.execute('SELECT photos.body,drafts.owner_id,drafts.project_id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE photos.id=?',(id,)).fetchone()
             if not r:error(404,'Photo introuvable')
-            # Conservative privacy default: images only after explicit selection, never in discovery.
+            # Legacy/private attachments stay private. Discovery requires explicit opt-in
+            # AND current server-side project eligibility (including moderation).
             if r['owner_id']!=user['id'] and user['role']!='admin':
                 a=c.execute("SELECT id FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(r['project_id'],user['id'])).fetchone()
-                if not a:error(404,'Photo introuvable')
-                m.check_conversation(c,a['id'],user['id'])
+                if a:m.check_conversation(c,a['id'],user['id'])
+                else:
+                    draft=c.execute('SELECT payload FROM drafts WHERE project_id=?',(r['project_id'],)).fetchone()
+                    if user['role']!='professional' or not draft or json.loads(draft['payload']).get('photo_visibility')!='matched':error(404,'Photo introuvable')
+                    if r['project_id'] not in {p['id'] for p in m.projects(user)['items']}:error(404,'Photo introuvable')
             return Response(r['body'],media_type='image/jpeg',headers={'Cache-Control':'no-store'})
+
+    @app.post('/api/v4/projects/{id}/hide-previews')
+    def hide_previews(id:int,user=Depends(m.require('requester'))):
+        with m.authenticated_db(user,write=True) as c:
+            visible_project(c,id,user)
+            r=c.execute('SELECT id,payload FROM drafts WHERE project_id=? AND owner_id=?',(id,user['id'])).fetchone()
+            if not r:error(404,'Photos de projet introuvables')
+            payload=json.loads(r['payload']);payload['photo_visibility']='private'
+            c.execute('UPDATE drafts SET payload=?,version=version+1 WHERE id=?',(json.dumps(payload,ensure_ascii=False),r['id']))
+            audit(c,user,'hide_project_previews','project',id);c.execute('COMMIT')
+        return {'ok':True}
 
     @app.delete('/api/v4/photos/{id}')
     def remove_photo(id:int,user=Depends(m.require('requester'))):
@@ -190,8 +218,11 @@ def install(m):
             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
             row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at')};row['trades']=list(m.project_trades(r))
             draft=c.execute('SELECT payload FROM drafts WHERE project_id=?',(id,)).fetchone()
-            row['timing']=json.loads(draft['payload']).get('timing','flexible') if draft else 'flexible'
-            row['photos']=photos if user['role'] in ('requester','admin') or c.execute("SELECT 1 FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone() else []
+            payload=json.loads(draft['payload']) if draft else {}
+            row['timing']=payload.get('timing','flexible');row['actions']=payload.get('actions',[])
+            row['photo_visibility']=payload.get('photo_visibility','private')
+            selected=c.execute("SELECT 1 FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone()
+            row['photos']=photos if user['role'] in ('requester','admin') or selected or payload.get('photo_visibility')=='matched' else []
             return row
 
     @app.post('/api/v4/reports',status_code=201)

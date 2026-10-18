@@ -6,6 +6,10 @@ import os
 import secrets
 import sys
 import tempfile
+import base64
+import io
+
+from PIL import Image, ImageDraw, ImageFont
 
 from fastapi import Request, Response
 from fastapi.testclient import TestClient
@@ -56,8 +60,37 @@ def build_presentation(database: Path):
         ('Réparer une fuite sous un évier', ['plomberie'], 'Toulouse', 'urgent', 'Identifier et réparer une fuite fictive sous l’évier. Le meuble est accessible et le raccord devra être examiné par le professionnel.'),
     ]
     ids = []
-    for title, trades, town, timing, description in projects:
-        draft = checked(owner.post('/api/v4/drafts', json=dict(title=title, trades=trades, town=town, timing=timing, description=description)))
+    for index, (title, trades, town, timing, description) in enumerate(projects):
+        draft = checked(owner.post('/api/v4/drafts', json=dict(title=title, trades=trades, town=town, timing=timing, description=description,
+            actions=['Déposer les équipements à remplacer', 'Installer et vérifier les nouveaux équipements'] if index != 2 else ['Préparer les supports', 'Peindre les murs et le plafond'],
+            photo_visibility='matched' if index in (0,3) else 'private')))
+        if index in (0,3):
+            # Synthetic illustrations uploaded through the same API as requester images.
+            # No real dwelling, person, external asset or data is used.
+            for view in range(3):
+                image=Image.new('RGB',(960,640),'#F5F0EA');draw=ImageDraw.Draw(image)
+                draw.polygon([(90,180),(470,75),(870,190),(490,320)],fill='#E6DFD4')
+                draw.polygon([(90,180),(490,320),(490,560),(90,400)],fill='#DED7CD')
+                draw.polygon([(490,320),(870,190),(870,420),(490,560)],fill='#D3D8EB')
+                draw.polygon([(90,400),(490,560),(870,420),(470,300)],fill=['#CEAD86','#BDB7AB','#B0BCCD'][view])
+                for step in range(6):
+                    x=120+step*115;draw.line([(x,405+step*20),(x+300,310+step*17)],fill='#F5F0EA',width=3)
+                if index==0:
+                    draw.rounded_rectangle((190,305,530,440),radius=45,fill='#FFFFFF',outline='#505DC1',width=5)
+                    draw.rounded_rectangle((220,328,500,407),radius=30,fill='#D8EBEE')
+                    draw.rectangle((630,260,795,375),fill='#BC9776');draw.ellipse((630,230,795,292),fill='white',outline='#505DC1',width=4)
+                    draw.rounded_rectangle((650,140,785,225),radius=12,fill='#B8D2D7',outline='white',width=8)
+                else:
+                    draw.rectangle((280,240,670,470),fill='#BA9372');draw.rectangle((260,220,690,265),fill='white')
+                    draw.ellipse((350,225,600,260),fill='#D8E1EB',outline='#505DC1',width=4)
+                    draw.line([(470,225),(470,178),(515,178)],fill='#505DC1',width=10)
+                    draw.rectangle((305,280,645,445),fill='#20223B');draw.line([(470,280),(470,410),(535,410)],fill='#DDE1EF',width=15)
+                font=ImageFont.load_default(size=22)
+                draw.rounded_rectangle((24,24,134,74),radius=12,fill='#FF791D');draw.text((47,34),'UCP',fill='#20223B',font=font)
+                draw.text((24,592),f'Illustration fictive / vue {view+1} / aucun logement réel',fill='#20223B',font=font)
+                output=io.BytesIO();image.save(output,'JPEG',quality=85)
+                uploaded=checked(owner.post(f'/api/v4/drafts/{draft["id"]}/photos',json={'data':base64.b64encode(output.getvalue()).decode()}))
+                draft['version']=uploaded['version']
         project = checked(owner.post(f'/api/v4/drafts/{draft["id"]}/publish', json=dict(version=draft['version'])))
         ids.append(project['id'])
     for client in (artisan, second):
