@@ -236,6 +236,30 @@ test('le telechargement cree le fichier puis libere son URL objet',()=>{
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
 
+test('le telechargement replie sur appendChild si body.append echoue',()=>{
+  let clicks=0;
+  let inserted=0;
+  const revoked=[];
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{
+      createObjectURL(){return 'blob:ucp-brief';},
+      revokeObjectURL(url){revoked.push(url);}
+    },
+    bodyAppendThrows:true,
+    onAppend(){inserted+=1;},
+    onClick(){clicks+=1;},
+    setTimeout(callback){callback();}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(inserted,1);
+  assert.equal(clicks,1);
+  assert.deepEqual(revoked,['blob:ucp-brief']);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
+
 
 test('un echec apres creation de l URL objet la libere immediatement',()=>{
   const revoked=[];
