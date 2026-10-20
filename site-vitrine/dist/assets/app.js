@@ -44,7 +44,14 @@
     const list=document.getElementById('brief-checklist');
     if(typeof list.replaceChildren==='function')list.replaceChildren();
     else list.textContent='';
-    brief.checklist.forEach(text=>{const li=document.createElement('li');li.textContent=text;list.append(li);});
+    brief.checklist.forEach(text=>{
+      const li=document.createElement('li');li.textContent=text;
+      let appended=false;
+      if(typeof list.append==='function'){
+        try{list.append(li);appended=true;}catch{}
+      }
+      if(!appended&&typeof list.appendChild==='function')list.appendChild(li);
+    });
     if(announce)status.textContent='Votre exemple est prêt. Vous pouvez le copier ou le télécharger.';
   }
   form.addEventListener('change',()=>{update(false);status.textContent='Exemple mis à jour selon vos choix.';});
