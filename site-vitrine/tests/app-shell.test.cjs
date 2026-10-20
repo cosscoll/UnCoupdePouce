@@ -253,3 +253,19 @@ test('le telechargement nettoie le lien sans Element.remove',()=>{
   assert.equal(legacyRemovals,1);
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
+
+
+test('le telechargement utilise removeChild si Element.remove echoue',()=>{
+  let legacyRemovals=0;
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{createObjectURL(){return 'blob:ucp-brief';},revokeObjectURL(){}},
+    linkRemoveThrows:true,
+    onLegacyRemove(){legacyRemovals+=1;}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(legacyRemovals,1);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
