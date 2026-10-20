@@ -76,7 +76,7 @@
           try{field.remove();fieldRemoved=true;}catch{}
         }
         if(!fieldRemoved&&field.parentNode&&typeof field.parentNode.removeChild==='function'){
-          field.parentNode.removeChild(field);
+          try{field.parentNode.removeChild(field);}catch{}
         }
       }
     }

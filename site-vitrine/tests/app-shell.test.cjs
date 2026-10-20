@@ -107,7 +107,9 @@ function runBriefApp(list,environment={}){
     addEventListener(){},
     execCommand:environment.execCommand,
     body:{append(link){
-      link.parentNode={removeChild(node){if(environment.onLegacyRemove)environment.onLegacyRemove(node);}};
+      link.parentNode=environment.legacyRemoveChild===false
+        ?{}
+        :{removeChild(node){if(environment.onLegacyRemove)environment.onLegacyRemove(node);}};
       if(environment.onAppend)environment.onAppend(link);
     }}
   };
@@ -242,6 +244,28 @@ test('la copie utilise removeChild si textarea.remove echoue',async()=>{
   });
   await assert.doesNotReject(()=>listeners['copy-brief:click']());
   assert.equal(legacyRemovals,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('une erreur removeChild ne transforme pas une copie reussie en echec',async()=>{
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    execCommand(command){return command==='copy';},
+    textareaRemove:false,
+    onLegacyRemove(){throw new Error('removeChild refuse');}
+  });
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('l absence totale de removeChild ne rejette pas la copie',async()=>{
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    execCommand(command){return command==='copy';},
+    textareaRemove:false,
+    legacyRemoveChild:false
+  });
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
   assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
 });
 
