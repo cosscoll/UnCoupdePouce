@@ -160,3 +160,21 @@ test('le telechargement cree le fichier puis libere son URL objet',()=>{
   assert.deepEqual(revoked,['blob:ucp-brief']);
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
+
+
+test('un echec apres creation de l URL objet la libere immediatement',()=>{
+  const revoked=[];
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{
+      createObjectURL(){return 'blob:ucp-brief';},
+      revokeObjectURL(url){revoked.push(url);}
+    },
+    onClick(){throw new Error('clic programmatique refuse');}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.deepEqual(revoked,['blob:ucp-brief']);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.');
+});
