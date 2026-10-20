@@ -6,7 +6,7 @@
   const closeMenu=()=>{if(!menu||!nav)return;menu.setAttribute('aria-expanded','false');nav.classList.remove('is-open');};
   if(menu&&nav){
     menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));nav.classList.toggle('is-open',open);});
-    nav.querySelectorAll('a').forEach(link=>link.addEventListener('click',closeMenu));
+    Array.from(nav.querySelectorAll('a')).forEach(link=>link.addEventListener('click',closeMenu));
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu.getAttribute('aria-expanded')==='true'){closeMenu();menu.focus();}});
     document.addEventListener('click',event=>{if(!nav.contains(event.target)&&!menu.contains(event.target))closeMenu();});
     const wideViewport=typeof window.matchMedia==='function'?window.matchMedia('(min-width: 761px)'):null;
