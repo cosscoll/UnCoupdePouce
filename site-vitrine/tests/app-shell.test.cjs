@@ -50,38 +50,56 @@ test('l absence de matchMedia ne bloque pas le reste du script',()=>{
 });
 
 
-function runBriefApp(list){
+function runBriefApp(list,environment={}){
   const listeners={};
-  const makeControl=value=>({value,textContent:'',addEventListener(type,callback){listeners[type]=callback;}});
+  const links=[];
+  const makeControl=(id,value)=>({value,textContent:'',addEventListener(type,callback){listeners[id+':'+type]=callback;}});
   const elements={
-    'brief-form':makeControl(),
-    'project-type':makeControl('peinture'),
-    'project-state':makeControl('idee'),
-    'project-timing':makeControl('flexible'),
-    'brief-status':makeControl(),
-    'brief-title':makeControl(),
-    'brief-trade':makeControl(),
-    'brief-state':makeControl(),
-    'brief-timing':makeControl(),
+    'brief-form':makeControl('brief-form'),
+    'project-type':makeControl('project-type','peinture'),
+    'project-state':makeControl('project-state','idee'),
+    'project-timing':makeControl('project-timing','flexible'),
+    'brief-status':makeControl('brief-status'),
+    'brief-title':makeControl('brief-title'),
+    'brief-trade':makeControl('brief-trade'),
+    'brief-state':makeControl('brief-state'),
+    'brief-timing':makeControl('brief-timing'),
     'brief-checklist':list,
-    'copy-brief':makeControl(),
-    'download-brief':makeControl()
+    'copy-brief':makeControl('copy-brief'),
+    'download-brief':makeControl('download-brief')
   };
   const document={
     documentElement:{classList:{remove(){}}},
     querySelector(){return null;},
     querySelectorAll(){return [];},
     getElementById(id){return elements[id]||null;},
-    createElement(){return {textContent:''};},
+    createElement(tag){
+      if(tag==='a'){
+        const link={
+          click(){if(environment.onClick)environment.onClick();},
+          remove(){if(environment.onRemove)environment.onRemove();}
+        };
+        links.push(link);
+        return link;
+      }
+      return {textContent:''};
+    },
     addEventListener(){},
-    body:{append(){}}
+    body:{append(link){if(environment.onAppend)environment.onAppend(link);}}
   };
   const window={UCPBrief:{
     create(){return {title:'Titre',trade:'Métier',state:'État',timing:'Horizon',checklist:['Un','Deux','Trois']};},
     toText(){return 'Brief';}
   }};
-  vm.runInNewContext(source,{document,window});
-  return {elements,listeners};
+  vm.runInNewContext(source,{
+    document,
+    window,
+    navigator:{},
+    Blob:environment.Blob,
+    URL:environment.URL,
+    setTimeout:environment.setTimeout||(()=>{})
+  });
+  return {elements,listeners,links};
 }
 
 test('le brief fonctionne sans Element.replaceChildren',()=>{
@@ -113,4 +131,50 @@ test('le chemin moderne continue d utiliser replaceChildren',()=>{
   runBriefApp(list);
   assert.equal(clears,1);
   assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
+});
+
+test('le telechargement indisponible propose la copie sans interrompre le parcours',()=>{
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list);
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.');
+});
+
+test('le telechargement cree le fichier puis libere son URL objet',()=>{
+  let clicks=0;
+  const revoked=[];
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners,links}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{
+      createObjectURL(){return 'blob:ucp-brief';},
+      revokeObjectURL(url){revoked.push(url);}
+    },
+    onClick(){clicks+=1;},
+    setTimeout(callback){callback();}
+  });
+  listeners['download-brief:click']();
+  assert.equal(clicks,1);
+  assert.equal(links[0].download,'UCP-mon-exemple-de-brief.txt');
+  assert.deepEqual(revoked,['blob:ucp-brief']);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
+
+
+test('un echec apres creation de l URL objet la libere immediatement',()=>{
+  const revoked=[];
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{
+      createObjectURL(){return 'blob:ucp-brief';},
+      revokeObjectURL(url){revoked.push(url);}
+    },
+    onClick(){throw new Error('clic programmatique refuse');}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.deepEqual(revoked,['blob:ucp-brief']);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.');
 });

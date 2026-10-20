@@ -56,8 +56,19 @@
   });
   document.getElementById('download-brief').addEventListener('click',()=>{
     update(false);
-    const blob=new Blob(['\uFEFF'+window.UCPBrief.toText(brief)],{type:'text/plain;charset=utf-8'});
-    const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download='UCP-mon-exemple-de-brief.txt';document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);status.textContent='Le téléchargement du brief a été déclenché.';
+    let url=null;
+    try{
+      if(typeof Blob!=='function'||typeof URL==='undefined'||typeof URL.createObjectURL!=='function')throw new Error('download unavailable');
+      const blob=new Blob(['\uFEFF'+window.UCPBrief.toText(brief)],{type:'text/plain;charset=utf-8'});
+      url=URL.createObjectURL(blob);
+      const link=document.createElement('a');
+      link.href=url;link.download='UCP-mon-exemple-de-brief.txt';document.body.append(link);link.click();link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      status.textContent='Le téléchargement du brief a été déclenché.';
+    }catch{
+      if(url&&typeof URL!=='undefined'&&typeof URL.revokeObjectURL==='function')URL.revokeObjectURL(url);
+      status.textContent='Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.';
+    }
   });
   update(false);
 })();
