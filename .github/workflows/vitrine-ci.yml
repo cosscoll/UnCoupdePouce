@@ -1,0 +1,25 @@
+name: Vitrine CI
+
+on:
+  pull_request:
+    paths:
+      - "site-vitrine/**"
+      - ".github/workflows/vitrine-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  static-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Vérifier la structure statique
+        run: python site-vitrine/scripts/check_site.py
+      - name: Vérifier la syntaxe JavaScript
+        run: |
+          node --check site-vitrine/dist/assets/app.js
+          node --check site-vitrine/dist/assets/brief.js
+      - name: Exécuter les tests du générateur de brief
+        run: node --test site-vitrine/tests/brief.test.cjs
