@@ -41,7 +41,9 @@
   function update(announce){
     brief=window.UCPBrief.create(type.value,state.value,timing.value);
     for(const key of ['title','trade','state','timing']) document.getElementById('brief-'+key).textContent=brief[key];
-    const list=document.getElementById('brief-checklist');list.replaceChildren();
+    const list=document.getElementById('brief-checklist');
+    if(typeof list.replaceChildren==='function')list.replaceChildren();
+    else list.textContent='';
     brief.checklist.forEach(text=>{const li=document.createElement('li');li.textContent=text;list.append(li);});
     if(announce)status.textContent='Votre exemple est prêt. Vous pouvez le copier ou le télécharger.';
   }
