@@ -45,6 +45,16 @@ test('le menu accepte une collection de liens legacy sans forEach',()=>{
   assert.equal(typeof clickListener,'function');
 });
 
+test('le menu lie toujours chaque lien d une collection moderne',()=>{
+  let registrations=0;
+  const links=[
+    {addEventListener(name){if(name==='click')registrations+=1;}},
+    {addEventListener(name){if(name==='click')registrations+=1;}}
+  ];
+  assert.doesNotThrow(()=>runApp(undefined,links));
+  assert.equal(registrations,2);
+});
+
 test('le menu conserve l API MediaQueryList moderne',()=>{
   let eventName=null;
   let listener=null;
