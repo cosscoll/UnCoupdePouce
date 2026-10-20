@@ -25,5 +25,5 @@ jobs:
         run: |
           node --check site-vitrine/dist/assets/app.js
           node --check site-vitrine/dist/assets/brief.js
-      - name: Exécuter les tests du générateur de brief
-        run: node --test site-vitrine/tests/brief.test.cjs
+      - name: Exécuter les tests JavaScript de la vitrine
+        run: node --test site-vitrine/tests/*.test.cjs
