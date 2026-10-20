@@ -46,6 +46,17 @@ for f,p in pages.items():
             check(dest.is_file(),f'ressource absente {u}')
             if parts.fragment and dest in pages:check(unquote(parts.fragment) in pages[dest].ids,f'ancre absente {u}')
     results.append({'page':label,'checks':checks,'h1':p.h1,'lang':p.lang})
+avancement=pages.get((DIST/'avancement.html').resolve())
+if not avancement:
+    errors.append('avancement.html absent')
+else:
+    menu=next((a for t,a in avancement.nodes if t=='button' and 'menu-toggle' in a.get('class','').split()),None)
+    nav=next((a for t,a in avancement.nodes if t=='nav' and a.get('id')=='main-nav'),None)
+    app_script=next((a for t,a in avancement.nodes if t=='script' and a.get('src')=='assets/app.js'),None)
+    if not menu:errors.append('avancement.html: bouton de navigation mobile absent')
+    elif menu.get('aria-controls')!='main-nav' or menu.get('aria-expanded')!='false':errors.append('avancement.html: contrat ARIA du menu mobile invalide')
+    if not nav:errors.append('avancement.html: navigation #main-nav absente')
+    if not app_script:errors.append('avancement.html: script du menu mobile absent')
 if not (DIST/'assets/social.png').is_file():errors.append('Image Open Graph absente')
 css=(DIST/'assets/style.css').read_text()
 for ref in re.findall(r'url\([\"\']?([^\)\"\']+)',css):
