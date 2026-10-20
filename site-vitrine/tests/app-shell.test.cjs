@@ -211,3 +211,21 @@ test('la copie indisponible conserve le repli vers le telechargement',async()=>{
   await listeners['copy-brief:click']();
   assert.equal(elements['brief-status'].textContent,'La copie n’est pas disponible ici. Utilisez « Télécharger en .txt » pour conserver votre brief.');
 });
+
+
+test('un rejet de Clipboard API bascule vers le repli historique',async()=>{
+  let modernAttempts=0;
+  let legacyAttempts=0;
+  let removed=0;
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    navigator:{clipboard:{writeText(){modernAttempts+=1;return Promise.reject(new Error('permission refusee'));}}},
+    execCommand(command){legacyAttempts+=1;return command==='copy';},
+    onTextareaRemove(){removed+=1;}
+  });
+  await listeners['copy-brief:click']();
+  assert.equal(modernAttempts,1);
+  assert.equal(legacyAttempts,1);
+  assert.equal(removed,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
