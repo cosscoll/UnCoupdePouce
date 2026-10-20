@@ -91,3 +91,26 @@ test('le brief fonctionne sans Element.replaceChildren',()=>{
   assert.doesNotThrow(()=>runBriefApp(list));
   assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
 });
+
+
+test('le repli efface les anciens conseils avant de regenerer le brief',()=>{
+  const children=[{textContent:'Ancien conseil'}];
+  let clears=0;
+  const list={append(node){children.push(node);}};
+  Object.defineProperty(list,'textContent',{set(){clears+=1;children.length=0;}});
+  runBriefApp(list);
+  assert.equal(clears,1);
+  assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
+});
+
+test('le chemin moderne continue d utiliser replaceChildren',()=>{
+  const children=[{textContent:'Ancien conseil'}];
+  let clears=0;
+  const list={
+    replaceChildren(){clears+=1;children.length=0;},
+    append(node){children.push(node);}
+  };
+  runBriefApp(list);
+  assert.equal(clears,1);
+  assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
+});
