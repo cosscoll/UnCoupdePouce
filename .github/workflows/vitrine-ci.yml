@@ -15,6 +15,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+      - name: Vérifier la synchronisation du générateur
+        run: |
+          python site-vitrine/build.py
+          git diff --exit-code -- site-vitrine/dist
       - name: Vérifier la structure statique
         run: python site-vitrine/scripts/check_site.py
       - name: Vérifier la syntaxe JavaScript

@@ -71,6 +71,21 @@ else:
         'https://cosscoll.github.io/Avancement-Projet/#/ucp/overview',
     ]:
         if expected not in proof_links:errors.append('avancement.html: lien de preuve absent : '+expected)
+project_fr=pages.get((DIST/'projet.html').resolve())
+project_en=pages.get((DIST/'en/index.html').resolve())
+progress_url='https://cosscoll.github.io/Avancement-Projet/#/ucp/overview'
+for label,page,required in [
+    ('projet.html',project_fr,'Situation de pré-lancement · voir les preuves publiques'),
+    ('en/index.html',project_en,'Current evidence and delivery limits are recorded'),
+]:
+    if not page:errors.append(label+': page projet absente')
+    else:
+        text=' '.join(' '.join(page.text).split())
+        if required not in text:errors.append(label+': statut de projet durable absent')
+        if not any(t=='a' and a.get('href')==progress_url for t,a in page.nodes):errors.append(label+': lien vers les preuves publiques absent')
+for f,page in pages.items():
+    visible=' '.join(' '.join(page.text).split())
+    if '14 octobre 2026' in visible or '14 October 2026' in visible:errors.append(str(f.relative_to(DIST))+': date éditoriale périmée')
 if not (DIST/'assets/social.png').is_file():errors.append('Image Open Graph absente')
 css=(DIST/'assets/style.css').read_text()
 for ref in re.findall(r'url\([\"\']?([^\)\"\']+)',css):
