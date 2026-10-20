@@ -57,6 +57,7 @@ else:
     elif menu.get('aria-controls')!='main-nav' or menu.get('aria-expanded')!='false':errors.append('avancement.html: contrat ARIA du menu mobile invalide')
     if not nav:errors.append('avancement.html: navigation #main-nav absente')
     if not app_script:errors.append('avancement.html: script du menu mobile absent')
+    if not any(t=='a' and a.get('class')=='skip' and a.get('href')=='#main' for t,a in avancement.nodes):errors.append('avancement.html: lien d’évitement non stylable absent')
 if not (DIST/'assets/social.png').is_file():errors.append('Image Open Graph absente')
 css=(DIST/'assets/style.css').read_text()
 for ref in re.findall(r'url\([\"\']?([^\)\"\']+)',css):
