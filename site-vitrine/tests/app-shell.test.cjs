@@ -82,9 +82,19 @@ function runBriefApp(list,environment={}){
         links.push(link);
         return link;
       }
+      if(tag==='textarea'){
+        return {
+          value:'',
+          style:{},
+          setAttribute(){},
+          select(){if(environment.onSelect)environment.onSelect();},
+          remove(){if(environment.onTextareaRemove)environment.onTextareaRemove();}
+        };
+      }
       return {textContent:''};
     },
     addEventListener(){},
+    execCommand:environment.execCommand,
     body:{append(link){if(environment.onAppend)environment.onAppend(link);}}
   };
   const window={UCPBrief:{
@@ -94,7 +104,7 @@ function runBriefApp(list,environment={}){
   vm.runInNewContext(source,{
     document,
     window,
-    navigator:{},
+    navigator:environment.navigator||{},
     Blob:environment.Blob,
     URL:environment.URL,
     setTimeout:environment.setTimeout||(()=>{})
@@ -177,4 +187,45 @@ test('un echec apres creation de l URL objet la libere immediatement',()=>{
   assert.doesNotThrow(()=>listeners['download-brief:click']());
   assert.deepEqual(revoked,['blob:ucp-brief']);
   assert.equal(elements['brief-status'].textContent,'Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.');
+});
+
+
+test('la copie utilise le repli historique quand Clipboard API est absente',async()=>{
+  let selected=0;
+  let removed=0;
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    execCommand(command){return command==='copy';},
+    onSelect(){selected+=1;},
+    onTextareaRemove(){removed+=1;}
+  });
+  await listeners['copy-brief:click']();
+  assert.equal(selected,1);
+  assert.equal(removed,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('la copie indisponible conserve le repli vers le telechargement',async()=>{
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list);
+  await listeners['copy-brief:click']();
+  assert.equal(elements['brief-status'].textContent,'La copie n’est pas disponible ici. Utilisez « Télécharger en .txt » pour conserver votre brief.');
+});
+
+
+test('un rejet de Clipboard API bascule vers le repli historique',async()=>{
+  let modernAttempts=0;
+  let legacyAttempts=0;
+  let removed=0;
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    navigator:{clipboard:{writeText(){modernAttempts+=1;return Promise.reject(new Error('permission refusee'));}}},
+    execCommand(command){legacyAttempts+=1;return command==='copy';},
+    onTextareaRemove(){removed+=1;}
+  });
+  await listeners['copy-brief:click']();
+  assert.equal(modernAttempts,1);
+  assert.equal(legacyAttempts,1);
+  assert.equal(removed,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
 });

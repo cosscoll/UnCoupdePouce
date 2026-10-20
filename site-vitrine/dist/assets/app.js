@@ -51,8 +51,27 @@
   form.addEventListener('submit',event=>{event.preventDefault();update(true);});
   document.getElementById('copy-brief').addEventListener('click',async()=>{
     update(false);
-    try{if(!navigator.clipboard||!navigator.clipboard.writeText)throw new Error('clipboard unavailable');await navigator.clipboard.writeText(window.UCPBrief.toText(brief));status.textContent='Brief copié dans votre presse-papiers.';}
-    catch{status.textContent='La copie n’est pas disponible ici. Utilisez « Télécharger en .txt » pour conserver votre brief.';}
+    const text=window.UCPBrief.toText(brief);
+    try{
+      if(typeof navigator!=='undefined'&&navigator.clipboard&&typeof navigator.clipboard.writeText==='function'){
+        await navigator.clipboard.writeText(text);
+        status.textContent='Brief copié dans votre presse-papiers.';
+        return;
+      }
+    }catch{}
+    let field=null;
+    try{
+      if(typeof document.execCommand!=='function')throw new Error('clipboard unavailable');
+      field=document.createElement('textarea');
+      field.value=text;field.setAttribute('readonly','');field.style.position='fixed';field.style.opacity='0';
+      document.body.append(field);field.select();
+      if(!document.execCommand('copy'))throw new Error('copy rejected');
+      status.textContent='Brief copié dans votre presse-papiers.';
+    }catch{
+      status.textContent='La copie n’est pas disponible ici. Utilisez « Télécharger en .txt » pour conserver votre brief.';
+    }finally{
+      if(field&&typeof field.remove==='function')field.remove();
+    }
   });
   document.getElementById('download-brief').addEventListener('click',()=>{
     update(false);
