@@ -38,6 +38,16 @@
   const timing=document.getElementById('project-timing');
   const status=document.getElementById('brief-status');
   let brief=window.UCPBrief.create(type.value,state.value,timing.value);
+  function appendTemporaryNode(node){
+    let appended=false;
+    if(typeof document.body.append==='function'){
+      try{document.body.append(node);appended=true;}catch{}
+    }
+    if(!appended&&typeof document.body.appendChild==='function'){
+      document.body.appendChild(node);appended=true;
+    }
+    if(!appended)throw new Error('DOM append unavailable');
+  }
   function update(announce){
     brief=window.UCPBrief.create(type.value,state.value,timing.value);
     for(const key of ['title','trade','state','timing']) document.getElementById('brief-'+key).textContent=brief[key];
@@ -71,7 +81,7 @@
       if(typeof document.execCommand!=='function')throw new Error('clipboard unavailable');
       field=document.createElement('textarea');
       field.value=text;field.setAttribute('readonly','');field.style.position='fixed';field.style.opacity='0';
-      document.body.append(field);field.select();
+      appendTemporaryNode(field);field.select();
       if(!document.execCommand('copy'))throw new Error('copy rejected');
       status.textContent='Brief copié dans votre presse-papiers.';
     }catch{
@@ -96,7 +106,7 @@
       const blob=new Blob(['\uFEFF'+window.UCPBrief.toText(brief)],{type:'text/plain;charset=utf-8'});
       url=URL.createObjectURL(blob);
       const link=document.createElement('a');
-      link.href=url;link.download='UCP-mon-exemple-de-brief.txt';document.body.append(link);link.click();
+      link.href=url;link.download='UCP-mon-exemple-de-brief.txt';appendTemporaryNode(link);link.click();
       let linkRemoved=false;
       if(typeof link.remove==='function'){
         try{link.remove();linkRemoved=true;}catch{}
