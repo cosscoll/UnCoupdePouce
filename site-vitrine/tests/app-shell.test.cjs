@@ -26,7 +26,8 @@ function runApp(matchMedia){
     getElementById(){return null;},
     addEventListener(){}
   };
-  const window={matchMedia};
+  const window={};
+  if(matchMedia)window.matchMedia=matchMedia;
   vm.runInNewContext(source,{document,window});
 }
 
@@ -42,4 +43,8 @@ test('le menu conserve l API MediaQueryList moderne',()=>{
   runApp(()=>({addEventListener(name,callback){eventName=name;listener=callback;}}));
   assert.equal(eventName,'change');
   assert.equal(typeof listener,'function');
+});
+
+test('l absence de matchMedia ne bloque pas le reste du script',()=>{
+  assert.doesNotThrow(()=>runApp());
 });
