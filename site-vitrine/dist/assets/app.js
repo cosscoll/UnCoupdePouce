@@ -70,7 +70,15 @@
     }catch{
       status.textContent='La copie n’est pas disponible ici. Utilisez « Télécharger en .txt » pour conserver votre brief.';
     }finally{
-      if(field&&typeof field.remove==='function')field.remove();
+      if(field){
+        let fieldRemoved=false;
+        if(typeof field.remove==='function'){
+          try{field.remove();fieldRemoved=true;}catch{}
+        }
+        if(!fieldRemoved&&field.parentNode&&typeof field.parentNode.removeChild==='function'){
+          field.parentNode.removeChild(field);
+        }
+      }
     }
   });
   document.getElementById('download-brief').addEventListener('click',()=>{
