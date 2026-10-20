@@ -232,6 +232,19 @@ test('la copie nettoie le champ sans Element.remove',async()=>{
   assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
 });
 
+test('la copie utilise removeChild si textarea.remove echoue',async()=>{
+  let legacyRemovals=0;
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    execCommand(command){return command==='copy';},
+    textareaRemoveThrows:true,
+    onLegacyRemove(){legacyRemovals+=1;}
+  });
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(legacyRemovals,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
 test('la copie indisponible conserve le repli vers le telechargement',async()=>{
   const list={replaceChildren(){},append(){}};
   const {elements,listeners}=runBriefApp(list);
