@@ -9,7 +9,11 @@
     nav.querySelectorAll('a').forEach(link=>link.addEventListener('click',closeMenu));
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu.getAttribute('aria-expanded')==='true'){closeMenu();menu.focus();}});
     document.addEventListener('click',event=>{if(!nav.contains(event.target)&&!menu.contains(event.target))closeMenu();});
-    window.matchMedia('(min-width: 761px)').addEventListener('change',closeMenu);
+    const wideViewport=typeof window.matchMedia==='function'?window.matchMedia('(min-width: 761px)'):null;
+    if(wideViewport){
+      if(typeof wideViewport.addEventListener==='function')wideViewport.addEventListener('change',closeMenu);
+      else if(typeof wideViewport.addListener==='function')wideViewport.addListener(closeMenu);
+    }
   }
   const tabs=Array.from(document.querySelectorAll('[role="tab"]'));
   function activateTab(tab,focus){
