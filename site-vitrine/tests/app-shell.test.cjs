@@ -76,9 +76,14 @@ function runBriefApp(list,environment={}){
     createElement(tag){
       if(tag==='a'){
         const link={
-          click(){if(environment.onClick)environment.onClick();},
-          remove(){if(environment.onRemove)environment.onRemove();}
+          click(){if(environment.onClick)environment.onClick();}
         };
+        if(environment.linkRemove!==false){
+          link.remove=()=>{
+            if(environment.linkRemoveThrows)throw new Error('remove indisponible');
+            if(environment.onRemove)environment.onRemove();
+          };
+        }
         links.push(link);
         return link;
       }
@@ -95,7 +100,10 @@ function runBriefApp(list,environment={}){
     },
     addEventListener(){},
     execCommand:environment.execCommand,
-    body:{append(link){if(environment.onAppend)environment.onAppend(link);}}
+    body:{append(link){
+      link.parentNode={removeChild(node){if(environment.onLegacyRemove)environment.onLegacyRemove(node);}};
+      if(environment.onAppend)environment.onAppend(link);
+    }}
   };
   const window={UCPBrief:{
     create(){return {title:'Titre',trade:'Métier',state:'État',timing:'Horizon',checklist:['Un','Deux','Trois']};},
@@ -228,4 +236,20 @@ test('un rejet de Clipboard API bascule vers le repli historique',async()=>{
   assert.equal(legacyAttempts,1);
   assert.equal(removed,1);
   assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+
+test('le telechargement nettoie le lien sans Element.remove',()=>{
+  let legacyRemovals=0;
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners,links}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{createObjectURL(){return 'blob:ucp-brief';},revokeObjectURL(){}},
+    linkRemove:false,
+    onLegacyRemove(node){legacyRemovals+=1;assert.equal(node,links[0]);}
+  });
+  listeners['download-brief:click']();
+  assert.equal(legacyRemovals,1);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
