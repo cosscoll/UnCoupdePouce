@@ -124,13 +124,21 @@ function runBriefApp(list,environment={}){
     },
     addEventListener(){},
     execCommand:environment.execCommand,
-    body:{append(link){
-      link.parentNode=environment.legacyRemoveChild===false
-        ?{}
-        :{removeChild(node){if(environment.onLegacyRemove)environment.onLegacyRemove(node);}};
-      if(environment.onAppend)environment.onAppend(link);
-    }}
+    body:{}
   };
+  const attachToBody=node=>{
+    node.parentNode=environment.legacyRemoveChild===false
+      ?{}
+      :{removeChild(child){if(environment.onLegacyRemove)environment.onLegacyRemove(child);}};
+    if(environment.onAppend)environment.onAppend(node);
+  };
+  if(environment.bodyAppend!==false){
+    document.body.append=node=>{
+      if(environment.bodyAppendThrows)throw new Error('append indisponible');
+      attachToBody(node);
+    };
+  }
+  if(environment.bodyAppendChild!==false)document.body.appendChild=attachToBody;
   const window={UCPBrief:{
     create(){return {title:'Titre',trade:'Métier',state:'État',timing:'Horizon',checklist:['Un','Deux','Trois']};},
     toText(){return 'Brief';}
@@ -259,6 +267,19 @@ test('la copie utilise le repli historique quand Clipboard API est absente',asyn
   await listeners['copy-brief:click']();
   assert.equal(selected,1);
   assert.equal(removed,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('la copie insere le champ sans document.body.append',async()=>{
+  let inserted=0;
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    bodyAppend:false,
+    execCommand(command){return command==='copy';},
+    onAppend(){inserted+=1;}
+  });
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(inserted,1);
   assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
 });
 
