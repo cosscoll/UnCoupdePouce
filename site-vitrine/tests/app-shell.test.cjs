@@ -48,3 +48,46 @@ test('le menu conserve l API MediaQueryList moderne',()=>{
 test('l absence de matchMedia ne bloque pas le reste du script',()=>{
   assert.doesNotThrow(()=>runApp());
 });
+
+
+function runBriefApp(list){
+  const listeners={};
+  const makeControl=value=>({value,textContent:'',addEventListener(type,callback){listeners[type]=callback;}});
+  const elements={
+    'brief-form':makeControl(),
+    'project-type':makeControl('peinture'),
+    'project-state':makeControl('idee'),
+    'project-timing':makeControl('flexible'),
+    'brief-status':makeControl(),
+    'brief-title':makeControl(),
+    'brief-trade':makeControl(),
+    'brief-state':makeControl(),
+    'brief-timing':makeControl(),
+    'brief-checklist':list,
+    'copy-brief':makeControl(),
+    'download-brief':makeControl()
+  };
+  const document={
+    documentElement:{classList:{remove(){}}},
+    querySelector(){return null;},
+    querySelectorAll(){return [];},
+    getElementById(id){return elements[id]||null;},
+    createElement(){return {textContent:''};},
+    addEventListener(){},
+    body:{append(){}}
+  };
+  const window={UCPBrief:{
+    create(){return {title:'Titre',trade:'Métier',state:'État',timing:'Horizon',checklist:['Un','Deux','Trois']};},
+    toText(){return 'Brief';}
+  }};
+  vm.runInNewContext(source,{document,window});
+  return {elements,listeners};
+}
+
+test('le brief fonctionne sans Element.replaceChildren',()=>{
+  const children=[];
+  const list={append(node){children.push(node);}};
+  Object.defineProperty(list,'textContent',{set(){children.length=0;}});
+  assert.doesNotThrow(()=>runBriefApp(list));
+  assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
+});
