@@ -59,7 +59,7 @@ else:
     if not app_script:errors.append('avancement.html: script du menu mobile absent')
     if not any(t=='a' and a.get('class')=='skip' and a.get('href')=='#main' for t,a in avancement.nodes):errors.append('avancement.html: lien d’évitement non stylable absent')
     visible_text=' '.join(' '.join(avancement.text).split())
-    required_text=['20 octobre 2026','QA-54','415 contrôles synthétiques','plateforme n\'est pas encore ouverte au public']
+    required_text=['20 octobre 2026','QA-54','415 contrôles synthétiques','plateforme n\'est pas encore ouverte au public','Ces contrôles n\'incluent pas de navigateur réel.']
     for expected in required_text:
         if expected not in visible_text:errors.append('avancement.html: preuve publique absente : '+expected)
     if '16 octobre 2026' in visible_text:errors.append('avancement.html: date obsolète encore publiée')
