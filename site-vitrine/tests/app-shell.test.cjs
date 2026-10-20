@@ -177,6 +177,16 @@ test('le chemin moderne continue d utiliser replaceChildren',()=>{
   assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
 });
 
+test('le brief ajoute les conseils sans Element.append',()=>{
+  const children=[];
+  const list={
+    replaceChildren(){children.length=0;},
+    appendChild(node){children.push(node);}
+  };
+  assert.doesNotThrow(()=>runBriefApp(list));
+  assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
+});
+
 test('le telechargement indisponible propose la copie sans interrompre le parcours',()=>{
   const list={replaceChildren(){},append(){}};
   const {elements,listeners}=runBriefApp(list);
