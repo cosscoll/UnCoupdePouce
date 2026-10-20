@@ -81,7 +81,15 @@
       const blob=new Blob(['\uFEFF'+window.UCPBrief.toText(brief)],{type:'text/plain;charset=utf-8'});
       url=URL.createObjectURL(blob);
       const link=document.createElement('a');
-      link.href=url;link.download='UCP-mon-exemple-de-brief.txt';document.body.append(link);link.click();link.remove();
+      link.href=url;link.download='UCP-mon-exemple-de-brief.txt';document.body.append(link);link.click();
+      let linkRemoved=false;
+      if(typeof link.remove==='function'){
+        try{link.remove();linkRemoved=true;}catch{}
+      }
+      if(!linkRemoved&&link.parentNode&&typeof link.parentNode.removeChild==='function'){
+        link.parentNode.removeChild(link);linkRemoved=true;
+      }
+      if(!linkRemoved)throw new Error('download link cleanup unavailable');
       setTimeout(()=>URL.revokeObjectURL(url),1000);
       status.textContent='Le téléchargement du brief a été déclenché.';
     }catch{
