@@ -88,13 +88,19 @@ function runBriefApp(list,environment={}){
         return link;
       }
       if(tag==='textarea'){
-        return {
+        const field={
           value:'',
           style:{},
           setAttribute(){},
-          select(){if(environment.onSelect)environment.onSelect();},
-          remove(){if(environment.onTextareaRemove)environment.onTextareaRemove();}
+          select(){if(environment.onSelect)environment.onSelect();}
         };
+        if(environment.textareaRemove!==false){
+          field.remove=()=>{
+            if(environment.textareaRemoveThrows)throw new Error('remove indisponible');
+            if(environment.onTextareaRemove)environment.onTextareaRemove();
+          };
+        }
+        return field;
       }
       return {textContent:''};
     },
@@ -210,6 +216,32 @@ test('la copie utilise le repli historique quand Clipboard API est absente',asyn
   await listeners['copy-brief:click']();
   assert.equal(selected,1);
   assert.equal(removed,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('la copie nettoie le champ sans Element.remove',async()=>{
+  let legacyRemovals=0;
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    execCommand(command){return command==='copy';},
+    textareaRemove:false,
+    onLegacyRemove(){legacyRemovals+=1;}
+  });
+  await listeners['copy-brief:click']();
+  assert.equal(legacyRemovals,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('la copie utilise removeChild si textarea.remove echoue',async()=>{
+  let legacyRemovals=0;
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    execCommand(command){return command==='copy';},
+    textareaRemoveThrows:true,
+    onLegacyRemove(){legacyRemovals+=1;}
+  });
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(legacyRemovals,1);
   assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
 });
 
