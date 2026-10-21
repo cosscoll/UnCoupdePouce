@@ -27,7 +27,9 @@ function runApp(matchMedia,linkCollection=[],options={}){
     addEventListener(){}
   };
   const window={};
-  if(matchMedia)window.matchMedia=matchMedia;
+  if(options.matchMediaGetterThrows){
+    Object.defineProperty(window,'matchMedia',{get(){throw new Error('getter matchMedia refuse');}});
+  }else if(matchMedia)window.matchMedia=matchMedia;
   vm.runInNewContext(source,{document,window,Array:options.Array||Array});
 }
 
@@ -86,8 +88,19 @@ test('le menu conserve l API MediaQueryList moderne',()=>{
   assert.equal(typeof listener,'function');
 });
 
+test('matchMedia conserve window comme receveur',()=>{
+  let receiver=null;
+  const matchMedia=function(){receiver=this;return {addListener(){}};};
+  runApp(matchMedia);
+  assert.equal(receiver.matchMedia,matchMedia);
+});
+
 test('l absence de matchMedia ne bloque pas le reste du script',()=>{
   assert.doesNotThrow(()=>runApp());
+});
+
+test('un getter window.matchMedia en erreur n interrompt pas le script',()=>{
+  assert.doesNotThrow(()=>runApp(undefined,[],{matchMediaGetterThrows:true}));
 });
 
 
