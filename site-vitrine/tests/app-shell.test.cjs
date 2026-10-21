@@ -81,6 +81,20 @@ test('les onglets restent lies sans Array.from',()=>{
   assert.equal(registrations,4);
 });
 
+test('les onglets replient sur slice si le getter Array.from echoue',()=>{
+  let registrations=0;
+  const legacyTabs={
+    0:{addEventListener(){registrations+=1;}},
+    1:{addEventListener(){registrations+=1;}},
+    length:2
+  };
+  function GetterRejectingArray(){}
+  GetterRejectingArray.prototype=Array.prototype;
+  Object.defineProperty(GetterRejectingArray,'from',{get(){throw new Error('getter Array.from refuse');}});
+  assert.doesNotThrow(()=>runApp(undefined,[],{Array:GetterRejectingArray,tabCollection:legacyTabs}));
+  assert.equal(registrations,4);
+});
+
 test('le menu lie toujours chaque lien d une collection moderne',()=>{
   let registrations=0;
   const links=[
