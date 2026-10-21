@@ -104,6 +104,10 @@
   document.getElementById('download-brief').addEventListener('click',()=>{
     update(false);
     let url=null;
+    const releaseObjectUrl=()=>{
+      if(!url||typeof URL==='undefined'||typeof URL.revokeObjectURL!=='function')return;
+      try{URL.revokeObjectURL(url);}catch{}
+    };
     try{
       if(typeof Blob!=='function'||typeof URL==='undefined'||typeof URL.createObjectURL!=='function')throw new Error('download unavailable');
       const blob=new Blob(['\uFEFF'+window.UCPBrief.toText(brief)],{type:'text/plain;charset=utf-8'});
@@ -117,16 +121,12 @@
       if(!linkRemoved&&link.parentNode&&typeof link.parentNode.removeChild==='function'){
         try{link.parentNode.removeChild(link);}catch{}
       }
-      const releaseObjectUrl=()=>{
-        if(typeof URL==='undefined'||typeof URL.revokeObjectURL!=='function')return;
-        try{URL.revokeObjectURL(url);}catch{}
-      };
       if(typeof setTimeout==='function'){
         try{setTimeout(releaseObjectUrl,1000);}catch{releaseObjectUrl();}
       }else releaseObjectUrl();
       status.textContent='Le téléchargement du brief a été déclenché.';
     }catch{
-      if(url&&typeof URL!=='undefined'&&typeof URL.revokeObjectURL==='function')URL.revokeObjectURL(url);
+      releaseObjectUrl();
       status.textContent='Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.';
     }
   });
