@@ -79,20 +79,26 @@
     for(const key of ['title','trade','state','timing']) document.getElementById('brief-'+key).textContent=brief[key];
     const list=document.getElementById('brief-checklist');
     let cleared=false;
-    if(typeof list.replaceChildren==='function'){
-      try{list.replaceChildren();cleared=true;}catch{}
+    let replaceChildren=null;
+    try{replaceChildren=list.replaceChildren;}catch{}
+    if(typeof replaceChildren==='function'){
+      try{replaceChildren.call(list);cleared=true;}catch{}
     }
     if(!cleared){
       try{list.textContent='';}catch{}
     }
+    let append=null;
+    try{append=list.append;}catch{}
+    let appendChild=null;
+    try{appendChild=list.appendChild;}catch{}
     brief.checklist.forEach(text=>{
       const li=document.createElement('li');li.textContent=text;
       let appended=false;
-      if(typeof list.append==='function'){
-        try{list.append(li);appended=true;}catch{}
+      if(typeof append==='function'){
+        try{append.call(list,li);appended=true;}catch{}
       }
-      if(!appended&&typeof list.appendChild==='function'){
-        try{list.appendChild(li);}catch{}
+      if(!appended&&typeof appendChild==='function'){
+        try{appendChild.call(list,li);}catch{}
       }
     });
     if(announce)status.textContent='Votre exemple est prêt. Vous pouvez le copier ou le télécharger.';
