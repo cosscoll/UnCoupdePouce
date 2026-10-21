@@ -521,3 +521,21 @@ test('une revocation en erreur ne casse pas le repli d un telechargement echoue'
   assert.equal(revokeAttempts,1);
   assert.equal(elements['brief-status'].textContent,'Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.');
 });
+
+
+test('un echec de temporisation libere l URL sans masquer le telechargement',()=>{
+  const revoked=[];
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{
+      createObjectURL(){return 'blob:ucp-brief';},
+      revokeObjectURL(url){revoked.push(url);}
+    },
+    setTimeout(){throw new Error('temporisation refusee');}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.deepEqual(revoked,['blob:ucp-brief']);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
