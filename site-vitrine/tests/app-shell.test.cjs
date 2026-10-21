@@ -6,7 +6,7 @@ const vm=require('node:vm');
 
 const source=fs.readFileSync(path.join(__dirname,'../dist/assets/app.js'),'utf8');
 
-function runApp(matchMedia,linkCollection=[]){
+function runApp(matchMedia,linkCollection=[],options={}){
   const menu={
     addEventListener(){},
     getAttribute(){return 'false';},
@@ -22,13 +22,13 @@ function runApp(matchMedia,linkCollection=[]){
   const document={
     documentElement:{classList:{remove(){}}},
     querySelector(selector){return selector==='.menu-toggle'?menu:selector==='#main-nav'?nav:null;},
-    querySelectorAll(){return [];},
+    querySelectorAll(){return options.tabCollection||[];},
     getElementById(){return null;},
     addEventListener(){}
   };
   const window={};
   if(matchMedia)window.matchMedia=matchMedia;
-  vm.runInNewContext(source,{document,window});
+  vm.runInNewContext(source,{document,window,Array:options.Array||Array});
 }
 
 test('le menu utilise le repli MediaQueryList.addListener sans interrompre le script',()=>{
@@ -42,6 +42,16 @@ test('le menu accepte une collection de liens legacy sans forEach',()=>{
   const link={addEventListener(name,callback){if(name==='click')clickListener=callback;}};
   const legacyLinks={0:link,length:1};
   assert.doesNotThrow(()=>runApp(undefined,legacyLinks));
+  assert.equal(typeof clickListener,'function');
+});
+
+test('le menu accepte une collection legacy sans Array.from',()=>{
+  let clickListener=null;
+  const link={addEventListener(name,callback){if(name==='click')clickListener=callback;}};
+  const legacyLinks={0:link,length:1};
+  function LegacyArray(){}
+  LegacyArray.prototype=Array.prototype;
+  assert.doesNotThrow(()=>runApp(undefined,legacyLinks,{Array:LegacyArray}));
   assert.equal(typeof clickListener,'function');
 });
 
