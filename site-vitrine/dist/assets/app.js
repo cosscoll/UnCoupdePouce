@@ -117,7 +117,13 @@
       if(!linkRemoved&&link.parentNode&&typeof link.parentNode.removeChild==='function'){
         try{link.parentNode.removeChild(link);}catch{}
       }
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      const releaseObjectUrl=()=>{
+        if(typeof URL==='undefined'||typeof URL.revokeObjectURL!=='function')return;
+        try{URL.revokeObjectURL(url);}catch{}
+      };
+      if(typeof setTimeout==='function'){
+        try{setTimeout(releaseObjectUrl,1000);}catch{releaseObjectUrl();}
+      }else releaseObjectUrl();
       status.textContent='Le téléchargement du brief a été déclenché.';
     }catch{
       if(url&&typeof URL!=='undefined'&&typeof URL.revokeObjectURL==='function')URL.revokeObjectURL(url);
