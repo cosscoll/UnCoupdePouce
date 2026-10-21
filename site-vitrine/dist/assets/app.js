@@ -115,9 +115,8 @@
         try{link.remove();linkRemoved=true;}catch{}
       }
       if(!linkRemoved&&link.parentNode&&typeof link.parentNode.removeChild==='function'){
-        link.parentNode.removeChild(link);linkRemoved=true;
+        try{link.parentNode.removeChild(link);}catch{}
       }
-      if(!linkRemoved)throw new Error('download link cleanup unavailable');
       setTimeout(()=>URL.revokeObjectURL(url),1000);
       status.textContent='Le téléchargement du brief a été déclenché.';
     }catch{
