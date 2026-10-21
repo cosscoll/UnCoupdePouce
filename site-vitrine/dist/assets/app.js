@@ -18,7 +18,9 @@
       if(typeof wideViewport.addEventListener==='function'){
         try{wideViewport.addEventListener('change',closeMenu);viewportListenerAdded=true;}catch{}
       }
-      if(!viewportListenerAdded&&typeof wideViewport.addListener==='function')wideViewport.addListener(closeMenu);
+      if(!viewportListenerAdded&&typeof wideViewport.addListener==='function'){
+        try{wideViewport.addListener(closeMenu);}catch{}
+      }
     }
   }
   const tabs=toArray(document.querySelectorAll('[role="tab"]'));
