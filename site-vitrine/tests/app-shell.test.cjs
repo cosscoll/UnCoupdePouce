@@ -505,6 +505,16 @@ test('le getter clipboard n est lu qu une fois',async()=>{
   assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
 });
 
+test('writeText conserve clipboard comme receveur',async()=>{
+  let receiver=null;
+  const list={replaceChildren(){},append(){}};
+  const clipboard={writeText(){receiver=this;return Promise.resolve();}};
+  const {elements,listeners}=runBriefApp(list,{navigator:{clipboard}});
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(receiver,clipboard);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
 test('un rejet de Clipboard API bascule vers le repli historique',async()=>{
   let modernAttempts=0;
   let legacyAttempts=0;
