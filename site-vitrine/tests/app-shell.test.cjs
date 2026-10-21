@@ -321,6 +321,22 @@ test('le getter createObjectURL n est lu qu une fois',()=>{
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
 
+test('createObjectURL conserve URL comme receveur',()=>{
+  let receiver=null;
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const objectUrl={revokeObjectURL(){}};
+  objectUrl.createObjectURL=function(){receiver=this;return 'blob:ucp-brief';};
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:objectUrl,
+    setTimeout(callback){callback();}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(receiver,objectUrl);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
+
 test('le telechargement replie sur appendChild si body.append echoue',()=>{
   let clicks=0;
   let inserted=0;
