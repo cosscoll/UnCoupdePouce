@@ -573,3 +573,11 @@ test('matchMedia utilise addListener si addEventListener echoue',()=>{
   })));
   assert.equal(typeof legacyListener,'function');
 });
+
+
+test('les erreurs des deux API matchMedia n interrompent pas le script',()=>{
+  assert.doesNotThrow(()=>runApp(()=>({
+    addEventListener(){throw new Error('API moderne refusee');},
+    addListener(){throw new Error('API legacy refusee');}
+  })));
+});
