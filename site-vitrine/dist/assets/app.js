@@ -131,8 +131,11 @@
     update(false);
     let url=null;
     const releaseObjectUrl=()=>{
-      if(!url||typeof URL==='undefined'||typeof URL.revokeObjectURL!=='function')return;
-      try{URL.revokeObjectURL(url);}catch{}
+      if(!url||typeof URL==='undefined')return;
+      let revokeObjectUrl=null;
+      try{revokeObjectUrl=URL.revokeObjectURL;}catch{}
+      if(typeof revokeObjectUrl!=='function')return;
+      try{revokeObjectUrl.call(URL,url);}catch{}
     };
     try{
       if(typeof Blob!=='function'||typeof URL==='undefined'||typeof URL.createObjectURL!=='function')throw new Error('download unavailable');
