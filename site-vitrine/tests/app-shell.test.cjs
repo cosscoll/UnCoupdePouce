@@ -301,6 +301,42 @@ test('le telechargement cree le fichier puis libere son URL objet',()=>{
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
 
+test('le getter createObjectURL n est lu qu une fois',()=>{
+  let reads=0;
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const objectUrl={revokeObjectURL(){}};
+  Object.defineProperty(objectUrl,'createObjectURL',{get(){
+    reads+=1;
+    if(reads>1)throw new Error('seconde lecture refusee');
+    return function(){return 'blob:ucp-brief';};
+  }});
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:objectUrl,
+    setTimeout(callback){callback();}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(reads,1);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
+
+test('createObjectURL conserve URL comme receveur',()=>{
+  let receiver=null;
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const objectUrl={revokeObjectURL(){}};
+  objectUrl.createObjectURL=function(){receiver=this;return 'blob:ucp-brief';};
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:objectUrl,
+    setTimeout(callback){callback();}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(receiver,objectUrl);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
+
 test('le telechargement replie sur appendChild si body.append echoue',()=>{
   let clicks=0;
   let inserted=0;

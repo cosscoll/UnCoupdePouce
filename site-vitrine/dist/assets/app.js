@@ -142,9 +142,12 @@
       try{revokeObjectUrl.call(URL,url);}catch{}
     };
     try{
-      if(typeof Blob!=='function'||typeof URL==='undefined'||typeof URL.createObjectURL!=='function')throw new Error('download unavailable');
+      if(typeof Blob!=='function'||typeof URL==='undefined')throw new Error('download unavailable');
+      let createObjectUrl=null;
+      try{createObjectUrl=URL.createObjectURL;}catch{}
+      if(typeof createObjectUrl!=='function')throw new Error('download unavailable');
       const blob=new Blob(['\uFEFF'+window.UCPBrief.toText(brief)],{type:'text/plain;charset=utf-8'});
-      url=URL.createObjectURL(blob);
+      url=createObjectUrl.call(URL,blob);
       const link=document.createElement('a');
       link.href=url;link.download='UCP-mon-exemple-de-brief.txt';appendTemporaryNode(link);link.click();
       let linkRemoved=false;
