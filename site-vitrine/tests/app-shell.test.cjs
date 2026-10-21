@@ -539,3 +539,27 @@ test('un echec de temporisation libere l URL sans masquer le telechargement',()=
   assert.deepEqual(revoked,['blob:ucp-brief']);
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
+
+
+test('une erreur appendChild ne bloque pas la generation du brief',()=>{
+  const list={
+    replaceChildren(){},
+    append(){throw new Error('append refuse');},
+    appendChild(){throw new Error('appendChild refuse');}
+  };
+  assert.doesNotThrow(()=>runBriefApp(list));
+});
+
+
+test('une erreur replaceChildren utilise le repli textContent',()=>{
+  const children=[{textContent:'Ancien conseil'}];
+  let clears=0;
+  const list={
+    replaceChildren(){throw new Error('replaceChildren refuse');},
+    append(node){children.push(node);}
+  };
+  Object.defineProperty(list,'textContent',{set(){clears+=1;children.length=0;}});
+  assert.doesNotThrow(()=>runBriefApp(list));
+  assert.equal(clears,1);
+  assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
+});
