@@ -1,9 +1,14 @@
 (function () {
   'use strict';
   document.documentElement.classList.remove('no-js');
-  const toArray=collection=>typeof Array.from==='function'
-    ?Array.from(collection)
-    :Array.prototype.slice.call(collection);
+  const toArray=collection=>{
+    let from=null;
+    try{from=Array.from;}catch{}
+    if(typeof from==='function'){
+      try{return from.call(Array,collection);}catch{}
+    }
+    return Array.prototype.slice.call(collection);
+  };
   const menu=document.querySelector('.menu-toggle');
   const nav=document.querySelector('#main-nav');
   const closeMenu=()=>{if(!menu||!nav)return;menu.setAttribute('aria-expanded','false');nav.classList.remove('is-open');};
