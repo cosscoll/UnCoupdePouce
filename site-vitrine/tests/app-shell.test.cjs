@@ -201,7 +201,9 @@ function runBriefApp(list,environment={}){
       attachToBody(node);
     };
   }
-  if(environment.bodyAppendChild!==false)document.body.appendChild=attachToBody;
+  if(environment.bodyAppendChildGetterThrows){
+    Object.defineProperty(document.body,'appendChild',{get(){throw new Error('getter appendChild indisponible');}});
+  }else if(environment.bodyAppendChild!==false)document.body.appendChild=attachToBody;
   const window={UCPBrief:{
     create(){return {title:'Titre',trade:'Métier',state:'État',timing:'Horizon',checklist:['Un','Deux','Trois']};},
     toText(){return 'Brief';}
@@ -381,6 +383,17 @@ test('la copie tolere un getter document.body.append en erreur',async()=>{
   await assert.doesNotReject(()=>listeners['copy-brief:click']());
   assert.equal(inserted,1);
   assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('la copie replie proprement si les deux getters d insertion echouent',async()=>{
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    bodyAppendGetterThrows:true,
+    bodyAppendChildGetterThrows:true,
+    execCommand(command){return command==='copy';}
+  });
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(elements['brief-status'].textContent,'La copie n’est pas disponible ici. Utilisez « Télécharger en .txt » pour conserver votre brief.');
 });
 
 test('la copie nettoie le champ sans Element.remove',async()=>{
