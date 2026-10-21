@@ -126,8 +126,10 @@
     }finally{
       if(field){
         let fieldRemoved=false;
-        if(typeof field.remove==='function'){
-          try{field.remove();fieldRemoved=true;}catch{}
+        let remove=null;
+        try{remove=field.remove;}catch{}
+        if(typeof remove==='function'){
+          try{remove.call(field);fieldRemoved=true;}catch{}
         }
         if(!fieldRemoved&&field.parentNode&&typeof field.parentNode.removeChild==='function'){
           try{field.parentNode.removeChild(field);}catch{}
