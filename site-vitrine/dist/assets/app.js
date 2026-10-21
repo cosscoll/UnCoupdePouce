@@ -131,8 +131,14 @@
         if(typeof remove==='function'){
           try{remove.call(field);fieldRemoved=true;}catch{}
         }
-        if(!fieldRemoved&&field.parentNode&&typeof field.parentNode.removeChild==='function'){
-          try{field.parentNode.removeChild(field);}catch{}
+        if(!fieldRemoved){
+          let parent=null;
+          try{parent=field.parentNode;}catch{}
+          let removeChild=null;
+          if(parent)try{removeChild=parent.removeChild;}catch{}
+          if(typeof removeChild==='function'){
+            try{removeChild.call(parent,field);}catch{}
+          }
         }
       }
     }
