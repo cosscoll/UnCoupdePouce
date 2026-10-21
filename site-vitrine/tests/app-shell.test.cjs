@@ -586,3 +586,21 @@ test('les erreurs des deux API matchMedia n interrompent pas le script',()=>{
 test('une erreur d initialisation matchMedia n interrompt pas le script',()=>{
   assert.doesNotThrow(()=>runApp(()=>{throw new Error('matchMedia refuse');}));
 });
+
+
+test('un getter moderne matchMedia en erreur replie sur addListener',()=>{
+  let legacyListener=null;
+  const media={
+    addListener(callback){legacyListener=callback;}
+  };
+  Object.defineProperty(media,'addEventListener',{get(){throw new Error('getter moderne refuse');}});
+  assert.doesNotThrow(()=>runApp(()=>media));
+  assert.equal(typeof legacyListener,'function');
+});
+
+test('des getters matchMedia en erreur n interrompent pas le script',()=>{
+  const media={};
+  Object.defineProperty(media,'addEventListener',{get(){throw new Error('getter moderne refuse');}});
+  Object.defineProperty(media,'addListener',{get(){throw new Error('getter legacy refuse');}});
+  assert.doesNotThrow(()=>runApp(()=>media));
+});
