@@ -62,11 +62,15 @@
   let brief=window.UCPBrief.create(type.value,state.value,timing.value);
   function appendTemporaryNode(node){
     let appended=false;
-    if(typeof document.body.append==='function'){
-      try{document.body.append(node);appended=true;}catch{}
+    let append=null;
+    try{append=document.body.append;}catch{}
+    if(typeof append==='function'){
+      try{append.call(document.body,node);appended=true;}catch{}
     }
-    if(!appended&&typeof document.body.appendChild==='function'){
-      document.body.appendChild(node);appended=true;
+    let appendChild=null;
+    try{appendChild=document.body.appendChild;}catch{}
+    if(!appended&&typeof appendChild==='function'){
+      appendChild.call(document.body,node);appended=true;
     }
     if(!appended)throw new Error('DOM append unavailable');
   }
