@@ -490,3 +490,16 @@ test('une erreur de revocation URL ne masque pas un telechargement declenche',()
   assert.doesNotThrow(()=>listeners['download-brief:click']());
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
+
+
+test('l absence de revokeObjectURL ne masque pas un telechargement declenche',()=>{
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{createObjectURL(){return 'blob:ucp-brief';}},
+    setTimeout(callback){callback();}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
