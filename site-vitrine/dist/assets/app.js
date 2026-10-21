@@ -103,8 +103,12 @@
     update(false);
     const text=window.UCPBrief.toText(brief);
     try{
-      if(typeof navigator!=='undefined'&&navigator.clipboard&&typeof navigator.clipboard.writeText==='function'){
-        await navigator.clipboard.writeText(text);
+      let clipboard=null;
+      if(typeof navigator!=='undefined')clipboard=navigator.clipboard;
+      let writeText=null;
+      if(clipboard)writeText=clipboard.writeText;
+      if(typeof writeText==='function'){
+        await writeText.call(clipboard,text);
         status.textContent='Brief copié dans votre presse-papiers.';
         return;
       }
