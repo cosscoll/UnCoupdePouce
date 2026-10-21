@@ -57,6 +57,17 @@ test('le menu accepte une collection legacy sans Array.from',()=>{
   assert.equal(typeof clickListener,'function');
 });
 
+test('le menu replie sur slice si Array.from rejette la collection DOM',()=>{
+  let clickListener=null;
+  const link={addEventListener(name,callback){if(name==='click')clickListener=callback;}};
+  const legacyLinks={0:link,length:1};
+  function RejectingArray(){}
+  RejectingArray.prototype=Array.prototype;
+  RejectingArray.from=()=>{throw new Error('collection DOM refusee');};
+  assert.doesNotThrow(()=>runApp(undefined,legacyLinks,{Array:RejectingArray}));
+  assert.equal(typeof clickListener,'function');
+});
+
 test('les onglets restent lies sans Array.from',()=>{
   let registrations=0;
   const legacyTabs={
