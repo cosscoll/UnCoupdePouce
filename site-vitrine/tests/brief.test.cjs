@@ -21,7 +21,11 @@ test('les entrées inconnues et les clés de prototype ne deviennent pas du cont
     assert.ok(!brief.toText(result).includes('<script>'));
   }
 });
-test('modifier un exemple ne modifie pas les générations suivantes',()=>{
-  const first=brief.create('peinture','idee','flexible');first.checklist.push('ALTÉRATION');
+test('la checklist d’un exemple reste immuable',()=>{
+  const first=brief.create('peinture','idee','flexible');
+  assert.ok(Object.isFrozen(first));
+  assert.ok(Object.isFrozen(first.checklist));
+  assert.throws(()=>first.checklist.push('ALTÉRATION'),TypeError);
+  assert.equal(first.checklist.length,3);
   assert.equal(brief.create('peinture','idee','flexible').checklist.length,3);
 });
