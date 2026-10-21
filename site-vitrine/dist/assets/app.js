@@ -14,8 +14,13 @@
     document.addEventListener('click',event=>{if(!nav.contains(event.target)&&!menu.contains(event.target))closeMenu();});
     const wideViewport=typeof window.matchMedia==='function'?window.matchMedia('(min-width: 761px)'):null;
     if(wideViewport){
-      if(typeof wideViewport.addEventListener==='function')wideViewport.addEventListener('change',closeMenu);
-      else if(typeof wideViewport.addListener==='function')wideViewport.addListener(closeMenu);
+      let viewportListenerAdded=false;
+      if(typeof wideViewport.addEventListener==='function'){
+        try{wideViewport.addEventListener('change',closeMenu);viewportListenerAdded=true;}catch{}
+      }
+      if(!viewportListenerAdded&&typeof wideViewport.addListener==='function'){
+        try{wideViewport.addListener(closeMenu);}catch{}
+      }
     }
   }
   const tabs=toArray(document.querySelectorAll('[role="tab"]'));

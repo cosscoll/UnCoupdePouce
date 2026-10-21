@@ -563,3 +563,21 @@ test('une erreur replaceChildren utilise le repli textContent',()=>{
   assert.equal(clears,1);
   assert.deepEqual(children.map(node=>node.textContent),['Un','Deux','Trois']);
 });
+
+
+test('matchMedia utilise addListener si addEventListener echoue',()=>{
+  let legacyListener=null;
+  assert.doesNotThrow(()=>runApp(()=>({
+    addEventListener(){throw new Error('API moderne refusee');},
+    addListener(callback){legacyListener=callback;}
+  })));
+  assert.equal(typeof legacyListener,'function');
+});
+
+
+test('les erreurs des deux API matchMedia n interrompent pas le script',()=>{
+  assert.doesNotThrow(()=>runApp(()=>({
+    addEventListener(){throw new Error('API moderne refusee');},
+    addListener(){throw new Error('API legacy refusee');}
+  })));
+});
