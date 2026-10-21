@@ -539,3 +539,13 @@ test('un echec de temporisation libere l URL sans masquer le telechargement',()=
   assert.deepEqual(revoked,['blob:ucp-brief']);
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
+
+
+test('une erreur appendChild ne bloque pas la generation du brief',()=>{
+  const list={
+    replaceChildren(){},
+    append(){throw new Error('append refuse');},
+    appendChild(){throw new Error('appendChild refuse');}
+  };
+  assert.doesNotThrow(()=>runBriefApp(list));
+});
