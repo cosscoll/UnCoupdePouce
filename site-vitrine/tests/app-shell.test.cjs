@@ -454,3 +454,23 @@ test('une erreur de nettoyage ne transforme pas un telechargement declenche en e
   assert.deepEqual(revoked,['blob:ucp-brief']);
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
+
+
+test('l absence des API de nettoyage ne masque pas un telechargement declenche',()=>{
+  const revoked=[];
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{
+      createObjectURL(){return 'blob:ucp-brief';},
+      revokeObjectURL(url){revoked.push(url);}
+    },
+    linkRemove:false,
+    legacyRemoveChild:false,
+    setTimeout(callback){callback();}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.deepEqual(revoked,['blob:ucp-brief']);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
+});
