@@ -193,13 +193,17 @@ function runBriefApp(list,environment={}){
       :{removeChild(child){if(environment.onLegacyRemove)environment.onLegacyRemove(child);}};
     if(environment.onAppend)environment.onAppend(node);
   };
-  if(environment.bodyAppend!==false){
+  if(environment.bodyAppendGetterThrows){
+    Object.defineProperty(document.body,'append',{get(){throw new Error('getter append indisponible');}});
+  }else if(environment.bodyAppend!==false){
     document.body.append=node=>{
       if(environment.bodyAppendThrows)throw new Error('append indisponible');
       attachToBody(node);
     };
   }
-  if(environment.bodyAppendChild!==false)document.body.appendChild=attachToBody;
+  if(environment.bodyAppendChildGetterThrows){
+    Object.defineProperty(document.body,'appendChild',{get(){throw new Error('getter appendChild indisponible');}});
+  }else if(environment.bodyAppendChild!==false)document.body.appendChild=attachToBody;
   const window={UCPBrief:{
     create(){return {title:'Titre',trade:'Métier',state:'État',timing:'Horizon',checklist:['Un','Deux','Trois']};},
     toText(){return 'Brief';}
@@ -366,6 +370,30 @@ test('la copie insere le champ sans document.body.append',async()=>{
   await assert.doesNotReject(()=>listeners['copy-brief:click']());
   assert.equal(inserted,1);
   assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('la copie tolere un getter document.body.append en erreur',async()=>{
+  let inserted=0;
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    bodyAppendGetterThrows:true,
+    execCommand(command){return command==='copy';},
+    onAppend(){inserted+=1;}
+  });
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(inserted,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
+test('la copie replie proprement si les deux getters d insertion echouent',async()=>{
+  const list={replaceChildren(){},append(){}};
+  const {elements,listeners}=runBriefApp(list,{
+    bodyAppendGetterThrows:true,
+    bodyAppendChildGetterThrows:true,
+    execCommand(command){return command==='copy';}
+  });
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(elements['brief-status'].textContent,'La copie n’est pas disponible ici. Utilisez « Télécharger en .txt » pour conserver votre brief.');
 });
 
 test('la copie nettoie le champ sans Element.remove',async()=>{
