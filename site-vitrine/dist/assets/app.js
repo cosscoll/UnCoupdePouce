@@ -18,11 +18,15 @@
     }
     if(wideViewport){
       let viewportListenerAdded=false;
-      if(typeof wideViewport.addEventListener==='function'){
-        try{wideViewport.addEventListener('change',closeMenu);viewportListenerAdded=true;}catch{}
+      let modernViewportListener=null;
+      try{modernViewportListener=wideViewport.addEventListener;}catch{}
+      if(typeof modernViewportListener==='function'){
+        try{modernViewportListener.call(wideViewport,'change',closeMenu);viewportListenerAdded=true;}catch{}
       }
-      if(!viewportListenerAdded&&typeof wideViewport.addListener==='function'){
-        try{wideViewport.addListener(closeMenu);}catch{}
+      let legacyViewportListener=null;
+      try{legacyViewportListener=wideViewport.addListener;}catch{}
+      if(!viewportListenerAdded&&typeof legacyViewportListener==='function'){
+        try{legacyViewportListener.call(wideViewport,closeMenu);}catch{}
       }
     }
   }
