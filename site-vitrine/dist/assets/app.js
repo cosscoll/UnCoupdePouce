@@ -1,12 +1,15 @@
 (function () {
   'use strict';
   document.documentElement.classList.remove('no-js');
+  const toArray=collection=>typeof Array.from==='function'
+    ?Array.from(collection)
+    :Array.prototype.slice.call(collection);
   const menu=document.querySelector('.menu-toggle');
   const nav=document.querySelector('#main-nav');
   const closeMenu=()=>{if(!menu||!nav)return;menu.setAttribute('aria-expanded','false');nav.classList.remove('is-open');};
   if(menu&&nav){
     menu.addEventListener('click',()=>{const open=menu.getAttribute('aria-expanded')!=='true';menu.setAttribute('aria-expanded',String(open));nav.classList.toggle('is-open',open);});
-    Array.from(nav.querySelectorAll('a')).forEach(link=>link.addEventListener('click',closeMenu));
+    toArray(nav.querySelectorAll('a')).forEach(link=>link.addEventListener('click',closeMenu));
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu.getAttribute('aria-expanded')==='true'){closeMenu();menu.focus();}});
     document.addEventListener('click',event=>{if(!nav.contains(event.target)&&!menu.contains(event.target))closeMenu();});
     const wideViewport=typeof window.matchMedia==='function'?window.matchMedia('(min-width: 761px)'):null;
@@ -15,7 +18,7 @@
       else if(typeof wideViewport.addListener==='function')wideViewport.addListener(closeMenu);
     }
   }
-  const tabs=Array.from(document.querySelectorAll('[role="tab"]'));
+  const tabs=toArray(document.querySelectorAll('[role="tab"]'));
   function activateTab(tab,focus){
     tabs.forEach(item=>{const selected=item===tab;item.setAttribute('aria-selected',String(selected));item.tabIndex=selected?0:-1;const panel=document.getElementById(item.getAttribute('aria-controls'));if(panel)panel.hidden=!selected;});
     if(focus)tab.focus();
