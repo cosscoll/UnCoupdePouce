@@ -55,6 +55,19 @@ test('le menu accepte une collection legacy sans Array.from',()=>{
   assert.equal(typeof clickListener,'function');
 });
 
+test('les onglets restent lies sans Array.from',()=>{
+  let registrations=0;
+  const legacyTabs={
+    0:{addEventListener(){registrations+=1;}},
+    1:{addEventListener(){registrations+=1;}},
+    length:2
+  };
+  function LegacyArray(){}
+  LegacyArray.prototype=Array.prototype;
+  assert.doesNotThrow(()=>runApp(undefined,[],{Array:LegacyArray,tabCollection:legacyTabs}));
+  assert.equal(registrations,4);
+});
+
 test('le menu lie toujours chaque lien d une collection moderne',()=>{
   let registrations=0;
   const links=[
