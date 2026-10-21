@@ -581,3 +581,8 @@ test('les erreurs des deux API matchMedia n interrompent pas le script',()=>{
     addListener(){throw new Error('API legacy refusee');}
   })));
 });
+
+
+test('une erreur d initialisation matchMedia n interrompt pas le script',()=>{
+  assert.doesNotThrow(()=>runApp(()=>{throw new Error('matchMedia refuse');}));
+});
