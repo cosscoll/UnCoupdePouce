@@ -503,3 +503,21 @@ test('l absence de revokeObjectURL ne masque pas un telechargement declenche',()
   assert.doesNotThrow(()=>listeners['download-brief:click']());
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
+
+
+test('une revocation en erreur ne casse pas le repli d un telechargement echoue',()=>{
+  let revokeAttempts=0;
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:{
+      createObjectURL(){return 'blob:ucp-brief';},
+      revokeObjectURL(){revokeAttempts+=1;throw new Error('revocation refusee');}
+    },
+    onClick(){throw new Error('clic refuse');}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(revokeAttempts,1);
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.');
+});
