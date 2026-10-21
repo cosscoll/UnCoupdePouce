@@ -12,14 +12,21 @@
     toArray(nav.querySelectorAll('a')).forEach(link=>link.addEventListener('click',closeMenu));
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&menu.getAttribute('aria-expanded')==='true'){closeMenu();menu.focus();}});
     document.addEventListener('click',event=>{if(!nav.contains(event.target)&&!menu.contains(event.target))closeMenu();});
-    const wideViewport=typeof window.matchMedia==='function'?window.matchMedia('(min-width: 761px)'):null;
+    let wideViewport=null;
+    if(typeof window.matchMedia==='function'){
+      try{wideViewport=window.matchMedia('(min-width: 761px)');}catch{}
+    }
     if(wideViewport){
       let viewportListenerAdded=false;
-      if(typeof wideViewport.addEventListener==='function'){
-        try{wideViewport.addEventListener('change',closeMenu);viewportListenerAdded=true;}catch{}
+      let modernViewportListener=null;
+      try{modernViewportListener=wideViewport.addEventListener;}catch{}
+      if(typeof modernViewportListener==='function'){
+        try{modernViewportListener.call(wideViewport,'change',closeMenu);viewportListenerAdded=true;}catch{}
       }
-      if(!viewportListenerAdded&&typeof wideViewport.addListener==='function'){
-        try{wideViewport.addListener(closeMenu);}catch{}
+      let legacyViewportListener=null;
+      try{legacyViewportListener=wideViewport.addListener;}catch{}
+      if(!viewportListenerAdded&&typeof legacyViewportListener==='function'){
+        try{legacyViewportListener.call(wideViewport,closeMenu);}catch{}
       }
     }
   }
