@@ -163,11 +163,19 @@
       const link=document.createElement('a');
       link.href=url;link.download='UCP-mon-exemple-de-brief.txt';appendTemporaryNode(link);link.click();
       let linkRemoved=false;
-      if(typeof link.remove==='function'){
-        try{link.remove();linkRemoved=true;}catch{}
+      let remove=null;
+      try{remove=link.remove;}catch{}
+      if(typeof remove==='function'){
+        try{remove.call(link);linkRemoved=true;}catch{}
       }
-      if(!linkRemoved&&link.parentNode&&typeof link.parentNode.removeChild==='function'){
-        try{link.parentNode.removeChild(link);}catch{}
+      if(!linkRemoved){
+        let parent=null;
+        try{parent=link.parentNode;}catch{}
+        let removeChild=null;
+        if(parent)try{removeChild=parent.removeChild;}catch{}
+        if(typeof removeChild==='function'){
+          try{removeChild.call(parent,link);}catch{}
+        }
       }
       if(typeof setTimeout==='function'){
         try{setTimeout(releaseObjectUrl,1000);}catch{releaseObjectUrl();}
