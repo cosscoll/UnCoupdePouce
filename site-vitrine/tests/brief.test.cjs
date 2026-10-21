@@ -29,3 +29,10 @@ test('la checklist d’un exemple reste immuable',()=>{
   assert.equal(first.checklist.length,3);
   assert.equal(brief.create('peinture','idee','flexible').checklist.length,3);
 });
+
+test('deux briefs conservent des checklists indépendantes',()=>{
+  const first=brief.create('peinture','idee','flexible');
+  const second=brief.create('peinture','idee','flexible');
+  assert.notStrictEqual(first.checklist,second.checklist);
+  assert.deepEqual(first.checklist,second.checklist);
+});
