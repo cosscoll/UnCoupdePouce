@@ -63,7 +63,9 @@
       if(typeof list.append==='function'){
         try{list.append(li);appended=true;}catch{}
       }
-      if(!appended&&typeof list.appendChild==='function')list.appendChild(li);
+      if(!appended&&typeof list.appendChild==='function'){
+        try{list.appendChild(li);}catch{}
+      }
     });
     if(announce)status.textContent='Votre exemple est prêt. Vous pouvez le copier ou le télécharger.';
   }
