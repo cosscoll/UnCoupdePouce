@@ -488,6 +488,23 @@ test('la copie indisponible conserve le repli vers le telechargement',async()=>{
 });
 
 
+test('le getter clipboard n est lu qu une fois',async()=>{
+  let reads=0;
+  let writes=0;
+  const list={replaceChildren(){},append(){}};
+  const navigator={};
+  Object.defineProperty(navigator,'clipboard',{get(){
+    reads+=1;
+    if(reads>1)throw new Error('seconde lecture refusee');
+    return {writeText(){writes+=1;return Promise.resolve();}};
+  }});
+  const {elements,listeners}=runBriefApp(list,{navigator});
+  await assert.doesNotReject(()=>listeners['copy-brief:click']());
+  assert.equal(reads,1);
+  assert.equal(writes,1);
+  assert.equal(elements['brief-status'].textContent,'Brief copié dans votre presse-papiers.');
+});
+
 test('un rejet de Clipboard API bascule vers le repli historique',async()=>{
   let modernAttempts=0;
   let legacyAttempts=0;
