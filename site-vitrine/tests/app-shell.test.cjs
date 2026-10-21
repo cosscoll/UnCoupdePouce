@@ -556,6 +556,20 @@ test('un getter revokeObjectURL en erreur ne masque pas un telechargement declen
   assert.equal(elements['brief-status'].textContent,'Le téléchargement du brief a été déclenché.');
 });
 
+test('un getter revokeObjectURL en erreur conserve le repli apres echec du clic',()=>{
+  const list={replaceChildren(){},append(){}};
+  class FakeBlob{}
+  const objectUrl={createObjectURL(){return 'blob:ucp-brief';}};
+  Object.defineProperty(objectUrl,'revokeObjectURL',{get(){throw new Error('getter revocation refuse');}});
+  const {elements,listeners}=runBriefApp(list,{
+    Blob:FakeBlob,
+    URL:objectUrl,
+    onClick(){throw new Error('clic refuse');}
+  });
+  assert.doesNotThrow(()=>listeners['download-brief:click']());
+  assert.equal(elements['brief-status'].textContent,'Le téléchargement n’est pas disponible ici. Utilisez « Copier le brief » pour conserver votre brief.');
+});
+
 
 test('une revocation en erreur ne casse pas le repli d un telechargement echoue',()=>{
   let revokeAttempts=0;
