@@ -57,6 +57,17 @@ test('le menu accepte une collection legacy sans Array.from',()=>{
   assert.equal(typeof clickListener,'function');
 });
 
+test('le menu replie sur slice si Array.from rejette la collection DOM',()=>{
+  let clickListener=null;
+  const link={addEventListener(name,callback){if(name==='click')clickListener=callback;}};
+  const legacyLinks={0:link,length:1};
+  function RejectingArray(){}
+  RejectingArray.prototype=Array.prototype;
+  RejectingArray.from=()=>{throw new Error('collection DOM refusee');};
+  assert.doesNotThrow(()=>runApp(undefined,legacyLinks,{Array:RejectingArray}));
+  assert.equal(typeof clickListener,'function');
+});
+
 test('les onglets restent lies sans Array.from',()=>{
   let registrations=0;
   const legacyTabs={
@@ -67,6 +78,20 @@ test('les onglets restent lies sans Array.from',()=>{
   function LegacyArray(){}
   LegacyArray.prototype=Array.prototype;
   assert.doesNotThrow(()=>runApp(undefined,[],{Array:LegacyArray,tabCollection:legacyTabs}));
+  assert.equal(registrations,4);
+});
+
+test('les onglets replient sur slice si le getter Array.from echoue',()=>{
+  let registrations=0;
+  const legacyTabs={
+    0:{addEventListener(){registrations+=1;}},
+    1:{addEventListener(){registrations+=1;}},
+    length:2
+  };
+  function GetterRejectingArray(){}
+  GetterRejectingArray.prototype=Array.prototype;
+  Object.defineProperty(GetterRejectingArray,'from',{get(){throw new Error('getter Array.from refuse');}});
+  assert.doesNotThrow(()=>runApp(undefined,[],{Array:GetterRejectingArray,tabCollection:legacyTabs}));
   assert.equal(registrations,4);
 });
 
