@@ -79,8 +79,10 @@
     for(const key of ['title','trade','state','timing']) document.getElementById('brief-'+key).textContent=brief[key];
     const list=document.getElementById('brief-checklist');
     let cleared=false;
-    if(typeof list.replaceChildren==='function'){
-      try{list.replaceChildren();cleared=true;}catch{}
+    let replaceChildren=null;
+    try{replaceChildren=list.replaceChildren;}catch{}
+    if(typeof replaceChildren==='function'){
+      try{replaceChildren.call(list);cleared=true;}catch{}
     }
     if(!cleared){
       try{list.textContent='';}catch{}
