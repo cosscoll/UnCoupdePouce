@@ -1,4 +1,4 @@
-"""Create fictional demonstration data, only in an empty local database."""
+"""Create fictional demonstration data, only in an empty local/staging database."""
 import secrets
 from fastapi.testclient import TestClient
 import app
@@ -15,7 +15,12 @@ def seed():
         if r.status_code>=400:raise ValueError(f'Échec de préparation : {r.status_code} {r.text}')
         return r.json()
     def client(email,name,role=None):
-        c=TestClient(app.app)
+        if app.HOSTING.staging:
+            host=sorted(app.HOSTING.hosts)[0]
+            c=TestClient(app.app,base_url='https://'+host)
+            c.auth=('ucp',app.HOSTING.password)
+        else:
+            c=TestClient(app.app)
         if role:checked(c.post('/api/register',json={'email':email,'name':name,'role':role,'password':password}))
         data=checked(c.post('/api/login',json={'email':email,'password':password}))
         c.headers['x-ucp-csrf']=data['csrf'];return c,data['user_id']

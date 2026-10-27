@@ -79,7 +79,8 @@ class Connection:
         if q.upper().startswith('PRAGMA '):
             return Result()
         if q.upper() in ('BEGIN', 'BEGIN IMMEDIATE'):
-            self.raw.execute('BEGIN')
+            self.raw.execute('BEGIN' if q.upper() == 'BEGIN IMMEDIATE' else
+                             'BEGIN ISOLATION LEVEL REPEATABLE READ')
             if q.upper() == 'BEGIN IMMEDIATE':
                 # Keep the lab's serialized write invariant across server instances.
                 self.raw.execute('SELECT pg_advisory_xact_lock(hashtext(%s))', (self.schema,))

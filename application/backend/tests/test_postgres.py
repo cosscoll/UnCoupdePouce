@@ -85,6 +85,14 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     assert len(requester.get(path).json()['items'])==1
     assert requester.post('/api/projects',json={'title':'Autre demande fictive','description':'Une demande fictive suffisamment longue.','trade':'plomberie','town':'Toulouse'}).status_code==201
     assert requester.post('/api/account/sessions/revoke-others').status_code==200
+    assert pro.post('/api/enterprise',json={'label':'Entreprise fictive'}).status_code==201
+    linked=pro.post('/api/enterprise/artisans',json={'alias':'Equipe fictive','trades':['plomberie'],'zones':['Toulouse']})
+    assert linked.status_code==201,linked.text
+    assert pro.get('/api/enterprise').json()['members'][0]['id']==linked.json()['id']
+    second=next(p['id'] for p in requester.get('/api/projects').json()['items'] if p['status']=='open')
+    assert pro.post(f'/api/projects/{second}/apply-linked/{linked.json()["id"]}').status_code==201
+    assert pro.post(f'/api/projects/{second}/apply-linked/{linked.json()["id"]}').status_code==409
+    assert pro.post(f'/api/enterprise/artisans/{linked.json()["id"]}/set-active',json={'active':False}).status_code==200
     assert admin.post(f'/api/admin/professionals/{pid}/suspend').status_code==200
     assert requester.get(path).status_code==403
 
@@ -138,3 +146,17 @@ def test_staging_https_gate_cookies_and_origin(pg,monkeypatch):
     assert guest.get('/api/me').status_code==200
     assert guest.post('/api/logout',headers={'x-ucp-csrf':r.json()['csrf'],'origin':'https://attacker.example'}).status_code==403
     assert guest.get('/',headers={'host':'attacker.example'}).status_code==403
+
+
+def test_staging_demo_seed_uses_private_gate(pg,monkeypatch):
+    from hosting import Hosting
+    monkeypatch.setattr(pg,'HOSTING',Hosting(True,frozenset({'ucp.example'}),'fictif-staging-password-0123456789'))
+    monkeypatch.setitem(sys.modules,'app',pg)
+    spec=importlib.util.spec_from_file_location('ucp_demo_test',ROOT/'demo.py')
+    demo=importlib.util.module_from_spec(spec);spec.loader.exec_module(demo)
+    password=demo.seed()
+    assert len(password)>=24
+    with pg.connect() as c:
+        assert c.execute('SELECT COUNT(*) FROM users').fetchone()[0]==3
+        assert c.execute('SELECT COUNT(*) FROM messages').fetchone()[0]==1
+    with pytest.raises(ValueError,match='Base non vide'): demo.seed()
