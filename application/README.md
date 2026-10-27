@@ -1,4 +1,8 @@
-# Un Coup de Pouce — version Work 4.0.2
+# Un Coup de Pouce — reprise 4.1 / préproduction
+
+Le code 4.0.2 est conservé. SQLite reste le mode local ; une configuration PostgreSQL/Vercel protégée est ajoutée. **Aucune URL applicative déployée à ce stade.** Voir [PREPRODUCTION.md](docs/PREPRODUCTION.md) et [audit de reprise](docs/REPRISE_2026-10-27.md).
+
+## Historique 4.0.2
 
 Application de développement privée, locale et persistante, issue du laboratoire UCP v3.6 existant. Date : 16 octobre 2026. Cette archive contient le code de référence du fil Work UCP et ses tests ; elle ne représente pas une application déployée ni une autorisation commerciale.
 
@@ -48,7 +52,7 @@ La destination doit être un nouveau fichier. La restauration invalide sessions 
 
 ## Sources et continuité
 
-Lire `docs/SYNCHRONISATION.md` avant toute reprise. Le journal Google Docs est la référence commune des priorités et arbitrages ; les archives sont identifiées par leurs empreintes. Aucun dépôt GitHub UCP distant, branche ou commit partagé n'a été identifié. Ne pas inventer de commit ou qualifier cette archive de production.
+Le fichier `docs/SYNCHRONISATION.md` historique est absent de main ; voir `docs/REPRISE_2026-10-27.md` avant toute reprise. Le journal Google Docs est la référence commune des priorités et arbitrages ; les archives sont identifiées par leurs empreintes. Le dépôt de référence est désormais `cosscoll/UnCoupdePouce`, branche `main`. Ne pas inventer de commit ou qualifier cette archive de production.
 
 Le backend est FastAPI/SQLite ; il ne dépend ni de Supabase ni d'une API payante. Les lots classiques 05 à 09 sont des contributions isolées : certains contrôles ont été adaptés, leur serveur n'a pas été fusionné. Voir `docs/RAPPROCHEMENT_LOTS.md`.
 

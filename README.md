@@ -4,7 +4,11 @@ Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en rela
 
 ## Suivi du projet
 
-- [Vitrine statique](site-vitrine/dist/index.html)
+- [Vitrine publique vérifiée](https://cosscoll.github.io/UnCoupdePouce/site-vitrine/dist/index.html)
+- Application en ligne : **pas encore déployée**, accès Vercel et organisation Supabase UCP à débloquer.
+- [Préproduction : configuration et blocages](application/docs/PREPRODUCTION.md)
+- [Audit de reprise du 27 octobre](application/docs/REPRISE_2026-10-27.md)
+- [Sources de la vitrine](site-vitrine/dist/index.html)
 - [Tableau d'avancement : fait / reste à faire / blocages](site-vitrine/dist/avancement.html)
 - [Page d'accueil compatible GitHub Pages](index.html) — l'hébergement GitHub Pages doit être activé et vérifié séparément.
 

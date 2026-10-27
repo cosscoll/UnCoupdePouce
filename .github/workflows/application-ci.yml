@@ -1,0 +1,38 @@
+name: Application CI
+on:
+  push:
+    branches: [main, 'feat/ucp-preproduction-*']
+    paths: ['application/**', '.github/workflows/application-ci.yml']
+  pull_request:
+    paths: ['application/**', '.github/workflows/application-ci.yml']
+permissions:
+  contents: read
+jobs:
+  api-and-interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ucp-fictional-ci-only
+          POSTGRES_DB: ucp_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      UCP_TEST_POSTGRES_URL: postgresql://postgres:ucp-fictional-ci-only@localhost:5432/ucp_test
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r application/backend/requirements-lock.txt
+      - run: python -m pytest -q application/backend/tests
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --prefix application/qa
+      - run: node --test application/qa/frontend.test.cjs
+      - run: node --check application/backend/static/app.js

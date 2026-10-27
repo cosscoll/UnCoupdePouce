@@ -1,0 +1,10 @@
+.venv
+qa
+backups
+*.sqlite3
+*.sqlite3-*
+*.db
+.env*
+__pycache__
+backend/tests
+docs/qa

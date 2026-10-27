@@ -73,7 +73,7 @@ def install(m):
         if publishing:
             if not body.trades:error(422,'Choisissez un métier ou « Je ne sais pas »')
             # Reuse the tested v3 input/contact guards.
-            try:m.Project(title=body.title,description=body.description,town=body.town,trade=body.trades[0])
+            try:m.Project.model_validate(dict(title=body.title,description=body.description,town=body.town,trade=body.trades[0]),context={'connection':c})
             except ValueError:error(422,'Complétez le titre (5 caractères), la description (20) et la commune. Ne donnez pas de coordonnées directes.')
     def visible_project(c,id,user):
         row=c.execute('SELECT * FROM projects WHERE id=?',(id,)).fetchone()

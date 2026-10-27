@@ -1,9 +1,9 @@
-"""UCP private local proof of concept; NOT approved for a public deployment.
-Runs on 127.0.0.1, uses SQLite, no payment/email/public signup to sales.
+"""UCP: local SQLite lab or explicitly configured, gated PostgreSQL staging.
+Fictional accounts only. No payments, commercial signup or external messaging.
 """
 from __future__ import annotations
 import os, sqlite3, hashlib, hmac, secrets, re, time, json
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
@@ -14,12 +14,21 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 ROOT = Path(__file__).parent
+import sys
+sys.path.insert(0, str(ROOT))
+from hosting import Hosting
+HOSTING = Hosting.from_env()
+DATABASE_URL = os.getenv('UCP_DATABASE_URL', '')
+DATABASE_SCHEMA = os.getenv('UCP_DATABASE_SCHEMA', 'ucp_private')
 DB = Path(os.getenv('UCP_LOCAL_DB', str(ROOT / 'ucp_local.sqlite3')))
 ROLES = {'requester', 'professional'}
 TRADES = {row['id'] for row in json.loads((ROOT/'taxonomy.json').read_text())}
 def project_trades(row):
     return set(json.loads(row['trades_json'] or '[]') or [row['trade']])
-def active_trade(value):
+def active_trade(value, connection=None):
+    # Reuse the publication transaction when supplied by model validation.
+    if connection is not None:
+        return bool(connection.execute('SELECT 1 FROM taxonomy WHERE id=? AND active=1',(value,)).fetchone())
     # Read the live catalog so additions work across processes and restarts.
     with connect() as c:
         return bool(c.execute('SELECT 1 FROM taxonomy WHERE id=? AND active=1',(value,)).fetchone())
@@ -30,10 +39,13 @@ app = FastAPI(title='UCP LAB — API locale non publique', docs_url=None, redoc_
 
 @app.middleware('http')
 async def security_headers(request: Request, call_next):
-    # Hard stop against accidental internet exposure of this laboratory build.
-    if request.url.hostname not in {'localhost','127.0.0.1','testserver'}:
-        return Response('Laboratoire privé : accès extérieur interdit',status_code=403,media_type='text/plain')
+    denied = HOSTING.reject(request)
+    if denied is not None:
+        return denied
     response = await call_next(request)
+    response.headers['X-Robots-Tag'] = 'noindex, nofollow'
+    if HOSTING.staging:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
@@ -43,6 +55,14 @@ async def security_headers(request: Request, call_next):
 
 @contextmanager
 def connect():
+    if DATABASE_URL:
+        from postgres import Connection
+        conn = Connection(DATABASE_URL, DATABASE_SCHEMA)
+        try:
+            yield conn
+        finally:
+            conn.close()
+        return
     DB.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB), timeout=10, isolation_level=None)
     conn.row_factory = sqlite3.Row
@@ -114,7 +134,6 @@ def init_db():
         enterprise_cols=[r['name'] for r in c.execute('PRAGMA table_info(enterprise_accounts)').fetchall()]
         if 'manager_artisan_active' not in enterprise_cols:
             c.execute('ALTER TABLE enterprise_accounts ADD COLUMN manager_artisan_active INTEGER NOT NULL DEFAULT 0 CHECK(manager_artisan_active IN (0,1))')
-init_db()
 
 
 def demo_email(value: str) -> str:
@@ -330,8 +349,9 @@ class Project(BaseModel):
         return clean
     @field_validator('trade')
     @classmethod
-    def trade_valid(cls,v):
-        if not active_trade(v): raise ValueError('métier inconnu ou désactivé')
+    def trade_valid(cls,v,info):
+        connection = (info.context or {}).get('connection')
+        if not active_trade(v,connection): raise ValueError('métier inconnu ou désactivé')
         return v
 
 class Message(BaseModel):
@@ -516,7 +536,12 @@ def apply_with_enterprise_profile(project_id:int,linked_id:int,user=Depends(requ
     return {'id':cur.lastrowid,'status':'pending','linked_profile_id':linked_id}
 
 @app.get('/api/health')
-def health(): return {'ok':True,'mode':'local_only','production':False,'release':'v4.0.2-prive-local'}
+def health():
+    with connect() as c:
+        c.execute('SELECT 1').fetchone()
+    return {'ok':True,'mode':'staging' if HOSTING.staging else 'local_only',
+            'storage':'postgresql' if DATABASE_URL else 'sqlite',
+            'production':False,'release':'v4.1-preproduction'}
 
 @app.post('/api/register',status_code=201)
 def register(body:Register):
@@ -572,7 +597,7 @@ def login(body:Login,response:Response):
         c.execute('INSERT INTO sessions(token_hash,user_id,csrf_hash,expires) VALUES(?,?,?,?)',
                   (hash_token(t),user['id'],hash_token(csrf),stamp+SESSION_SECONDS))
         c.execute('COMMIT')
-    response.set_cookie('ucp_lab_sid',t,max_age=SESSION_SECONDS,httponly=True,samesite='strict',secure=False,path='/')
+    response.set_cookie('ucp_lab_sid',t,max_age=SESSION_SECONDS,httponly=True,samesite='strict',secure=HOSTING.staging,path='/')
     return {'user_id':user['id'],'role':user['role'],'name':user['name'],'csrf':csrf}
 
 @app.get('/api/me')
@@ -1057,9 +1082,14 @@ def delete_own_account(user=Depends(get_user)):
 
 @app.get('/')
 def root():return FileResponse(ROOT/'static'/'index.html')
-import sys
-sys.path.insert(0,str(ROOT))
 from features_v4 import install
-install(sys.modules[__name__])
+if DATABASE_URL:
+    from postgres import initialize_schema
+    initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
+else:
+    initialization = nullcontext()
+with initialization:
+    init_db()
+    install(sys.modules[__name__])
 
 app.mount('/assets', StaticFiles(directory=ROOT/'static'),name='static')
