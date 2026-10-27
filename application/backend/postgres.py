@@ -6,6 +6,9 @@ not a transaction pooler (search_path is session state). No browser DB access.
 from contextlib import contextmanager
 import re
 import sqlite3
+import os
+import socket
+import logging
 import psycopg
 from psycopg import sql
 from psycopg.pq import TransactionStatus
@@ -58,8 +61,25 @@ class Connection:
         if not re.fullmatch(r'ucp_[a-z0-9_]{1,45}', schema):
             raise ValueError('Use a private ucp_ schema')
         self.schema = schema
-        self.raw = psycopg.connect(url, autocommit=True, prepare_threshold=None,
-                                   connect_timeout=10, row_factory=row_factory)
+        options = {}
+        if os.getenv('VERCEL') == '1':
+            info = psycopg.conninfo.conninfo_to_dict(url)
+            try:
+                addresses = socket.getaddrinfo(info['host'], int(info.get('port',5432)),
+                                               socket.AF_INET, socket.SOCK_STREAM)
+                options['hostaddr'] = ','.join(dict.fromkeys(r[4][0] for r in addresses))
+            except (OSError,KeyError):
+                pass
+        try:
+            self.raw = psycopg.connect(url, autocommit=True, prepare_threshold=None,
+                                       connect_timeout=10, row_factory=row_factory, **options)
+        except psycopg.OperationalError as exc:
+            message = str(exc).lower()
+            logging.error('UCP database unavailable: tls_certificate=%s authentication=%s network=%s ipv4_selected=%s',
+                          'certificate' in message, 'authentication' in message or 'password' in message,
+                          'connection' in message or 'timeout' in message, bool(options))
+            # Never send the DSN, password or full driver exception to logs.
+            raise RuntimeError('PostgreSQL connection unavailable; see UCP database diagnosis') from None
         self.raw.execute(sql.SQL('SET search_path TO {}').format(sql.Identifier(schema)))
         self.raw.execute("SET statement_timeout = '15s'")
         self.raw.execute("SET lock_timeout = '10s'")
