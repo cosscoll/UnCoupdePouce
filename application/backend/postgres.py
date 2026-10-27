@@ -78,8 +78,16 @@ class Connection:
             logging.error('UCP database unavailable: tls_certificate=%s authentication=%s network=%s ipv4_selected=%s',
                           'certificate' in message, 'authentication' in message or 'password' in message,
                           'connection' in message or 'timeout' in message, bool(options))
-            # Never send the DSN, password or full driver exception to logs.
-            raise RuntimeError('PostgreSQL connection unavailable; see UCP database diagnosis') from None
+            # Keep one useful diagnostic after redacting credentials and URLs.
+            info = psycopg.conninfo.conninfo_to_dict(url)
+            diagnostic = str(exc).splitlines()[0]
+            from urllib.parse import quote
+            for key in ('password','user','dbname'):
+                value = info.get(key,'')
+                if value:
+                    diagnostic = diagnostic.replace(value,'[redacted]').replace(quote(value,safe=''),'[redacted]')
+            diagnostic = re.sub(r'postgres(?:ql)?://\S+', '[redacted-dsn]', diagnostic)
+            raise RuntimeError('PostgreSQL unavailable: '+diagnostic[:350]) from None
         self.raw.execute(sql.SQL('SET search_path TO {}').format(sql.Identifier(schema)))
         self.raw.execute("SET statement_timeout = '15s'")
         self.raw.execute("SET lock_timeout = '10s'")
