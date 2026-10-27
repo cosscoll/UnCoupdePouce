@@ -5,7 +5,7 @@ Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en rela
 ## Suivi du projet
 
 - [Vitrine publique vérifiée](https://cosscoll.github.io/UnCoupdePouce/site-vitrine/dist/index.html)
-- Application en ligne : **pas encore déployée**, accès Vercel et organisation Supabase UCP à débloquer.
+- Application en ligne : **pas encore déployée**, projet Vercel `ucp-preproduction` créé ; organisation Supabase UCP à connecter.
 - [Préproduction : configuration et blocages](application/docs/PREPRODUCTION.md)
 - [Audit de reprise du 27 octobre](application/docs/REPRISE_2026-10-27.md)
 - [Sources de la vitrine](site-vitrine/dist/index.html)

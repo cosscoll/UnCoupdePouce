@@ -68,8 +68,10 @@ explicitement simulées. D01–D13 ne sont pas validées par ce déploiement.
 
 `Application CI` exécute les tests SQLite, les tests d'intégration PostgreSQL 17 et
 les huit tests DOM à chaque push concerné. Aucun déclencheur horaire, paiement,
-email ou tâche autonome. La liaison Git Vercel reste à activer après déblocage des
-accès ; ce workflow de tests ne prétend pas déployer le backend. Vérifier le commit,
+email ou tâche autonome. Le projet Vercel `ucp-preproduction` a été créé avec le dépôt GitHub et la racine
+`application`. Les builds sont temporairement ignorés (`exit 0`) tant que la base
+et les secrets ne sont pas configurés ; rétablir les builds après configuration.
+Ce workflow de tests ne prétend pas déployer le backend. Vérifier le commit,
 les tests verts et le plan avant import/promotion. Ajouter l'URL réelle au README
 et le lien vitrine uniquement après recette HTTPS du service déployé.
 
@@ -93,8 +95,11 @@ mises en cache par un futur service worker.
 
 ## Blocages constatés pendant la session
 
-- Vercel : le projet cible n'existe pas encore ; accès au compte connu refusé avec
-  erreur 403 demandant `authorize_team_access`. Pas de déploiement affirmé.
+- Vercel : accès autorisé et revérifié après intervention utilisateur. Projet
+  `ucp-preproduction` créé, ID `prj_rbWCIYaeYmGDe8Xg9Ftc2n5CArlv`, espace
+  `team_S3CZCMukEO0dAG8QdpmXtabI`, framework FastAPI. Aucune version déployée
+  et aucun domaine applicatif : la base et les variables restent à configurer.
+  Les protections SSO par défaut sont conservées. Aucun service payant ajouté.
 - Supabase : seule l'organisation IAgile est visible ; l'utilisateur a choisi une
   autre organisation. Son nom/accès reste à fournir. Aucun projet créé ou facturé.
 - Chromium local : téléchargement refusé/tronqué par l'environnement. Les tests DOM
