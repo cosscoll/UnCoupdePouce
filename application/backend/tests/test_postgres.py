@@ -93,6 +93,9 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     assert pro.post(f'/api/projects/{second}/apply-linked/{linked.json()["id"]}').status_code==201
     assert pro.post(f'/api/projects/{second}/apply-linked/{linked.json()["id"]}').status_code==409
     assert pro.post(f'/api/enterprise/artisans/{linked.json()["id"]}/set-active',json={'active':False}).status_code==200
+    candidate=requester.get(f'/api/projects/{project_id}/applications').json()['items'][0]
+    assert candidate['trades']==['plomberie'] and candidate['verification_status']=='test_authorized'
+    assert 'siren' not in candidate and 'subscription_active' not in candidate
     from test_reports import exercise_report_flow
     exercise_report_flow(pg,admin,requester,pro,other,aid)
     assert admin.post(f'/api/admin/professionals/{pid}/suspend').status_code==200

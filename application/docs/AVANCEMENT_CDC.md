@@ -5,6 +5,7 @@ Ils ne valent ni ouverture commerciale ni validation des décisions D01–D13.
 
 | Exigence | Développement de ce lot | Limite restante |
 |---|---|---|
+| F16 — Comparaison | Jusqu’à trois profils actuels, métiers et communes déclarés, date de candidature, statut de test et disponibilité de sélection. Le comparatif distingue le profil lié de son gestionnaire et exclut coordonnées et facturation. | Avis, réalisations, assurances et vérification réelle restent absents ; aucune note ou certification inventée. |
 | F49 — Signalement | Bouton sur chaque message, signalement ciblé, contrôle du participant et refus des doublons ouverts. Le signalement de conversation et de projet est conservé. | Politique complète de sanctions, blocage individuel, conservation et recours à formaliser. Aucune suppression automatique de message. |
 | F82 — Back-office | Examen du contenu d'un dossier ouvert : projet signalé, message exact ou conversation signalée par fenêtres de 20 messages. Rôles et CSRF contrôlés. | Pas de lecteur général des conversations privées pour les administrateurs. Vérification professionnelle réelle toujours absente. |
 | F83 — Audit | Chaque consultation privée exige un motif interne ; identité, date et dossier sont journalisés avant restitution. Si l'écriture de l'audit échoue, aucun contenu n'est rendu. Réponse et clôture sont tracées. | Politique de rétention et séparation de rôles admin/support à définir avant production. |
@@ -25,7 +26,7 @@ Les résultats CI et HTTPS effectifs sont consignés dans QA.md après exécutio
 
 ## Priorités suivantes
 
-- F16 : comparer les métiers, zones et statut réel des candidatures ; aucun avis ou badge inventé.
+- F16 : enrichir les profils avec des réalisations et justificatifs réels après définition du parcours de vérification ; avis liés à D10.
 - F87–F92 : recette mobile visuelle, installation PWA et reprise réseau.
 - Restaurer une sauvegarde PostgreSQL dans un environnement isolé.
 - Arbitrer D01–D13 avant toute règle commerciale, invitation entreprise nominative ou paiement réel.

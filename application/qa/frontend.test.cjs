@@ -152,3 +152,28 @@ test('admin case content requires explicit reason and case review before showing
   assert.ok(x.calls.some(c=>c.url.endsWith('/resolve')&&c.body.reason.includes('bien été examiné')));
  }finally{x.close()}
 });
+
+test('requester comparison selects two or three profiles, stays textual and shows actual team trades',async()=>{
+ const x=await boot();try{
+  const apps=[1,2,3,4].map(id=>({id,status:'pending',professional_name:'Atelier '+id,trade:'electricite',town:'Toulouse',trades:['plomberie'],service_zones:['Blagnac'],linked_artisan_alias:'<img src=x>',verification_status:'test_authorized',eligible_for_selection:true,submitted_at:'2026-10-27T12:00:00Z'}));
+  const box=x.w.document.createElement('section');x.w.document.querySelector('#view').replaceChildren(box);x.w.renderCandidateCards(box,apps);
+  const compare=[...box.querySelectorAll('button')].find(b=>b.textContent==='Comparer les profils sélectionnés'),checks=[...box.querySelectorAll('input[type=checkbox]')];
+  assert.equal(compare.disabled,true);
+  for(const c of checks.slice(0,3)){c.checked=true;c.dispatchEvent(new x.w.Event('change'));}
+  assert.equal(compare.disabled,false);assert.equal(checks[3].disabled,true);
+  compare.click();
+  assert.equal(x.w.document.querySelectorAll('.comparison-card').length,3);assert.equal(x.w.document.querySelector('#dialog img'),null);
+  const card=x.w.document.querySelector('.comparison-card');assert.match(card.textContent,/Plomberie/);assert.match(card.textContent,/Blagnac/);assert.doesNotMatch(card.textContent,/Électricité/);
+  assert.match(x.w.document.querySelector('#dialog').textContent,/aucune certification réelle/);
+  checks[0].checked=false;checks[0].dispatchEvent(new x.w.Event('change'));assert.equal(checks[3].disabled,false);
+  checks[1].checked=false;checks[1].dispatchEvent(new x.w.Event('change'));assert.equal(compare.disabled,true);
+ }finally{x.close()}
+});
+
+test('unavailable application does not offer a select button',async()=>{
+ const x=await boot();try{
+  const box=x.w.document.createElement('section');x.w.renderCandidateCards(box,[{id:1,status:'pending',professional_name:'Atelier',trade:'plomberie',town:'Toulouse',verification_status:'test_unavailable',eligible_for_selection:false}]);
+  assert.equal([...box.querySelectorAll('button')].some(b=>b.textContent==='Choisir ce professionnel'),false);
+  assert.match(box.textContent,/ne peut pas être sélectionnée/);
+ }finally{x.close()}
+});

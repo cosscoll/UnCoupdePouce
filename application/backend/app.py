@@ -853,16 +853,30 @@ def my_applications(user=Depends(require('professional'))):
 @app.get('/api/projects/{project_id}/applications')
 def get_applications(project_id:int,user=Depends(require('requester'))):
     with authenticated_db(user,write=False) as c:
-        pr=c.execute('SELECT requester_id FROM projects WHERE id=?',(project_id,)).fetchone()
+        pr=c.execute('SELECT requester_id,status,hidden FROM projects WHERE id=?',(project_id,)).fetchone()
         if not pr:error(404,'Projet inconnu')
         if pr['requester_id']!=user['id']:error(403,'Vous ne possédez pas ce projet')
-        items=c.execute('''SELECT applications.id, applications.status, users.name AS professional_name,
-           profiles.trade, profiles.town,linked.alias AS linked_artisan_alias FROM applications
+        rows=c.execute('''SELECT applications.id,applications.status,applications.created_at,
+           applications.linked_profile_id,users.name AS professional_name,users.suspended,
+           profiles.trade,profiles.town,profiles.approved,profiles.service_trades,profiles.service_areas,
+           linked.alias AS linked_artisan_alias,linked.service_trades AS linked_trades,
+           linked.service_areas AS linked_zones,linked.is_active AS linked_active FROM applications
            JOIN users ON applications.professional_id=users.id
            JOIN profiles ON profiles.user_id=users.id
            LEFT JOIN enterprise_artisans linked ON linked.id=applications.linked_profile_id
            WHERE applications.project_id=? ORDER BY applications.id''',(project_id,)).fetchall()
-    return {'items':[dict(x) for x in items]}
+        items=[]
+        for row in rows:
+            linked=bool(row['linked_profile_id'])
+            scope=json.loads(row['linked_trades'] or '[]') if linked else [row['trade'],*json.loads(row['service_trades'] or '[]')]
+            zones=json.loads(row['linked_zones'] or '[]') if linked else json.loads(row['service_areas'] or '[]') or [row['town']]
+            authorized=bool(row['approved'] and not row['suspended'] and (not linked or row['linked_active']))
+            # Public candidate fields only: no email, SIREN, session or billing data.
+            items.append({k:row[k] for k in ('id','status','professional_name','trade','town','linked_artisan_alias')} |
+                         {'trades':list(dict.fromkeys(scope)),'service_zones':zones,'submitted_at':row['created_at'],
+                          'verification_status':'test_authorized' if authorized else 'test_unavailable',
+                          'eligible_for_selection':authorized and row['status']=='pending' and pr['status']=='open' and not pr['hidden']})
+    return {'items':items}
 
 @app.post('/api/applications/{application_id}/accept')
 def accept(application_id:int,user=Depends(require('requester'))):

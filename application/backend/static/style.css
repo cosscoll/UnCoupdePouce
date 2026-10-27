@@ -6,3 +6,7 @@
 .brand{display:flex;align-items:center;gap:18px}.brand-logo{width:42px;height:52px;object-fit:contain}.brand-name{font-size:20px}
 
 .case-text{white-space:pre-wrap;overflow-wrap:anywhere}.report-message{display:block;font-size:11px;margin-top:8px}.bubble .case-text{margin:0 0 8px}
+
+.candidate-facts{margin:18px 0}.candidate-facts dt{font-size:11px;font-weight:700;margin-top:12px;color:var(--muted)}.candidate-facts dd{margin:4px 0 0;overflow-wrap:anywhere;font-size:13px}.candidate-choice{display:flex;align-items:center;gap:10px;font-size:13px;margin:14px 0}.candidate-choice input{width:20px;height:20px;margin:0;flex-shrink:0}.comparison-toolbar{position:sticky;top:0;z-index:1;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px;background:var(--paper,#fff);border:1px solid var(--line);border-radius:12px}.candidate-comparison{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}.comparison-card{border:1px solid var(--line);border-radius:12px;padding:16px;min-width:0}.comparison-card h4{margin:0;overflow-wrap:anywhere}@media(max-width:600px){.candidate-comparison{grid-template-columns:1fr}.comparison-toolbar{position:static}.comparison-toolbar button{width:100%}}
+
+dialog:has(.candidate-comparison){max-width:1000px;max-height:90dvh;overflow:auto}
