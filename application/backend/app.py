@@ -16,9 +16,9 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 ROOT = Path(__file__).parent
 import sys
 sys.path.insert(0, str(ROOT))
-from hosting import Hosting
+from hosting import Hosting, database_url
 HOSTING = Hosting.from_env()
-DATABASE_URL = os.getenv('UCP_DATABASE_URL', '')
+DATABASE_URL = database_url()
 DATABASE_SCHEMA = os.getenv('UCP_DATABASE_SCHEMA', 'ucp_private')
 DB = Path(os.getenv('UCP_LOCAL_DB', str(ROOT / 'ucp_local.sqlite3')))
 ROLES = {'requester', 'professional'}
@@ -1091,5 +1091,12 @@ else:
 with initialization:
     init_db()
     install(sys.modules[__name__])
+    # Optional, one-time fictional seed under the initialization lock.
+    if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
+        with connect() as c:
+            empty_demo = c.execute('SELECT 1 FROM users').fetchone() is None
+        if empty_demo:
+            from demo import seed
+            seed(sys.modules[__name__], os.environ['UCP_DEMO_SEED_PASSWORD'])
 
 app.mount('/assets', StaticFiles(directory=ROOT/'static'),name='static')

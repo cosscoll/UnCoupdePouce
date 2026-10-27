@@ -1,10 +1,13 @@
 """Create fictional demonstration data, only in an empty local/staging database."""
 import secrets
 from fastapi.testclient import TestClient
-import app
 
-def seed():
-    password=secrets.token_urlsafe(20)
+def seed(module=None,password=None):
+    if module is None:
+        import app as module
+    app=module
+    password=password or secrets.token_urlsafe(20)
+    if len(password)<24:raise ValueError('Mot de passe de démonstration trop court')
     with app.connect() as c:
         c.execute('BEGIN IMMEDIATE')
         if c.execute('SELECT 1 FROM users').fetchone():raise ValueError('Base non vide : aucune donnée remplacée. Choisissez une nouvelle base via UCP_LOCAL_DB.')

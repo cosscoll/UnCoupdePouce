@@ -3,8 +3,21 @@ import base64
 import hmac
 import os
 from dataclasses import dataclass
-from urllib.parse import urlsplit, parse_qs
+from urllib.parse import urlsplit, parse_qs, parse_qsl, urlencode, urlunsplit
 from fastapi.responses import JSONResponse, Response
+
+def database_url():
+    # Marketplace secrets are consumed only inside the deployed server.
+    # Neon PgBouncer cannot keep the session state used by the SQL adapter.
+    direct = os.getenv('UCP_DATABASE_DATABASE_URL_UNPOOLED', '')
+    value = direct or os.getenv('UCP_DATABASE_URL', '')
+    if direct:
+        parts = urlsplit(direct)
+        params = dict(parse_qsl(parts.query))
+        params.update(sslmode='verify-full', sslrootcert='system')
+        value = urlunsplit(parts._replace(query=urlencode(params)))
+    return value
+
 
 @dataclass(frozen=True)
 class Hosting:
@@ -19,14 +32,18 @@ class Hosting:
             raise RuntimeError('UCP_ENV must be local or staging; commercial production is disabled')
         hosts = frozenset(h.strip().lower() for h in os.getenv('UCP_ALLOWED_HOSTS', '').split(',') if h.strip())
         password = os.getenv('UCP_STAGING_PASSWORD', '')
+        if os.getenv('VERCEL') == '1':
+            system_hosts = [os.getenv(k, '').strip().lower() for k in
+                            ('VERCEL_URL','VERCEL_BRANCH_URL','VERCEL_PROJECT_PRODUCTION_URL')]
+            hosts |= frozenset(h for h in system_hosts if h and h.endswith('.vercel.app'))
         if mode == 'staging':
             if not hosts or any('*' in h or '/' in h or ':' in h for h in hosts):
                 raise RuntimeError('Staging requires exact UCP_ALLOWED_HOSTS')
             if len(password) < 24:
                 raise RuntimeError('Staging requires UCP_STAGING_PASSWORD of at least 24 characters')
-            if not os.getenv('UCP_DATABASE_URL'):
+            if not database_url():
                 raise RuntimeError('Staging requires persistent UCP_DATABASE_URL; SQLite is local only')
-            db = urlsplit(os.environ['UCP_DATABASE_URL'])
+            db = urlsplit(database_url())
             if db.scheme not in ('postgres', 'postgresql') or parse_qs(db.query).get('sslmode') != ['verify-full']:
                 raise RuntimeError('Staging requires PostgreSQL with sslmode=verify-full')
             if os.getenv('UCP_LOCAL_ADMIN_BOOTSTRAP'):

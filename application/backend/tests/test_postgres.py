@@ -160,3 +160,20 @@ def test_staging_demo_seed_uses_private_gate(pg,monkeypatch):
         assert c.execute('SELECT COUNT(*) FROM users').fetchone()[0]==3
         assert c.execute('SELECT COUNT(*) FROM messages').fetchone()[0]==1
     with pytest.raises(ValueError,match='Base non vide'): demo.seed()
+
+
+def test_first_staging_start_seeds_once_and_preserves_accounts(pg,monkeypatch):
+    from hosting import Hosting
+    monkeypatch.setenv('UCP_DEMO_SEED_PASSWORD','Fictional-bootstrap-only!0123456789')
+    monkeypatch.setattr(Hosting,'from_env',classmethod(lambda cls: Hosting(True,frozenset({'ucp.example'}),'fictif-staging-password-0123456789')))
+    for i in range(2):
+        name='ucp_bootstrap_test_'+str(i)
+        spec=importlib.util.spec_from_file_location(name,ROOT/'app.py')
+        mod=importlib.util.module_from_spec(spec);sys.modules[name]=mod
+        try:
+            spec.loader.exec_module(mod)
+            with mod.connect() as c:
+                assert c.execute('SELECT COUNT(*) FROM users').fetchone()[0]==3
+                assert c.execute('SELECT COUNT(*) FROM messages').fetchone()[0]==1
+        finally:
+            sys.modules.pop(name,None)

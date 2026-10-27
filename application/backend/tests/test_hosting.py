@@ -51,3 +51,25 @@ def test_local_gate_remains_loopback_only():
 def test_commercial_production_disabled(monkeypatch):
     monkeypatch.setenv('UCP_ENV','production')
     with pytest.raises(RuntimeError): Hosting.from_env()
+
+
+def test_neon_marketplace_prefers_direct_url_and_verifies_tls(monkeypatch):
+    from hosting import database_url
+    monkeypatch.setenv('UCP_DATABASE_DATABASE_URL_UNPOOLED','postgresql://demo:fictional@direct.example/db?sslmode=require&channel_binding=require')
+    monkeypatch.setenv('UCP_DATABASE_URL','postgresql://demo:fictional@pooler.example/db')
+    url=database_url()
+    assert 'direct.example' in url and 'pooler.example' not in url
+    assert 'sslmode=verify-full' in url and 'sslrootcert=system' in url
+    assert 'channel_binding=require' in url
+
+
+def test_vercel_hosts_are_exact_and_require_platform_flag(monkeypatch):
+    monkeypatch.delenv('VERCEL',raising=False)
+    monkeypatch.setenv('UCP_ENV','local')
+    monkeypatch.setenv('UCP_ALLOWED_HOSTS','')
+    monkeypatch.setenv('VERCEL_URL','ucp-unique.vercel.app')
+    assert 'ucp-unique.vercel.app' not in Hosting.from_env().hosts
+    monkeypatch.setenv('VERCEL','1')
+    assert 'ucp-unique.vercel.app' in Hosting.from_env().hosts
+    monkeypatch.setenv('VERCEL_URL','attacker.example')
+    assert 'attacker.example' not in Hosting.from_env().hosts
