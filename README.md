@@ -38,10 +38,10 @@ Sous Windows, utilisez `application/DEMARRER.bat`. L'application est destinée �
 
 ## Vérifications de référence
 
-- Application : 110 tests Python réussis.
+- Application : 119 tests Python réussis sur GitHub Actions le 27/10/2026 (SQLite et PostgreSQL 17).
 - Interface de l'application : 8 tests DOM réussis.
 - Vitrine : contrôles statiques et tests des scénarios de brief réussis.
-- Les contrôles visuels complets dans un navigateur réel restent à effectuer avant une ouverture publique.
+- Vitrine ouverte dans un navigateur réel ; recette visuelle de l’application et de son hébergement encore à effectuer.
 
 ## Sécurité des sources
 

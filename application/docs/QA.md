@@ -1,3 +1,22 @@
+# Reprise et contrôles du 27 octobre 2026
+
+119 tests Python réussis sur SQLite et PostgreSQL 17.11, puis 8 tests DOM réussis :
+[run GitHub Actions](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40525907397).
+Source contrôlée : `fd7f5a743b3b9081c59d26c6c9b3168996fb13cb`.
+Le parcours demandeur → publication → candidature → sélection → chat est testé,
+avec les refus inter-comptes, les réessais idempotents, les photos privées,
+l'entreprise simplifiée et le peuplement fictif derrière le verrou de staging.
+Un avertissement de dépréciation anyio/Starlette persiste, sans test en échec.
+
+Ces tests utilisent TestClient et une base PostgreSQL de CI ; ils ne constituent
+pas une preuve de déploiement ou de recette mobile de l'application. La vitrine
+publique a été ouverte dans le navigateur ; 55 tests JavaScript et son contrôle
+statique passent. Les sauvegardes/restaurations SQLite sont couvertes par les tests
+hérités ; restauration PostgreSQL distante, charge et préproduction HTTPS restent
+à vérifier après déblocage des accès. Voir [PREPRODUCTION.md](PREPRODUCTION.md).
+
+---
+
 # Preuves de contrôle — Work 4.0.2
 
 Exécution du 16 octobre 2026, heure de Paris, dans le fil Work existant. Données entièrement fictives et bases temporaires.
