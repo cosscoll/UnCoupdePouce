@@ -4,3 +4,5 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 
 .brand{display:flex;align-items:center;gap:18px}.brand-logo{width:42px;height:52px;object-fit:contain}.brand-name{font-size:20px}
+
+.case-text{white-space:pre-wrap;overflow-wrap:anywhere}.report-message{display:block;font-size:11px;margin-top:8px}.bubble .case-text{margin:0 0 8px}

@@ -108,3 +108,47 @@ test('analytics is off by default and strips private properties',async()=>{
   assert.equal(a.track('unknown_event'),false);a.reset();assert.equal(a.enabled(),false);
  }finally{x.close()}
 });
+
+test('a message report targets only that message and preserves text as text',async()=>{
+ const x=await boot({'GET /api/conversations/12/messages':{items:[{id:41,sender_id:2,body:'<img src=x onerror=alert(1)>',created_at:'2026-10-27T12:00:00Z'}]},'POST /api/v4/reports':{id:6,status:'open'}});
+ try{
+  const holder=x.w.document.createElement('section');x.w.document.body.append(holder);
+  await x.w.openChat(holder,{application_id:12,peer:'Atelier',title:'Projet fictif'});
+  assert.equal(holder.querySelector('.bubble img'),null);
+  holder.querySelector('.report-message').click();
+  input(x.w,'#dialog [name=reason]','Ce message fictif demande un examen.');submit(x.w,'#dialog form');await tick();
+  const sent=x.calls.find(c=>c.method==='POST'&&c.url==='/api/v4/reports');
+  assert.equal(sent.body.kind,'message');assert.equal(sent.body.target_id,41);
+  assert.match(x.w.document.querySelector('#alert').textContent,/Assistance/);
+ }finally{x.close()}
+});
+
+test('support shows own case response and requests older pages without leaking markup',async()=>{
+ const x=await boot({'/api/v4/reports':{items:[{id:9,kind:'message',target_id:41,reason:'Ma demande de test',status:'resolved',resolution:'<script>private()</script>',created_at:'2026-10-27T12:00:00Z'}],next_before_id:9},'/api/v4/reports?before_id=9':{items:[],next_before_id:null}});
+ try{
+  [...x.w.document.querySelectorAll('#tabs button')].find(b=>b.textContent==='Assistance').click();await tick();
+  assert.match(x.w.document.querySelector('#view').textContent,/Réponse disponible/);
+  assert.match(x.w.document.querySelector('#view').textContent,/<script>private/);
+  assert.equal(x.w.document.querySelector('#view script'),null);
+  [...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent.includes('plus anciens')).click();await tick();
+  assert.ok(x.calls.some(c=>c.url==='/api/v4/reports?before_id=9'));
+ }finally{x.close()}
+});
+
+test('admin case content requires explicit reason and case review before showing the response action',async()=>{
+ const x=await boot({'/api/session':{id:99,name:'Admin',role:'admin',csrf:'admin-token'},'/api/admin/metrics':{counts:{}},'/api/admin/queue':{items:[]},'/api/admin/audit':{items:[]},'/api/v4/admin':{reports:[{id:6,kind:'message',target_id:41,reason:'Un signalement fictif',status:'open'}],projects:[],users:[]},'POST /api/v4/admin/reports/6/review':{report:{reason:'Un signalement fictif'},context:{project:null,messages:[{id:41,sender_name:'Atelier',body:'<img src=x>',created_at:'2026-10-27T12:00:00Z'}],next_before_id:null}},'POST /api/v4/admin/reports/6/resolve':{ok:true}});
+ try{
+  await x.w.go('moderation');
+  assert.equal(x.calls.some(c=>c.url.endsWith('/review')),false);
+  [...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Examiner le signalement').click();
+  assert.equal(x.calls.some(c=>c.url.endsWith('/review')),false);
+  input(x.w,'#dialog [name=reason]','Examen nécessaire pour le dossier.');submit(x.w,'#dialog form');await tick();
+  const reviewed=x.calls.find(c=>c.url.endsWith('/review'));
+  assert.equal(reviewed.body.reason,'Examen nécessaire pour le dossier.');assert.equal(reviewed.headers['x-ucp-csrf'],'admin-token');
+  assert.equal(x.w.document.querySelector('#dialog img'),null);assert.match(x.w.document.querySelector('#dialog').textContent,/<img src=x>/);
+  [...x.w.document.querySelectorAll('#dialog button')].find(b=>b.textContent==='Répondre et clôturer le signalement').click();
+  assert.match(x.w.document.querySelector('#dialog label').textContent,/visible dans Assistance/);
+  input(x.w,'#dialog [name=reason]','Votre signalement a bien été examiné.');submit(x.w,'#dialog form');await tick();
+  assert.ok(x.calls.some(c=>c.url.endsWith('/resolve')&&c.body.reason.includes('bien été examiné')));
+ }finally{x.close()}
+});

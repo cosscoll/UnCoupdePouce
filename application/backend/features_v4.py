@@ -1,7 +1,7 @@
 """Additive v4 features for the isolated UCP laboratory. No external services."""
 import base64, binascii, io, json, re, secrets, sqlite3, time, unicodedata
-from fastapi import Depends, Response
-from pydantic import BaseModel, Field
+from fastapi import Depends, Response, Query
+from pydantic import BaseModel, Field, field_validator
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 class Draft(BaseModel):
@@ -13,13 +13,25 @@ class Draft(BaseModel):
     version: int = Field(default=0,ge=0)
 class Photo(BaseModel):
     data: str = Field(max_length=6_000_000)
-class Report(BaseModel):
-    kind: str = Field(pattern='^(project|conversation)$')
-    target_id: int
-    reason: str = Field(min_length=10,max_length=1000)
-class Decision(BaseModel):
+class Reason(BaseModel):
     reason: str = Field(min_length=10,max_length=500)
+
+    @field_validator('reason')
+    @classmethod
+    def meaningful_reason(cls, value):
+        value = value.strip()
+        if len(value) < 10:
+            raise ValueError('Précisez le motif en au moins 10 caractères')
+        return value
+
+class Report(Reason):
+    kind: str = Field(pattern='^(project|conversation|message)$')
+    target_id: int = Field(gt=0)
+    reason: str = Field(min_length=10,max_length=1000)
+class Decision(Reason):
     value: bool
+class Review(Reason):
+    before_id: int | None = Field(default=None,gt=0,le=9223372036854775807)
 class Trade(BaseModel):
     id: str = Field(pattern='^[a-z][a-z0-9-]{1,60}$')
     label: str = Field(min_length=2,max_length=80)
@@ -198,10 +210,58 @@ def install(m):
     def report(body:Report,user=Depends(m.get_user)):
         with m.authenticated_db(user,write=True) as c:
             if body.kind=='project':visible_project(c,body.target_id,user)
+            elif body.kind=='message':
+                message=c.execute('SELECT application_id FROM messages WHERE id=?',(body.target_id,)).fetchone()
+                if not message:error(404,'Message introuvable')
+                m.check_conversation(c,message['application_id'],user['id'])
             else:m.check_conversation(c,body.target_id,user['id'])
             if c.execute("SELECT 1 FROM reports WHERE reporter_id=? AND kind=? AND target_id=? AND status='open'",(user['id'],body.kind,body.target_id)).fetchone():error(409,'Un signalement est déjà en cours')
             cur=c.execute('INSERT INTO reports(reporter_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',(user['id'],body.kind,body.target_id,body.reason.strip(),now()));audit(c,user,'report_created','report',cur.lastrowid);c.execute('COMMIT')
             return {'id':cur.lastrowid,'status':'open'}
+
+    @app.get('/api/v4/reports')
+    def own_reports(before_id:int | None=Query(default=None,gt=0,le=9223372036854775807),user=Depends(m.get_user)):
+        with m.authenticated_db(user,write=False) as c:
+            rows=c.execute('''SELECT id,kind,target_id,reason,status,resolution,created_at FROM reports
+                WHERE reporter_id=? AND id<COALESCE(?,9223372036854775807) ORDER BY id DESC LIMIT 51''',
+                (user['id'],before_id)).fetchall()
+            items=[dict(r) for r in rows[:50]]
+            return {'items':items,'next_before_id':items[-1]['id'] if len(rows)>50 else None}
+
+    @app.post('/api/v4/admin/reports/{id}/review')
+    def review_report(id:int,body:Review,user=Depends(m.require('admin'))):
+        # The audit is committed before any private content is returned. No general
+        # admin conversation reader is introduced; every read belongs to an open case.
+        with m.authenticated_db(user,write=True) as c:
+            report=c.execute('SELECT id,kind,target_id,reason,status,created_at FROM reports WHERE id=?',(id,)).fetchone()
+            if not report:error(404,'Signalement introuvable')
+            if report['status']!='open':error(409,'Ce signalement est déjà traité')
+            context={'project':None,'messages':[],'next_before_id':None}
+            if report['kind']=='project':
+                if body.before_id is not None:error(422,'Pagination réservée aux conversations signalées')
+                row=c.execute('SELECT id,title,description,town,status,hidden FROM projects WHERE id=?',(report['target_id'],)).fetchone()
+                if row:context['project']=dict(row)
+            else:
+                if report['kind']=='message':
+                    if body.before_id is not None:error(422,'Un seul message est consultable dans ce dossier')
+                    rows=c.execute('''SELECT messages.id,messages.application_id,messages.sender_id,
+                        users.name AS sender_name,messages.body,messages.created_at FROM messages
+                        JOIN users ON users.id=messages.sender_id WHERE messages.id=?''',(report['target_id'],)).fetchall()
+                else:
+                    # Keyset pagination: a bounded window, no unrelated conversations.
+                    rows=c.execute('''SELECT messages.id,messages.application_id,messages.sender_id,
+                        users.name AS sender_name,messages.body,messages.created_at FROM messages
+                        JOIN users ON users.id=messages.sender_id WHERE messages.application_id=?
+                        AND messages.id<COALESCE(?,9223372036854775807) ORDER BY messages.id DESC LIMIT 21''',
+                        (report['target_id'],body.before_id)).fetchall()
+                    if len(rows)>20:context['next_before_id']=rows[19]['id']
+                    rows=list(reversed(rows[:20]))
+                context['messages']=[dict(r) for r in rows]
+            c.execute('INSERT INTO admin_decisions(actor_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',
+                      (user['id'],'review_report',id,body.reason,now()))
+            audit(c,user,'review_report','report',id)
+            c.execute('COMMIT')
+            return {'report':dict(report),'context':context}
 
     @app.get('/api/v4/admin')
     def admin(user=Depends(m.require('admin'))):
@@ -253,8 +313,14 @@ def install(m):
     @app.post('/api/v4/admin/reports/{id}/resolve')
     def resolve(id:int,body:Decision,user=Depends(m.require('admin'))):
         with m.authenticated_db(user,write=True) as c:
-            if not c.execute("SELECT 1 FROM reports WHERE id=? AND status='open'",(id,)).fetchone():error(409,'Signalement absent ou déjà traité')
-            c.execute("UPDATE reports SET status='resolved',resolution=? WHERE id=?",(body.reason,id));audit(c,user,'resolve_report','report',id);c.execute('COMMIT')
+            report=c.execute("SELECT reporter_id FROM reports WHERE id=? AND status='open'",(id,)).fetchone()
+            if not report:error(409,'Signalement absent ou déjà traité')
+            c.execute("UPDATE reports SET status='resolved',resolution=? WHERE id=?",(body.reason,id))
+            c.execute('INSERT INTO admin_decisions(actor_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',
+                      (user['id'],'resolve_report',id,body.reason,now()))
+            audit(c,user,'resolve_report','report',id)
+            m.queue_notice(c,report['reporter_id'],'report_resolved',id)
+            c.execute('COMMIT')
         return {'ok':True}
 
     @app.put('/api/v4/admin/catalog')

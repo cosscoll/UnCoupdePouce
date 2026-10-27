@@ -93,6 +93,8 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     assert pro.post(f'/api/projects/{second}/apply-linked/{linked.json()["id"]}').status_code==201
     assert pro.post(f'/api/projects/{second}/apply-linked/{linked.json()["id"]}').status_code==409
     assert pro.post(f'/api/enterprise/artisans/{linked.json()["id"]}/set-active',json={'active':False}).status_code==200
+    from test_reports import exercise_report_flow
+    exercise_report_flow(pg,admin,requester,pro,other,aid)
     assert admin.post(f'/api/admin/professionals/{pid}/suspend').status_code==200
     assert requester.get(path).status_code==403
 

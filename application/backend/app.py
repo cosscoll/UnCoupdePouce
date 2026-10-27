@@ -193,6 +193,7 @@ NOTIFICATION_TYPES = {
     'application_withdrawn': 'Une candidature sur votre projet a été retirée.',
     'project_closed': 'Un projet auquel vous avez candidaté a été clôturé.',
     'new_message': 'Un nouveau message fictif vous attend dans une conversation.',
+    'report_resolved': 'Une réponse à votre signalement est disponible dans Assistance.',
 }
 
 def queue_notice(connection, recipient_id, event_type, entity_id):
@@ -935,7 +936,7 @@ def check_conversation(c,aid,uid,allow_locked=False):
 def read_messages(aid:int,user=Depends(get_user)):
     with authenticated_db(user,write=False) as c:
         check_conversation(c,aid,user['id'])
-        items=c.execute('SELECT sender_id,body,created_at FROM messages WHERE application_id=? ORDER BY id',(aid,)).fetchall()
+        items=c.execute('SELECT id,sender_id,body,created_at FROM messages WHERE application_id=? ORDER BY id',(aid,)).fetchall()
     return {'items':[dict(x) for x in items]}
 
 @app.post('/api/conversations/{aid}/messages',status_code=201)
