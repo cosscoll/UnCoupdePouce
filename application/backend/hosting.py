@@ -2,6 +2,7 @@
 import base64
 import hmac
 import os
+import certifi
 from dataclasses import dataclass
 from urllib.parse import urlsplit, parse_qs, parse_qsl, urlencode, urlunsplit
 from fastapi.responses import JSONResponse, Response
@@ -14,7 +15,7 @@ def database_url():
     if direct:
         parts = urlsplit(direct)
         params = dict(parse_qsl(parts.query))
-        params.update(sslmode='verify-full', sslrootcert='system')
+        params.update(sslmode='verify-full', sslrootcert=certifi.where())
         value = urlunsplit(parts._replace(query=urlencode(params)))
     return value
 

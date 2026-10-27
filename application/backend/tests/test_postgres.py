@@ -194,3 +194,17 @@ def test_hosted_ipv4_keeps_tls_hostname(monkeypatch):
     postgres.Connection(original,'ucp_test_transport')
     assert seen['url']==original  # DNS host remains available for TLS certificate verification.
     assert seen['options']['hostaddr']=='192.0.2.15'
+
+
+def test_database_diagnostic_never_exposes_credentials(monkeypatch):
+    import postgres
+    monkeypatch.delenv('VERCEL',raising=False)
+    password='Fictional-secret-should-not-be-logged'
+    def fail(*args,**kwargs):
+        raise postgres.psycopg.OperationalError('connection rejected for fictional-user password='+password)
+    monkeypatch.setattr(postgres.psycopg,'connect',fail)
+    with pytest.raises(RuntimeError) as exc:
+        postgres.Connection('postgresql://fictional-user:'+password+'@db.example/test','ucp_test_diagnostic')
+    assert password not in str(exc.value)
+    assert 'fictional-user' not in str(exc.value)
+    assert '[redacted]' in str(exc.value)

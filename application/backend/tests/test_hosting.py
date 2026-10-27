@@ -59,7 +59,10 @@ def test_neon_marketplace_prefers_direct_url_and_verifies_tls(monkeypatch):
     monkeypatch.setenv('UCP_DATABASE_URL','postgresql://demo:fictional@pooler.example/db')
     url=database_url()
     assert 'direct.example' in url and 'pooler.example' not in url
-    assert 'sslmode=verify-full' in url and 'sslrootcert=system' in url
+    from urllib.parse import parse_qs,urlsplit
+    import certifi
+    params=parse_qs(urlsplit(url).query)
+    assert params['sslmode']==['verify-full'] and params['sslrootcert']==[certifi.where()]
     assert 'channel_binding=require' in url
 
 
