@@ -30,11 +30,11 @@ Sources consultées :
 - https://supabase.com/docs/guides/database/connecting-to-postgres
 - https://supabase.com/docs/guides/troubleshooting/disabling-prepared-statements-qL8lEL
 
-## Configuration Vercel prévue
+## Configuration Vercel effective
 
 Importer `cosscoll/UnCoupdePouce`, branche `main`, racine `application`.
 Le point d'entrée `backend.app:app` est défini dans `pyproject.toml`.
-Ne pas publier avant confirmation du plan gratuit et des limites du compte cible.
+Plan Hobby Vercel et Neon Free vérifiés ; aucune offre payante souscrite.
 Les fichiers `.vercelignore` excluent les bases, environnements et tests du bundle.
 Le serveur refuse de démarrer en mode staging si un élément obligatoire manque.
 
@@ -58,22 +58,28 @@ Ne pas utiliser de pooler **transaction** : cet adaptateur conserve un search_pa
 par session et le verrou d'initialisation est lié à la session. Les instructions
 préparées automatiques sont désactivées par précaution.
 
-Créer l'administrateur fictif depuis une session opérateur avec la même configuration
-et `python backend/create_local_admin.py`. Le helper et `backend/demo.py` restent des
-commandes manuelles ; ne jamais les lancer automatiquement sur une base non vide.
-Les règles de tarif, sélection, chat et entreprise sont celles du laboratoire,
+Le premier démarrage peut peupler une base **vide** avec `UCP_DEMO_SEED_PASSWORD`
+(secret aléatoire >= 24 caractères). Le verrou d'initialisation empêche les doubles
+semis ; une base déjà peuplée n'est ni réinitialisée ni modifiée par ce mécanisme.
+Les règles de tarif, sélection, chat et entreprise restent celles du laboratoire,
 explicitement simulées. D01–D13 ne sont pas validées par ce déploiement.
 
-## Publication après tests
+## Publication effective
 
-`Application CI` exécute les tests SQLite, les tests d'intégration PostgreSQL 17 et
-les huit tests DOM à chaque push concerné. Aucun déclencheur horaire, paiement,
-email ou tâche autonome. Le projet Vercel `ucp-preproduction` a été créé avec le dépôt GitHub et la racine
-`application`. Les builds sont temporairement ignorés (`exit 0`) tant que la base
-et les secrets ne sont pas configurés ; rétablir les builds après configuration.
-Ce workflow de tests ne prétend pas déployer le backend. Vérifier le commit,
-les tests verts et le plan avant import/promotion. Ajouter l'URL réelle au README
-et le lien vitrine uniquement après recette HTTPS du service déployé.
+Application : https://ucp-preproduction.vercel.app
+
+Vercel importe `main`, racine `application`. Les builds ne sont plus ignorés.
+Les protections Vercel Authentication et HTTP Basic sont conservées.
+Neon `ucp-preproduction` est une base dédiée ; aucune base IAgile/CONTROL modifiée.
+L'intégration Marketplace a fourni `UCP_DATABASE_DATABASE_URL_UNPOOLED` ; le serveur
+l'utilise sans divulgation au navigateur. TLS vérifie le nom DNS et la chaîne de
+certificats via certifi ; une adresse IPv4 est sélectionnée côté Vercel pour libpq.
+Le backend conserve les comptes, sessions, messages et photos dans PostgreSQL.
+
+`Application CI` contrôle SQLite, PostgreSQL 17 et huit tests DOM à chaque push.
+Vercel déploie automatiquement les commits `main`. Le statut de CI doit être vérifié
+avant de considérer une version validée : le build Vercel n'est pas bloqué par CI.
+Aucun déclencheur horaire, paiement, email ou tâche autonome n'a été ajouté.
 
 ## Sauvegardes et recette de réception
 
@@ -93,14 +99,12 @@ peuvent être refusées par la plateforme ; réduire les images avant envoi. Pas
 PWA ou fonctionnement hors connexion promis ; les API privées ne doivent pas être
 mises en cache par un futur service worker.
 
-## Blocages constatés pendant la session
+## Limites restantes
 
-- Vercel : accès autorisé et revérifié après intervention utilisateur. Projet
-  `ucp-preproduction` créé, ID `prj_rbWCIYaeYmGDe8Xg9Ftc2n5CArlv`, espace
-  `team_S3CZCMukEO0dAG8QdpmXtabI`, framework FastAPI. Aucune version déployée
-  et aucun domaine applicatif : la base et les variables restent à configurer.
-  Les protections SSO par défaut sont conservées. Aucun service payant ajouté.
-- Supabase : seule l'organisation IAgile est visible ; l'utilisateur a choisi une
-  autre organisation. Son nom/accès reste à fournir. Aucun projet créé ou facturé.
-- Chromium local : téléchargement refusé/tronqué par l'environnement. Les tests DOM
-  ne sont pas présentés comme une recette visuelle de l'application.
+Supabase a été examiné mais le quota gratuit de l'organisation visible est occupé.
+Neon Free a été installé par le propriétaire sans toucher aux projets existants.
+Le backend HTTPS et les connexions des trois rôles ont été vérifiés sur le service
+réel le 27 octobre. Voir QA.md pour la recette du parcours et ses limites.
+La restauration PostgreSQL distante, la charge et la recette mobile restent à
+réaliser avant toute ouverture réelle. La PWA et les arbitrages D01–D13 restent
+hors validation. Aucune ouverture commerciale ni paiement réel activés.

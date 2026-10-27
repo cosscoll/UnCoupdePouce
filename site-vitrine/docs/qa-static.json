@@ -2,8 +2,8 @@
   "status": "PASS",
   "pages": [
     {
-      "page": "index.html",
-      "checks": 101,
+      "page": "informations.html",
+      "checks": 64,
       "h1": 1,
       "lang": "fr"
     },
@@ -14,14 +14,20 @@
       "lang": "fr"
     },
     {
-      "page": "informations.html",
+      "page": "404.html",
       "checks": 64,
       "h1": 1,
       "lang": "fr"
     },
     {
-      "page": "404.html",
-      "checks": 64,
+      "page": "index.html",
+      "checks": 101,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "avancement.html",
+      "checks": 29,
       "h1": 1,
       "lang": "fr"
     },
@@ -76,19 +82,9 @@
   ],
   "assets": [
     {
-      "file": "index.html",
-      "bytes": 19698,
-      "gzip_bytes": 6240
-    },
-    {
-      "file": "robots.txt",
-      "bytes": 26,
-      "gzip_bytes": 46
-    },
-    {
-      "file": "projet.html",
-      "bytes": 10689,
-      "gzip_bytes": 4024
+      "file": "informations.html",
+      "bytes": 7819,
+      "gzip_bytes": 2948
     },
     {
       "file": "_headers",
@@ -96,29 +92,29 @@
       "gzip_bytes": 467
     },
     {
-      "file": "informations.html",
-      "bytes": 7658,
-      "gzip_bytes": 2880
+      "file": "projet.html",
+      "bytes": 10928,
+      "gzip_bytes": 4109
     },
     {
       "file": "404.html",
-      "bytes": 4385,
-      "gzip_bytes": 1631
+      "bytes": 4546,
+      "gzip_bytes": 1701
     },
     {
-      "file": "assets/app.js",
-      "bytes": 3925,
-      "gzip_bytes": 1476
+      "file": "index.html",
+      "bytes": 19859,
+      "gzip_bytes": 6308
     },
     {
-      "file": "assets/logo.svg",
-      "bytes": 159256,
-      "gzip_bytes": 28162
+      "file": "robots.txt",
+      "bytes": 26,
+      "gzip_bytes": 46
     },
     {
-      "file": "assets/house.svg",
-      "bytes": 2990,
-      "gzip_bytes": 1208
+      "file": "avancement.html",
+      "bytes": 4551,
+      "gzip_bytes": 2044
     },
     {
       "file": "assets/social.svg",
@@ -126,9 +122,19 @@
       "gzip_bytes": 7514
     },
     {
-      "file": "assets/style.css",
-      "bytes": 18876,
-      "gzip_bytes": 4883
+      "file": "assets/brief.js",
+      "bytes": 2930,
+      "gzip_bytes": 1358
+    },
+    {
+      "file": "assets/logo.svg",
+      "bytes": 159256,
+      "gzip_bytes": 28162
+    },
+    {
+      "file": "assets/app.js",
+      "bytes": 8631,
+      "gzip_bytes": 2382
     },
     {
       "file": "assets/social.png",
@@ -136,19 +142,24 @@
       "gzip_bytes": 99847
     },
     {
-      "file": "assets/brief.js",
-      "bytes": 2889,
-      "gzip_bytes": 1349
+      "file": "assets/house.svg",
+      "bytes": 2990,
+      "gzip_bytes": 1208
+    },
+    {
+      "file": "assets/style.css",
+      "bytes": 18876,
+      "gzip_bytes": 4883
     },
     {
       "file": "en/index.html",
-      "bytes": 10835,
-      "gzip_bytes": 3826
+      "bytes": 11109,
+      "gzip_bytes": 3925
     },
     {
-      "file": "assets/fonts/montserrat-700.woff2",
-      "bytes": 63596,
-      "gzip_bytes": 63634
+      "file": "assets/fonts/anton-OFL.txt",
+      "bytes": 4484,
+      "gzip_bytes": 2008
     },
     {
       "file": "assets/fonts/anton.woff2",
@@ -156,24 +167,24 @@
       "gzip_bytes": 47121
     },
     {
-      "file": "assets/fonts/montserrat-OFL.txt",
-      "bytes": 4400,
-      "gzip_bytes": 1964
-    },
-    {
       "file": "assets/fonts/montserrat-400.woff2",
       "bytes": 61868,
       "gzip_bytes": 61906
     },
     {
+      "file": "assets/fonts/montserrat-700.woff2",
+      "bytes": 63596,
+      "gzip_bytes": 63634
+    },
+    {
+      "file": "assets/fonts/montserrat-OFL.txt",
+      "bytes": 4400,
+      "gzip_bytes": 1964
+    },
+    {
       "file": "assets/fonts/montserrat-600.woff2",
       "bytes": 62784,
       "gzip_bytes": 62822
-    },
-    {
-      "file": "assets/fonts/anton-OFL.txt",
-      "bytes": 4484,
-      "gzip_bytes": 2008
     }
   ],
   "errors": [],

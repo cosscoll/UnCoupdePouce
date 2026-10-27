@@ -5,7 +5,7 @@ Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en rela
 ## Suivi du projet
 
 - [Vitrine publique vérifiée](https://cosscoll.github.io/UnCoupdePouce/site-vitrine/dist/index.html)
-- Application en ligne : **pas encore déployée**, projet Vercel `ucp-preproduction` créé ; organisation Supabase UCP à connecter.
+- [Application — préproduction privée](https://ucp-preproduction.vercel.app) : FastAPI sur Vercel, PostgreSQL Neon persistant (offre Free). Accès Vercel puis identifiant de préproduction requis ; données fictives uniquement.
 - [Préproduction : configuration et blocages](application/docs/PREPRODUCTION.md)
 - [Audit de reprise du 27 octobre](application/docs/REPRISE_2026-10-27.md)
 - [Sources de la vitrine](site-vitrine/dist/index.html)
@@ -38,7 +38,7 @@ Sous Windows, utilisez `application/DEMARRER.bat`. L'application est destinée �
 
 ## Vérifications de référence
 
-- Application : 119 tests Python réussis sur GitHub Actions le 27/10/2026 (SQLite et PostgreSQL 17).
+- Application : 124 tests Python réussis sur GitHub Actions le 27/10/2026 (SQLite et PostgreSQL 17).
 - Interface de l'application : 8 tests DOM réussis.
 - Vitrine : contrôles statiques et tests des scénarios de brief réussis.
 - Vitrine ouverte dans un navigateur réel ; recette visuelle de l’application et de son hébergement encore à effectuer.
