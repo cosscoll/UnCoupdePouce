@@ -32,5 +32,26 @@
     "load",
     "pwa"
   ],
-  "commercial_payments_enabled": false
+  "commercial_payments_enabled": false,
+  "functional_increments": {
+    "source": "644c7380c7cc75c8c8794e66f1483d4296960fcd",
+    "ci_run": 40537513877,
+    "python_passed": 131,
+    "dom_passed": 13,
+    "support_https": {
+      "date": "2026-10-27",
+      "case_id": 1,
+      "message_id": 5,
+      "result": "PASS",
+      "checks": 6
+    },
+    "comparison_https": {
+      "date": "2026-10-27",
+      "project_id": 6,
+      "selected_application": 6,
+      "linked_profile": 2,
+      "result": "PASS",
+      "checks": 5
+    }
+  }
 }

@@ -1,3 +1,37 @@
+# Compléments fonctionnels — signalements, assistance et comparaison
+
+Source : `644c7380c7cc75c8c8794e66f1483d4296960fcd`, publiée depuis `main`.
+[Tests de la version](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40537513877) :
+**131 tests Python réussis sur SQLite et PostgreSQL 17**, **13 tests DOM réussis**.
+Localement : 125 réussis, six tests PostgreSQL ignorés faute de base locale.
+
+- Signalement ciblé d'un message et conservation des signalements projet/conversation.
+- Consultation administrative limitée à un dossier ouvert, avec motif, CSRF et
+  audit obligatoire avant restitution du contenu. Aucun lecteur général de chat.
+- Assistance : historique personnel paginé, statut, réponse de clôture et notification
+  interne atomique ; aucun email ni engagement contractuel de réponse.
+- Comparatif de deux ou trois candidatures : métiers et communes du profil candidat,
+  distinction artisan individuel/profil lié, date et disponibilité de sélection.
+  Aucun email, SIREN, montant d'abonnement, avis ou certificat fictif exposé.
+
+**Recette HTTPS support réussie** : envoi d'un message signalé, refus d'un tiers et
+  d'un doublon, examen du seul message concerné, refus des rôles et CSRF invalides,
+  trace dans le journal distant, réponse visible seulement par le déclarant,
+  notification interne et refus de consultation après clôture.
+
+**Recette HTTPS comparaison réussie** : publication multi-métiers, candidature
+individuelle et candidature d'un profil lié, métiers/zones exacts dans le comparatif,
+refus d'accès du tiers et du professionnel, sélection avec refus de l'autre
+candidature, échange privé avec le profil lié puis vérification des fichiers
+HTML/JavaScript effectivement servis. Une interruption du proxy de l'environnement
+s'est produite ; la recette a repris les candidatures déjà créées sans doublon.
+
+Les profils d'entreprise restent une simulation sous gestionnaire unique ; les
+arbitrages D01–D13 n'ont pas été modifiés. La recette visuelle mobile reste ouverte.
+Voir [l'avancement du cahier des charges](AVANCEMENT_CDC.md).
+
+---
+
 # Recette du 27 octobre 2026
 
 Application réelle : https://ucp-preproduction.vercel.app (préproduction privée).

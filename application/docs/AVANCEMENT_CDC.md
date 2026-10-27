@@ -22,7 +22,11 @@ Tests dédiés dans `backend/tests/test_reports.py` : périmètre exact du messa
 refus inter-comptes, CSRF, motifs vides, accès après clôture, audit obligatoire,
 pagination, réponse et notification atomiques. Le parcours de signalement est
 également exécuté par le test d'intégration PostgreSQL et par les tests DOM.
-Les résultats CI et HTTPS effectifs sont consignés dans QA.md après exécution.
+Résultats : 131 tests Python (SQLite/PostgreSQL) et 13 tests DOM réussis. Le parcours
+signalement → examen tracé → réponse privée a aussi été réussi sur le service HTTPS
+déployé. La comparaison et la sélection de deux candidatures, dont un profil lié,
+puis sa messagerie ont également été réussies en HTTPS. Voir QA.md pour les preuves
+et limites de recette.
 
 ## Priorités suivantes
 

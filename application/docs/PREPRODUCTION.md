@@ -76,7 +76,7 @@ l'utilise sans divulgation au navigateur. TLS vérifie le nom DNS et la chaîne 
 certificats via certifi ; une adresse IPv4 est sélectionnée côté Vercel pour libpq.
 Le backend conserve les comptes, sessions, messages et photos dans PostgreSQL.
 
-`Application CI` contrôle SQLite, PostgreSQL 17 et huit tests DOM à chaque push.
+`Application CI` contrôle SQLite, PostgreSQL 17 et les tests DOM à chaque push.
 Vercel déploie automatiquement les commits `main`. Le statut de CI doit être vérifié
 avant de considérer une version validée : le build Vercel n'est pas bloqué par CI.
 Aucun déclencheur horaire, paiement, email ou tâche autonome n'a été ajouté.
