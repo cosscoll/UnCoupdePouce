@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-27",
+  "environment": "staging",
+  "url": "https://ucp-preproduction.vercel.app",
+  "storage": "postgresql-neon",
+  "deployed_source": "1230ba301286afa7f3fe50ee4c7601f2d0b5dd3e",
+  "real_https_checks": {
+    "distinct_registration": true,
+    "three_demo_roles_login": true,
+    "draft_photo_publish": true,
+    "application_selection": true,
+    "two_way_messages": true,
+    "message_idempotency": true,
+    "chat_gate_before_test_subscription": true,
+    "third_party_denied": true,
+    "photo_private_before_selection": true,
+    "enterprise_simulation": true,
+    "data_survives_redeployment": true,
+    "basic_gate_401": true,
+    "secure_httponly_cookies": true,
+    "no_store_noindex_csp": true
+  },
+  "ci": {
+    "python_passed": 124,
+    "dom_passed": 8,
+    "run": 40533099129
+  },
+  "vitrine_js_passed": 55,
+  "not_verified": [
+    "application_mobile_browser",
+    "remote_postgres_restore",
+    "load",
+    "pwa"
+  ],
+  "commercial_payments_enabled": false
+}

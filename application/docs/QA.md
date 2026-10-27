@@ -1,19 +1,40 @@
-# Reprise et contrôles du 27 octobre 2026
+# Recette du 27 octobre 2026
 
-119 tests Python réussis sur SQLite et PostgreSQL 17.11, puis 8 tests DOM réussis :
-[run GitHub Actions](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40525907397).
-Source contrôlée : `fd7f5a743b3b9081c59d26c6c9b3168996fb13cb`.
-Le parcours demandeur → publication → candidature → sélection → chat est testé,
-avec les refus inter-comptes, les réessais idempotents, les photos privées,
-l'entreprise simplifiée et le peuplement fictif derrière le verrou de staging.
+Application réelle : https://ucp-preproduction.vercel.app (préproduction privée).
+FastAPI et interface existants conservés ; PostgreSQL Neon persistant, TLS vérifié.
+
+## Vérifications effectuées
+
+- GitHub Actions : **124 tests Python réussis** (SQLite et PostgreSQL 17), **8 tests DOM réussis**.
+  [Exécution](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40533099129),
+  source `98cab2f145c0edb7d58e08d3efc4a90210b86d1c`.
+- **Recette HTTPS réelle réussie** sur l'alias public protégé, par clients HTTP
+  indépendants : inscriptions/connexions demandeur et professionnel ; validation
+  admin fictive ; brouillon, photo, publication et réessai sans doublon ; recherche,
+  candidature et rejet d'un doublon ; sélection ; refus du chat avant activation
+  d'un abonnement de test ; échanges dans les deux sens ; idempotence du message.
+- Un troisième compte ne peut lire ni messages, ni photos, ni candidatures d'autrui.
+  Le professionnel ne peut lire la photo avant sélection ; accès autorisé ensuite.
+- Compte entreprise de laboratoire, ajout et désactivation d'un profil lié : réussis.
+  Aucun accès nominatif de collaborateur ni abonnement réel n'est prétendu.
+- Après redéploiement depuis GitHub, une nouvelle connexion retrouve les deux messages et la photo privée : persistance vérifiée.
+- Connexions des trois comptes de démonstration : réussies ; données en base distante.
+- Sans mot de passe de préproduction, l'API renvoie 401. Cookies Secure/HttpOnly,
+  no-store, noindex et CSP contrôlés sur le service réel.
+- Vitrine : ouverte dans un navigateur réel ; 55 tests JavaScript et contrôles
+  statiques réussis. Lien vers la préproduction ajouté dans les pieds de page.
+
+## Limites explicites
+
+Les tests HTTP distants vérifient réellement serveur et base ; les huit tests DOM
+utilisent des API simulées et ne prouvent pas le rendu mobile. Le navigateur de
+contrôle n'a pas pu franchir la protection HTTP Basic ; aucune recette visuelle
+mobile de l'application n'est revendiquée. Les protections sont restées actives.
+Les sauvegardes/restaurations SQLite sont testées ; le dump/restore PostgreSQL
+**distant** reste à réaliser. Charge, PWA, accès nominatifs entreprise et décisions
+D01–D13 restent à traiter avant toute ouverture réelle. Aucun paiement activé.
 Un avertissement de dépréciation anyio/Starlette persiste, sans test en échec.
-
-Ces tests utilisent TestClient et une base PostgreSQL de CI ; ils ne constituent
-pas une preuve de déploiement ou de recette mobile de l'application. La vitrine
-publique a été ouverte dans le navigateur ; 55 tests JavaScript et son contrôle
-statique passent. Les sauvegardes/restaurations SQLite sont couvertes par les tests
-hérités ; restauration PostgreSQL distante, charge et préproduction HTTPS restent
-à vérifier après déblocage des accès. Voir [PREPRODUCTION.md](PREPRODUCTION.md).
+Voir [PREPRODUCTION.md](PREPRODUCTION.md).
 
 ---
 

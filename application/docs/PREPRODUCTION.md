@@ -91,9 +91,9 @@ rejouer le parcours. Ne pas mettre une URL avec mot de passe dans les arguments 
 commande ni committer les dumps. Le dump/restore PostgreSQL distant reste à exécuter
 sur le projet choisi ; aucune sauvegarde fournisseur gratuite n'est présumée.
 
-À vérifier sur l'hébergement : persistance après redéploiement, accès privé,
-inscription distincte, annonce → candidature → sélection → messages, photos et
-comptes tiers refusés, mobile/clavier, cookies HTTPS et restauration réelle.
+Recette HTTPS réussie : persistance après redéploiement, accès privé, inscription
+distincte, annonce → candidature → sélection → messages, photos et refus inter-comptes,
+cookies HTTPS. Restent mobile/clavier et restauration PostgreSQL distante.
 Vercel limite la taille des requêtes : les photos volumineuses du laboratoire
 peuvent être refusées par la plateforme ; réduire les images avant envoi. Pas de
 PWA ou fonctionnement hors connexion promis ; les API privées ne doivent pas être

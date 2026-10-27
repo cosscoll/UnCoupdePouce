@@ -41,7 +41,8 @@ Sous Windows, utilisez `application/DEMARRER.bat`. L'application est destinée �
 - Application : 124 tests Python réussis sur GitHub Actions le 27/10/2026 (SQLite et PostgreSQL 17).
 - Interface de l'application : 8 tests DOM réussis.
 - Vitrine : contrôles statiques et tests des scénarios de brief réussis.
-- Vitrine ouverte dans un navigateur réel ; recette visuelle de l’application et de son hébergement encore à effectuer.
+- Parcours HTTPS réel publication → candidature → sélection → messagerie et refus inter-comptes réussis sur la préproduction.
+- Vitrine ouverte dans un navigateur réel ; rendu mobile de l’application, restauration PostgreSQL distante et PWA restent à vérifier.
 
 ## Sécurité des sources
 
