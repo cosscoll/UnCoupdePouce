@@ -177,3 +177,20 @@ def test_first_staging_start_seeds_once_and_preserves_accounts(pg,monkeypatch):
                 assert c.execute('SELECT COUNT(*) FROM messages').fetchone()[0]==1
         finally:
             sys.modules.pop(name,None)
+
+
+def test_hosted_ipv4_keeps_tls_hostname(monkeypatch):
+    import postgres
+    seen={}
+    class Raw:
+        def execute(self,*a,**k): pass
+    def connect(url,**options):
+        seen.update(url=url,options=options)
+        return Raw()
+    monkeypatch.setenv('VERCEL','1')
+    monkeypatch.setattr(postgres.socket,'getaddrinfo',lambda *args:[(2,1,6,'',('192.0.2.15',5432)),(2,1,6,'',('192.0.2.16',5432))])
+    monkeypatch.setattr(postgres.psycopg,'connect',connect)
+    original='postgresql://fictional:unused@db.example/test?sslmode=verify-full'
+    postgres.Connection(original,'ucp_test_transport')
+    assert seen['url']==original  # DNS host remains available for TLS certificate verification.
+    assert seen['options']['hostaddr']=='192.0.2.15'

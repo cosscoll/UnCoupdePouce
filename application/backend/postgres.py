@@ -67,7 +67,7 @@ class Connection:
             try:
                 addresses = socket.getaddrinfo(info['host'], int(info.get('port',5432)),
                                                socket.AF_INET, socket.SOCK_STREAM)
-                options['hostaddr'] = ','.join(dict.fromkeys(r[4][0] for r in addresses))
+                options['hostaddr'] = addresses[0][4][0]
             except (OSError,KeyError):
                 pass
         try:
