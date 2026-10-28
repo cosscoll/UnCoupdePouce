@@ -239,3 +239,10 @@ def test_postgres_declared_showcase_privacy_and_versions(pg):
     assert admin.post(f'/api/admin/professionals/{pid}/approve').status_code==200
     exercise_showcase(pro,requester,other)
     with pg.connect() as db:assert db.execute('SELECT COUNT(*) FROM professional_showcases').fetchone()[0]==1
+
+
+def test_postgres_notification_history_and_unread_pagination(pg):
+    from test_notification_center import exercise_notification_history
+    owner,owner_id=client_for(pg,'notification-owner@ucp.test','requester')
+    other,other_id=client_for(pg,'notification-other@ucp.test','requester')
+    exercise_notification_history(pg,owner,owner_id,other,other_id)

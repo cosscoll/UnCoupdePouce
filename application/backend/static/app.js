@@ -119,7 +119,7 @@ async function renderProfessionalHome(n){
    clear(target.content);target.content.append(el('p',{class:'status-note',text:'Information indisponible. Les autres rubriques restent utilisables.'}),button('Réessayer cette rubrique',()=>action(()=>load(target,path))));return false;
   }
  }
- await Promise.all([[missions,'/projects'],[applications,'/my-applications'],[messages,'/conversations'],[profile,'/my-profile'],[notices,'/notifications']].map(([target,path])=>load(target,path)));
+ await Promise.all([[missions,'/projects'],[applications,'/my-applications'],[messages,'/conversations'],[profile,'/my-profile'],[notices,'/notifications?unread_only=true']].map(([target,path])=>load(target,path)));
 }
 async function renderProjects(n){
   const req=appState.user.role==='requester',epoch=renderEpoch,owner=appState.user.id;
@@ -459,7 +459,54 @@ function reviewReport(report){
   });
   showDialog('Examiner le signalement #'+report.id,form);
 }
-async function renderNotifications(n){n.append(heading('Votre actualité UCP.','Les nouvelles candidatures, sélections et messages.'));const d=await api('/notifications');if(!d.items.length)n.append(empty('Vous êtes à jour.','Les prochains événements apparaîtront ici.'));if(d.unread)n.append(button('Tout marquer comme lu',async()=>{const r=await action(()=>api('/notifications/read-all',{method:'POST'}));if(r)render()}));for(const x of d.items)n.append(el('div',{class:'item'},el('p',{text:x.message}),el('span',{class:'small muted',text:new Date(x.created_at).toLocaleString('fr-FR')}),!x.read_at?el('span',{class:'chip violet',text:'Nouveau'}):null))}
+async function renderNotifications(n){
+ const epoch=renderEpoch,valid=()=>epoch===renderEpoch;
+ n.append(heading('Votre actualité UCP.','Retrouvez les candidatures, sélections, messages et réponses de l’assistance.'));
+ const count=el('p',{class:'status-note','aria-live':'polite',text:'Chargement du compteur…'});
+ const filter=field('Afficher les notifications','notification_filter','select',{required:false,options:{all:'Toutes',unread:'Non lues'}}),select=filter.querySelector('select');
+ const applied=el('p',{class:'hint'}),status=el('p',{class:'hint',role:'status',hidden:true}),list=el('div'),more=el('div');
+ let cursor=null,requestEpoch=0,appliedFilter='all',readers=new Map();
+ const markAll=button('Tout marquer comme lu',async()=>{const result=await action(()=>api('/notifications/read-all',{method:'POST'}));if(result&&valid())await load(true)});markAll.disabled=true;
+ n.append(count,el('div',{class:'row'},filter,button('Actualiser',()=>load(true)),markAll),applied,status,list,more);
+ function counter(value){count.textContent=value+' notification(s) non lue(s)';markAll.disabled=value===0}
+ function empty(){if(!readers.size&&!list.querySelector('.notification-empty'))list.append(el('p',{class:'notification-empty muted',text:'Aucune notification dans cette page.'}))}
+ function add(note){
+  if(readers.has(note.id))return;
+  const flag=el('span',{class:'chip '+(!note.read_at?'violet':''),text:note.read_at?'Lue':'Non lue'});
+  const card=el('article',{class:'item'},el('p',{text:note.message}),el('time',{class:'small muted',text:new Date(note.created_at).toLocaleString('fr-FR')}),flag);
+  let done=!!note.read_at;const read=button('Marquer comme lue',async()=>{
+   if(done||!valid())return;
+   const result=await action(()=>api('/notifications/'+note.id+'/read',{method:'POST'}));
+   if(!result||!valid()||readers.get(note.id)!==finishRead)return;
+   finishRead();if(Number.isInteger(result.unread))counter(result.unread);empty();
+  });
+  read.setAttribute('aria-label','Marquer comme lue : '+note.message);
+  function finishRead(){done=true;read.remove();flag.textContent='Lue';flag.className='chip';if(appliedFilter==='unread'){card.remove();readers.delete(note.id)}}
+  if(!done)card.append(read);readers.set(note.id,finishRead);list.append(card);
+ }
+ async function load(reset){
+  if(!valid())return false;
+  if(!reset&&!cursor)return false;
+  if(!reset&&select.value!==appliedFilter)return load(true);
+  const token=++requestEpoch,choice=select.value;
+  const query=new URLSearchParams();if(choice==='unread')query.set('unread_only','true');if(!reset)query.set('before_id',cursor);
+  status.hidden=false;status.textContent='Chargement des notifications…';clear(more);
+  try{
+   const encoded=query.toString();const data=await api('/notifications'+(encoded?'?'+encoded:''));if(!valid()||token!==requestEpoch)return false;
+   if(!Array.isArray(data.items)||!Number.isInteger(data.unread))throw Error('Réponse de notifications incomplète');
+   if(reset){clear(list);readers=new Map()}list.querySelector('.notification-empty')?.remove();
+   appliedFilter=choice;applied.textContent=choice==='unread'?'Affichage : notifications non lues.':'Affichage : toutes les notifications.';
+   counter(data.unread);for(const note of data.items)add(note);cursor=data.next_before_id||null;empty();status.hidden=true;
+   if(cursor)more.append(button('Voir les notifications plus anciennes',()=>load(false)));
+   return {ok:true};
+  }catch(e){
+   if(e.stale||e.status===401||!valid()||token!==requestEpoch)return false;
+   status.hidden=false;status.textContent='Impossible de charger les notifications. Les résultats précédents restent affichés.';
+   more.append(button('Réessayer le chargement',()=>load(reset)));return false;
+  }
+ }
+ select.addEventListener('change',()=>load(true));await load(true);
+}
 async function renderAdmin(n){n.append(heading('Le pouls de votre bêta.','Indicateurs calculés sur les données de test. Aucun chiffre commercial.'));const m=(await api('/admin/metrics')).counts;n.append(el('div',{class:'stat-grid'},...[['Demandes',m.projects],['Candidatures',m.applications],['Mises en relation',m.accepted_applications],['Messages',m.messages]].map(([t,v])=>el('div',{class:'stat'},el('strong',{text:v}),t))));const queue=(await api('/admin/queue')).items;const box=panel('Profils professionnels','La revue autorise le scénario de test ; elle ne vérifie ni l’activité ni l’assurance.');for(const p of queue)box.append(el('div',{class:'item'},el('h4',{text:p.name}),el('p',{class:'small muted',text:(trades[p.trade]||p.trade)+' · '+p.town}),el('div',{class:'row'},badge(p.approved?'Autorisé en test':'À examiner'),button(p.approved?'Suspendre le profil':'Autoriser les tests',async()=>{const r=await action(()=>api('/admin/professionals/'+p.id+(p.approved?'/suspend':'/approve'),{method:'POST'}));if(r)render()}),p.approved&&!p.subscription_active?button('Activer l’accès messagerie de test',async()=>{const r=await action(()=>api('/admin/professionals/'+p.id+'/activate-test-subscription',{method:'POST'}));if(r)render()}):null)));if(!queue.length)box.append(el('p',{text:'Aucun profil à examiner.'}));n.append(box);const audit=panel('Journal d’audit','Actions sensibles enregistrées par le serveur.');for(const e of(await api('/admin/audit')).items.slice(0,20))audit.append(el('p',{class:'mini',text:e.created_at+' · '+e.action+' · #'+e.target_id}));n.append(audit)}
 function classifyProject(p){let selected=[];const f=el('form',{},el('p',{text:p.description}),tradePicker(selected,v=>selected=v,true),field('Motif du classement','reason','textarea',{minlength:10,maxlength:500}),el('button',{type:'submit',class:'primary',text:'Confirmer les métiers'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/admin/projects/'+p.id+'/classify',{method:'POST',body:{trades:selected,reason:formValue(f).reason}}),'Besoin classé et rendu accessible aux métiers concernés.');if(r){$('#dialog').close();render()}});showDialog('Classer ce besoin après lecture',f)}
 function adminDecision(title,path,value,label='Motif de la décision'){const f=el('form',{},field(label,'reason','textarea',{minlength:10,maxlength:500}),el('button',{class:'primary',type:'submit',text:'Enregistrer la décision'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api(path,{method:'POST',body:{value,reason:formValue(f).reason}}),'Décision appliquée et journalisée.');if(r){$('#dialog').close();render()}});showDialog(title,f)}

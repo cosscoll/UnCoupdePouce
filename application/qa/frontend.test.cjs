@@ -495,7 +495,7 @@ test('a failure loading linked showcase profiles never hides the editable profes
 });
 
 test('professional overview counts only active applications and conversations actually accessible',async()=>{
- const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[{id:91,title:'Mission autorisée',town:'Toulouse',trade:'plomberie',status:'open'}],search_scope:'ready'},'/api/my-applications':{items:[{id:1,title:'En attente',status:'pending',project_status:'open'},{id:2,title:'Historique clôturé',status:'pending',project_status:'closed'},{id:3,title:'Sélection active',status:'accepted',project_status:'selected'}]},'/api/conversations':{items:[{application_id:3,subscription_active:1,linked_profile_id:null},{application_id:4,subscription_active:0},{application_id:5,subscription_active:1,linked_profile_id:7,linked_active:0}]},'/api/notifications':{unread:2,items:[{message:'Notification fictive',read_at:null}]},'/api/my-profile':{profile:{approved:true,subscription_active:true}}});try{
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[{id:91,title:'Mission autorisée',town:'Toulouse',trade:'plomberie',status:'open'}],search_scope:'ready'},'/api/my-applications':{items:[{id:1,title:'En attente',status:'pending',project_status:'open'},{id:2,title:'Historique clôturé',status:'pending',project_status:'closed'},{id:3,title:'Sélection active',status:'accepted',project_status:'selected'}]},'/api/conversations':{items:[{application_id:3,subscription_active:1,linked_profile_id:null},{application_id:4,subscription_active:0},{application_id:5,subscription_active:1,linked_profile_id:7,linked_active:0}]},'/api/notifications?unread_only=true':{unread:2,items:[{message:'Notification fictive',read_at:null}]},'/api/my-profile':{profile:{approved:true,subscription_active:true}}});try{
   await x.w.go('professional-home');const panels=[...x.w.document.querySelectorAll('.overview-grid>.panel')],get=title=>panels.find(p=>p.querySelector('h3').textContent===title);
   assert.equal(get('Missions ouvertes accessibles').querySelector('.overview-count').textContent,'1');
   assert.deepEqual([...get('Vos candidatures').querySelectorAll('dd')].map(n=>n.textContent),['1','1']);
@@ -505,7 +505,7 @@ test('professional overview counts only active applications and conversations ac
  }finally{x.close()}
 });
 test('professional overview isolates a failed section, never invents a zero and retries only that source',async()=>{
- let attempts=0;const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':()=>++attempts===2?{status:503,data:{detail:'Erreur temporaire'}}:{items:[],search_scope:'ready'},'/api/my-applications':{items:[]},'/api/conversations':{items:[]},'/api/notifications':{unread:3,items:[]}});try{
+ let attempts=0;const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':()=>++attempts===2?{status:503,data:{detail:'Erreur temporaire'}}:{items:[],search_scope:'ready'},'/api/my-applications':{items:[]},'/api/conversations':{items:[]},'/api/notifications?unread_only=true':{unread:3,items:[]}});try{
   await x.w.go('professional-home');const find=title=>[...x.w.document.querySelectorAll('.overview-grid>.panel')].find(p=>p.querySelector('h3').textContent===title);
   const failed=find('Missions ouvertes accessibles');assert.match(failed.textContent,/Information indisponible/);assert.equal(failed.querySelector('.overview-count'),null);
   assert.equal(find('Notifications non lues').querySelector('.overview-count').textContent,'3');const before=x.calls.length;
@@ -519,8 +519,40 @@ test('professional overview navigation stays reserved to the professional menu',
 
 test('a mission opened from the professional overview returns to that overview',async()=>{
  const project={id:91,title:'Mission fictive',description:'Description entièrement fictive de la mission.',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'open',photos:[],own_application:null};
- const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[project],search_scope:'ready'},'/api/my-applications':{items:[]},'/api/conversations':{items:[]},'/api/notifications':{unread:0,items:[]},'/api/v4/projects/91':project});try{
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[project],search_scope:'ready'},'/api/my-applications':{items:[]},'/api/conversations':{items:[]},'/api/notifications?unread_only=true':{unread:0,items:[]},'/api/v4/projects/91':project});try{
   await x.w.go('professional-home');[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Consulter ce projet').click();await tick();
   const back=[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='← Vue d’ensemble');assert.ok(back);back.click();await tick();assert.ok(x.w.document.querySelector('.overview-grid'));
+ }finally{x.close()}
+});
+
+test('notification center paginates unread history and marks only the selected notification',async()=>{
+ const note=id=>({id,message:'Notification fictive '+id,created_at:'2026-10-28T10:00:00Z',read_at:null});
+ const x=await boot({'/api/notifications':{unread:2,items:[note(9)],next_before_id:9},'/api/notifications?unread_only=true':{unread:2,items:[note(9)],next_before_id:9},'/api/notifications?unread_only=true&before_id=9':{unread:2,items:[note(8)],next_before_id:null},'POST /api/notifications/9/read':{ok:true,read_at:'2026-10-28T11:00:00Z',unread:1}});try{
+  await x.w.go('notifications');const filter=x.w.document.querySelector('[name=notification_filter]');filter.value='unread';filter.dispatchEvent(new x.w.Event('change'));await tick();
+  [...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Voir les notifications plus anciennes').click();await tick();assert.equal(x.w.document.querySelectorAll('#view article').length,2);
+  [...x.w.document.querySelectorAll('#view article button')][0].click();await tick();assert.equal(x.w.document.querySelectorAll('#view article').length,1);assert.match(x.w.document.querySelector('#view').textContent,/1 notification\(s\) non lue/);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,1);assert.equal(x.calls.find(c=>c.method==='POST').url,'/api/notifications/9/read');
+ }finally{x.close()}
+});
+test('notification history preserves visible results and cursor after a page load failure',async()=>{
+ let attempts=0;const x=await boot({'/api/notifications':{unread:2,items:[{id:9,message:'À conserver',created_at:'2026-10-28T10:00:00Z',read_at:null}],next_before_id:9},'/api/notifications?before_id=9':()=>++attempts===1?{status:503,data:{detail:'Panne temporaire'}}:{unread:2,items:[{id:8,message:'Page reprise',created_at:'2026-10-28T10:00:00Z',read_at:null}],next_before_id:null}});try{
+  await x.w.go('notifications');[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Voir les notifications plus anciennes').click();await tick();assert.match(x.w.document.querySelector('#view').textContent,/À conserver/);assert.match(x.w.document.querySelector('#view').textContent,/résultats précédents/);
+  [...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Réessayer le chargement').click();await tick();assert.equal(x.w.document.querySelectorAll('#view article').length,2);
+ }finally{x.close()}
+});
+test('an older unread filter response cannot replace a newer all-notifications result',async()=>{
+ let finish;const x=await boot({'/api/notifications':{unread:0,items:[{id:9,message:'Notification déjà lue',read_at:'2026-10-28',created_at:'2026-10-28'}],next_before_id:null},'/api/notifications?unread_only=true':()=>new Promise(resolve=>finish=resolve)});try{
+  await x.w.go('notifications');const filter=x.w.document.querySelector('[name=notification_filter]');filter.value='unread';filter.dispatchEvent(new x.w.Event('change'));await tick();filter.value='all';filter.dispatchEvent(new x.w.Event('change'));await tick();finish({unread:1,items:[{id:10,message:'Ancien résultat non lu',read_at:null,created_at:'2026-10-28'}]});await tick();
+  assert.match(x.w.document.querySelector('#view').textContent,/Notification déjà lue/);assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/Ancien résultat non lu/);
+ }finally{x.close()}
+});
+
+test('marking all notifications read preserves the unread filter and refreshes its actual empty state',async()=>{
+ let done=false;const note={id:9,message:'À lire',created_at:'2026-10-28',read_at:null};
+ const x=await boot({'/api/notifications':{unread:1,items:[note],next_before_id:null},'/api/notifications?unread_only=true':()=>({unread:done?0:1,items:done?[]:[note],next_before_id:null}),'POST /api/notifications/read-all':()=>{done=true;return {ok:true,count:1,unread:0}}});try{
+  await x.w.go('notifications');const filter=x.w.document.querySelector('[name=notification_filter]');filter.value='unread';filter.dispatchEvent(new x.w.Event('change'));await tick();
+  const mark=[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Tout marquer comme lu');mark.click();await tick();await tick();
+  assert.equal(filter.value,'unread');assert.equal(mark.disabled,true);assert.equal(x.w.document.querySelectorAll('#view article').length,0);assert.match(x.w.document.querySelector('#view').textContent,/0 notification\(s\) non lue/);
+  assert.equal(x.calls.find(c=>c.method==='POST').headers['x-ucp-csrf'],'test-token');
  }finally{x.close()}
 });
