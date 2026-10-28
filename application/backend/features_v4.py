@@ -1,6 +1,7 @@
 """Additive v4 features for the isolated UCP laboratory. No external services."""
-import base64, binascii, io, json, re, secrets, sqlite3, time, unicodedata
-from fastapi import Depends, Response, Query
+import base64, binascii, hashlib, io, json, re, secrets, sqlite3, time, unicodedata
+from typing import Annotated
+from fastapi import Depends, Response, Query, Header
 from pydantic import BaseModel, Field, field_validator
 from PIL import Image, ImageOps, UnidentifiedImageError
 from project_budget import Budget
@@ -60,6 +61,8 @@ def install(m):
         c.executescript('''
         CREATE TABLE IF NOT EXISTS taxonomy(id TEXT PRIMARY KEY,label TEXT NOT NULL,group_name TEXT NOT NULL,synonyms TEXT NOT NULL,active INTEGER NOT NULL DEFAULT 1);
         CREATE TABLE IF NOT EXISTS drafts(id INTEGER PRIMARY KEY,owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,payload TEXT NOT NULL,version INTEGER NOT NULL DEFAULT 1,project_id INTEGER REFERENCES projects(id),updated_at TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS draft_creation_retries(owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,retry_key TEXT NOT NULL,draft_id INTEGER REFERENCES drafts(id) ON DELETE SET NULL,payload_hash TEXT NOT NULL,PRIMARY KEY(owner_id,retry_key));
+        CREATE INDEX IF NOT EXISTS idx_draft_creation_target ON draft_creation_retries(draft_id);
         CREATE TABLE IF NOT EXISTS photos(id INTEGER PRIMARY KEY,draft_id INTEGER NOT NULL REFERENCES drafts(id) ON DELETE CASCADE,body BLOB NOT NULL,created_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY,reporter_id INTEGER NOT NULL REFERENCES users(id),kind TEXT NOT NULL,target_id INTEGER NOT NULL,reason TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'open',resolution TEXT,created_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS resets(token_hash TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires INTEGER NOT NULL);
@@ -116,11 +119,26 @@ def install(m):
         with m.authenticated_db(user,write=False) as c:return {'items':[draft_json(c,r) for r in c.execute('SELECT * FROM drafts WHERE owner_id=? AND project_id IS NULL ORDER BY updated_at DESC',(user['id'],))]}
 
     @app.post('/api/v4/drafts',status_code=201)
-    def create_draft(body:Draft,user=Depends(m.require('requester'))):
+    def create_draft(body:Draft,user=Depends(m.require('requester')),
+                     idempotency_key:Annotated[str|None,Header(min_length=16,max_length=100,pattern=r'^[A-Za-z0-9._:-]+$')]=None):
         with m.authenticated_db(user,write=True) as c:
+            payload=body.model_dump_json(exclude={'version'})
+            digest=hashlib.sha256(payload.encode()).hexdigest()
+            if idempotency_key:
+                previous=c.execute('SELECT draft_id,payload_hash FROM draft_creation_retries WHERE owner_id=? AND retry_key=?',(user['id'],idempotency_key)).fetchone()
+                if previous:
+                    if previous['payload_hash']!=digest:error(409,'Cette tentative de création correspond à une autre saisie.')
+                    if previous['draft_id'] is None:error(409,'Ce brouillon a été supprimé. Créez une nouvelle demande explicitement.')
+                    # Never adopt a later version: a retry must not bypass a concurrent edit.
+                    target=c.execute('SELECT version,project_id FROM drafts WHERE id=? AND owner_id=?',(previous['draft_id'],user['id'])).fetchone()
+                    if not target:error(409,'Ce brouillon n’est plus disponible pour ce compte.')
+                    result={'id':previous['draft_id'],'version':1}
+                    if target['version']!=1 or target['project_id'] is not None:result['changed_since_creation']=True
+                    return result
             validate_draft(c,body)
             if c.execute('SELECT count(*) FROM drafts WHERE owner_id=? AND project_id IS NULL',(user['id'],)).fetchone()[0]>=30:error(409,'Vous avez déjà 30 brouillons')
-            cur=c.execute('INSERT INTO drafts(owner_id,payload,updated_at) VALUES(?,?,?)',(user['id'],body.model_dump_json(exclude={'version'}),now()))
+            cur=c.execute('INSERT INTO drafts(owner_id,payload,updated_at) VALUES(?,?,?)',(user['id'],payload,now()))
+            if idempotency_key:c.execute('INSERT INTO draft_creation_retries(owner_id,retry_key,draft_id,payload_hash) VALUES(?,?,?,?)',(user['id'],idempotency_key,cur.lastrowid,digest))
             audit(c,user,'draft_created','draft',cur.lastrowid);c.execute('COMMIT')
             return {'id':cur.lastrowid,'version':1}
 

@@ -638,3 +638,118 @@ test('unavailable stored options remain explicit and a failed application preser
   assert.match(x.w.document.querySelector('.project-list').textContent,/Derniers résultats autorisés/);assert.match(x.w.document.querySelector('.count').textContent,/Recherche non appliquée/);assert.match(x.w.document.querySelector('.project-search [name=trade]').textContent,/critère enregistré/);
  }finally{x.close()}
 });
+
+function draftClock(w){
+ const timers=new Map(),set=w.setTimeout.bind(w),clear=w.clearTimeout.bind(w);let id=100000;
+ w.setTimeout=(fn,delay,...args)=>{if(delay!==1200)return set(fn,delay,...args);const key=++id;timers.set(key,()=>fn(...args));return key};
+ w.clearTimeout=key=>{if(!timers.delete(key))clear(key)};
+ return {size:()=>timers.size,fire(){assert.equal(timers.size,1);const [key,fn]=timers.entries().next().value;timers.delete(key);fn()}};
+}
+const resumedDraft={id:51,version:1,title:'Projet déjà enregistré',description:'Description fictive suffisamment détaillée pour une demande.',town:'Toulouse',trades:['plomberie'],timing:'flexible',budget_min:null,budget_max:null,photos:[]};
+function draftButton(w,label,scope='.wizard'){return [...w.document.querySelectorAll(scope+' button')].find(b=>b.textContent===label)}
+
+test('draft autosave waits for a pause, stores only the latest text and does not move focus',async()=>{
+ let clock;const x=await boot({'POST /api/v4/drafts':{id:51,version:1}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard();const title=x.w.document.querySelector('.wizard [name=title]');title.focus();input(x.w,'.wizard [name=title]','Première saisie');input(x.w,'.wizard [name=title]','Dernière saisie');
+  assert.equal(clock.size(),1);assert.equal(x.calls.filter(c=>c.method==='POST').length,0);clock.fire();await tick();
+  const calls=x.calls.filter(c=>c.method==='POST');assert.equal(calls.length,1);assert.equal(calls[0].body.title,'Dernière saisie');assert.ok(calls[0].headers['Idempotency-Key'].length>=16);
+  assert.equal(x.w.document.activeElement,title);assert.match(x.w.document.querySelector('.draft-save-status').textContent,/Brouillon enregistré/);assert.equal(clock.size(),0);
+ }finally{x.close()}
+});
+
+test('manual continuation waits for an initial autosave then flushes text entered while it was pending',async()=>{
+ let clock,release;
+ const x=await boot({'POST /api/v4/drafts':()=>new Promise(resolve=>{release=resolve}),'PUT /api/v4/drafts/51':{id:51,version:2}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard();input(x.w,'.wizard [name=title]','Titre avant réponse');input(x.w,'.wizard [name=description]','Description fictive saisie avant la première sauvegarde.');
+  const trade=x.w.document.querySelector('.wizard input[value=plomberie]');trade.checked=true;trade.dispatchEvent(new x.w.Event('change',{bubbles:true}));
+  clock.fire();await tick();input(x.w,'.wizard [name=title]','Titre saisi pendant la sauvegarde');submit(x.w,'.wizard form');await tick();assert.equal(x.calls.filter(c=>c.method==='PUT').length,0);
+  release({id:51,version:1});await tick();await tick();
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,1);const put=x.calls.find(c=>c.method==='PUT');assert.equal(put.body.title,'Titre saisi pendant la sauvegarde');assert.equal(put.body.version,1);assert.match(x.w.document.querySelector('.wizard h2').textContent,/Parlez-nous/);
+ }finally{x.close()}
+});
+
+test('a lost creation response pauses autosave and explicit retry recovers the same intent before saving newer text',async()=>{
+ let clock,attempts=0;
+ const x=await boot({'POST /api/v4/drafts':()=>{if(++attempts===1)throw Error('response lost');return {id:51,version:1}},'PUT /api/v4/drafts/51':{id:51,version:2}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard();input(x.w,'.wizard [name=title]','Texte envoyé initialement');clock.fire();await tick();assert.match(x.w.document.querySelector('.draft-save-status').textContent,/non confirmé/);assert.equal(x.w.document.querySelector('#alert').textContent,'');
+  input(x.w,'.wizard [name=title]','Texte conservé pendant la panne');assert.equal(clock.size(),0);draftButton(x.w,'Réessayer l’enregistrement').click();await tick();await tick();
+  const creates=x.calls.filter(c=>c.method==='POST');assert.equal(creates.length,2);assert.deepEqual(creates[0].body,creates[1].body);assert.equal(creates[0].headers['Idempotency-Key'],creates[1].headers['Idempotency-Key']);
+  const put=x.calls.find(c=>c.method==='PUT');assert.equal(put.body.title,'Texte conservé pendant la panne');assert.equal(put.body.version,1);assert.equal(x.w.document.querySelector('.wizard [name=title]').value,'Texte conservé pendant la panne');assert.match(x.w.document.querySelector('.draft-save-status').textContent,/Brouillon enregistré/);
+ }finally{x.close()}
+});
+
+test('a draft version conflict stops automatic writes and offers a copy before explicitly loading the server version',async()=>{
+ let clock;const server={...resumedDraft,title:'Version du compte à conserver',version:3};
+ const x=await boot({'PUT /api/v4/drafts/51':{status:409,data:{detail:'Ce brouillon a changé dans une autre fenêtre.'}},'/api/v4/drafts':{items:[server]}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard(resumedDraft);input(x.w,'.wizard [name=title]','<img src=x> Ma copie locale');clock.fire();await tick();
+  assert.match(x.w.document.querySelector('.draft-save-status').textContent,/aucun écrasement automatique/);input(x.w,'.wizard [name=title]','Ma saisie la plus récente');assert.equal(clock.size(),0);
+  draftButton(x.w,'Récupérer ma saisie').click();assert.match(x.w.document.querySelector('#dialog textarea').value,/Ma saisie la plus récente/);assert.equal(x.w.document.querySelector('#dialog img'),null);
+  draftButton(x.w,'Charger le brouillon du compte','#dialog').click();await tick();
+  assert.equal(x.w.document.querySelector('.wizard [name=title]').value,server.title);assert.equal(x.calls.filter(c=>c.method==='PUT').length,1);assert.equal(clock.size(),0);
+ }finally{x.close()}
+});
+
+test('invalid budget blocks automatic writes, then a correction can be saved without losing zero',async()=>{
+ let clock,version=1;const x=await boot({'PUT /api/v4/drafts/51':()=>({id:51,version:++version})},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard(resumedDraft);submit(x.w,'.wizard form');await tick();const initial=x.calls.filter(c=>c.method==='PUT').length;
+  input(x.w,'.wizard [name=budget_min]','-1');clock.fire();await tick();assert.equal(x.calls.filter(c=>c.method==='PUT').length,initial);assert.equal(x.w.document.querySelector('.wizard [name=budget_min]').value,'-1');
+  input(x.w,'.wizard [name=budget_min]','0');clock.fire();await tick();const last=x.calls.filter(c=>c.method==='PUT').at(-1);assert.equal(last.body.budget_min,0);assert.equal(last.body.version,2);assert.match(x.w.document.querySelector('.draft-save-status').textContent,/Brouillon enregistré/);
+ }finally{x.close()}
+});
+
+test('a late autosave response after logout cannot restore private draft UI or issue another write',async()=>{
+ let clock,release;const x=await boot({'POST /api/v4/drafts':()=>new Promise(resolve=>{release=resolve}),'POST /api/logout':{ok:true}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard();input(x.w,'.wizard [name=title]','Saisie privée de l’ancien compte');clock.fire();await tick();x.w.document.querySelector('#logout').click();await tick();
+  release({id:51,version:1});await tick();assert.equal(x.w.document.querySelector('.wizard'),null);assert.equal(x.w.document.querySelector('#anonymous').hidden,false);assert.equal(x.calls.filter(c=>c.method==='PUT').length,0);assert.equal(clock.size(),0);assert.doesNotMatch(x.w.document.querySelector('#alert').textContent,/Saisie privée|Réponse ignorée/);
+ }finally{x.close()}
+});
+
+test('leaving a draft warns only for unsaved or pending work, not a confirmed save',async()=>{
+ let clock,release;const x=await boot({'PUT /api/v4/drafts/51':()=>new Promise(resolve=>{release=resolve})},w=>{clock=draftClock(w)});
+ function warned(){const event=new x.w.Event('beforeunload',{cancelable:true});x.w.dispatchEvent(event);return event.defaultPrevented}
+ try{
+  x.w.startWizard(resumedDraft);assert.equal(warned(),false);input(x.w,'.wizard [name=title]','Modification non envoyée');assert.equal(warned(),true);clock.fire();await tick();assert.equal(warned(),true);
+  release({id:51,version:2});await tick();assert.equal(warned(),false);
+ }finally{x.close()}
+});
+
+test('searching the trade picker does not create an empty draft but selecting and removing a trade are saved',async()=>{
+ let clock;const x=await boot({'POST /api/v4/drafts':{id:51,version:1},'PUT /api/v4/drafts/51':{id:51,version:2}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard();input(x.w,'.wizard input[aria-label="Rechercher un métier"]','plomb');assert.equal(clock.size(),0);
+  const trade=x.w.document.querySelector('.wizard input[value=plomberie]');trade.checked=true;trade.dispatchEvent(new x.w.Event('change',{bubbles:true}));clock.fire();await tick();assert.deepEqual(x.calls.find(c=>c.method==='POST').body.trades,['plomberie']);
+  x.w.document.querySelector('.wizard .selected-trades button').click();clock.fire();await tick();assert.deepEqual(x.calls.find(c=>c.method==='PUT').body.trades,[]);
+ }finally{x.close()}
+});
+
+test('recovering a lost initial response cannot confirm or overwrite a draft changed in another window',async()=>{
+ let clock,attempts=0;
+ const x=await boot({'POST /api/v4/drafts':()=>{if(++attempts===1)throw Error('lost');return {id:51,version:1,changed_since_creation:true}}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard();input(x.w,'.wizard [name=title]','Ma copie privée à préserver');clock.fire();await tick();draftButton(x.w,'Réessayer l’enregistrement').click();await tick();
+  assert.match(x.w.document.querySelector('.draft-save-status').textContent,/Conflit de version/);assert.doesNotMatch(x.w.document.querySelector('.draft-save-status').textContent,/Brouillon enregistré/);assert.equal(x.calls.filter(c=>c.method==='PUT').length,0);assert.equal(clock.size(),0);
+  draftButton(x.w,'Récupérer ma saisie').click();assert.match(x.w.document.querySelector('#dialog textarea').value,/Ma copie privée à préserver/);assert.ok(draftButton(x.w,'Charger le brouillon du compte','#dialog'));
+ }finally{x.close()}
+});
+
+test('a change-only title edit is synchronized before the draft autosave snapshot',async()=>{
+ let clock;const x=await boot({'POST /api/v4/drafts':{id:51,version:1}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard();const title=x.w.document.querySelector('.wizard [name=title]');title.value='Modification par remplissage';title.dispatchEvent(new x.w.Event('change',{bubbles:true}));clock.fire();await tick();assert.equal(x.calls.find(c=>c.method==='POST').body.title,title.value);
+ }finally{x.close()}
+});
+
+test('removing a draft photo waits for autosave and keeps the photo mutation version for the next write',async()=>{
+ let clock,release,puts=0;
+ const x=await boot({'PUT /api/v4/drafts/51':()=>{if(++puts===2)return new Promise(resolve=>{release=resolve});return {id:51,version:puts===1?2:5}},'DELETE /api/v4/photos/7':{ok:true,version:4}},w=>{clock=draftClock(w)});
+ try{
+  x.w.startWizard({...resumedDraft,photos:[7]});submit(x.w,'.wizard form');await tick();input(x.w,'.wizard [name=town]','Blagnac');clock.fire();await tick();draftButton(x.w,'Retirer').click();await tick();assert.equal(x.calls.filter(c=>c.method==='DELETE').length,0);
+  release({id:51,version:3});await tick();await tick();assert.equal(x.calls.filter(c=>c.method==='DELETE').length,1);input(x.w,'.wizard [name=budget_min]','0');clock.fire();await tick();assert.equal(x.calls.filter(c=>c.method==='PUT').at(-1).body.version,4);
+ }finally{x.close()}
+});
