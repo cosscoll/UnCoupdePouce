@@ -299,11 +299,13 @@ def install(m):
     @app.post('/api/v4/admin/users/{id}/suspend')
     def suspend(id:int,body:Decision,user=Depends(m.require('admin'))):
         with m.authenticated_db(user,write=True) as c:
-            r=c.execute('SELECT role FROM users WHERE id=?',(id,)).fetchone()
+            r=c.execute('SELECT role,suspended FROM users WHERE id=?',(id,)).fetchone()
             if not r:error(404,'Compte introuvable')
             if r['role']=='admin':error(409,'La suspension d’un administrateur nécessite une procédure opérateur')
             c.execute('UPDATE users SET suspended=? WHERE id=?',(int(body.value),id))
             if body.value:c.execute('DELETE FROM sessions WHERE user_id=?',(id,))
+            if bool(r['suspended'])!=body.value:
+                m.queue_notice(c,id,'account_suspended' if body.value else 'account_restored',id)
             c.execute('INSERT INTO admin_decisions(actor_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',(user['id'],'suspend' if body.value else 'restore',id,body.reason,now()));audit(c,user,'suspend_user' if body.value else 'restore_user','user',id);c.execute('COMMIT')
         return {'ok':True}
 

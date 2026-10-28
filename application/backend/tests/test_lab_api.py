@@ -433,7 +433,9 @@ def test_notices_on_application_private_and_read_marker(setup):
     assert 'email' not in req_data['items'][0]
     nid=req_data['items'][0]['id']
     assert v['other'].get('/api/notifications').json()['items']==[]
-    assert v['pro'].get('/api/notifications').json()['items']==[]
+    pro_notices=v['pro'].get('/api/notifications').json()['items']
+    assert [n['event_type'] for n in pro_notices]==['profile_test_authorized']
+    assert all(n['id']!=nid for n in pro_notices)
     assert v['call'](v['other'],v['ocsrf'],'post',f'/api/notifications/{nid}/read').status_code==404
     assert v['requester'].get('/api/notifications').json()['unread']==1
     assert v['call'](v['requester'],v['rcsrf'],'post',f'/api/notifications/{nid}/read').status_code==200
@@ -454,7 +456,7 @@ def test_accept_chat_and_close_notifications_are_private(setup):
     assert v['call'](v['requester'],v['rcsrf'],'post',f'/api/projects/{job}/close').status_code==200
     events=v['pro'].get('/api/notifications').json()
     assert events['items'][0]['event_type']=='project_closed'
-    assert v['call'](v['pro'],v['pcsrf'],'post','/api/notifications/read-all').json()['count']==2
+    assert v['call'](v['pro'],v['pcsrf'],'post','/api/notifications/read-all').json()['count']==4
     assert v['pro'].get('/api/notifications').json()['unread']==0
     assert v['requester'].get('/api/notifications').json()['unread']==2
 
@@ -470,7 +472,8 @@ def test_reject_and_withdraw_notices_and_owner_export(setup):
     assert v['requester'].get('/api/notifications').json()['items'][0]['event_type']=='application_withdrawn'
     mine=v['requester'].get('/api/account/export').json()['own_notifications']
     others=v['pro'].get('/api/account/export').json()['own_notifications']
-    assert len(mine)==3 and len(others)==1
+    assert len(mine)==3 and len(others)==2
+    assert {r['event_type'] for r in others}=={'profile_test_authorized','application_rejected'}
     assert all(r['event_type']!='application_rejected' for r in mine)
     assert all(r['event_type']!='new_application' for r in others)
 

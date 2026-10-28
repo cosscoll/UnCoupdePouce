@@ -246,3 +246,14 @@ def test_postgres_notification_history_and_unread_pagination(pg):
     owner,owner_id=client_for(pg,'notification-owner@ucp.test','requester')
     other,other_id=client_for(pg,'notification-other@ucp.test','requester')
     exercise_notification_history(pg,owner,owner_id,other,other_id)
+
+
+def test_postgres_lifecycle_notifications_are_owner_scoped_and_not_duplicated(pg):
+    from test_notification_events import exercise_lifecycle_notices
+    admin=TestClient(pg.app)
+    assert admin.post('/api/admin/bootstrap',json={'secret':'test-bootstrap-only-0123456789','email':'admin@ucp.test','password':'Fictif-Long-Test!9326'}).status_code==200
+    admin.headers['x-ucp-csrf']=admin.post('/api/login',json={'email':'admin@ucp.test','password':'Fictif-Long-Test!9326'}).json()['csrf']
+    pro,pid=client_for(pg,'events-professional@ucp.test','professional')
+    other,_=client_for(pg,'events-other@ucp.test','requester')
+    assert pro.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
+    exercise_lifecycle_notices(pg,admin,pro,pid,other)

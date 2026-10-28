@@ -200,6 +200,12 @@ NOTIFICATION_TYPES = {
     'new_message': 'Un nouveau message fictif vous attend dans une conversation.',
     'support_resolved': 'Une réponse à votre demande d’assistance est disponible dans Assistance.',
     'report_resolved': 'Une réponse à votre signalement est disponible dans Assistance.',
+    'profile_test_authorized': 'Votre profil a été autorisé pour les tests. Cette autorisation ne vérifie ni votre entreprise ni vos assurances.',
+    'profile_review_required': 'Après modification de votre profil, une nouvelle revue est nécessaire. Votre autorisation et votre accès de test ont été désactivés.',
+    'profile_test_suspended': 'Votre autorisation professionnelle de test a été désactivée, ainsi que votre accès de test aux conversations.',
+    'test_access_activated': 'Votre accès de test aux conversations a été activé. Les autres conditions d’accès restent applicables. Aucun paiement ni abonnement réel.',
+    'account_suspended': 'Votre compte a été suspendu et ses sessions révoquées. Cet événement reste dans votre historique après réactivation.',
+    'account_restored': 'La suspension de votre compte a été levée. Reconnectez-vous ; les autorisations professionnelles et les autres conditions d’accès restent applicables.',
 }
 
 def queue_notice(connection, recipient_id, event_type, entity_id):
@@ -672,6 +678,7 @@ def save_profile(body:Profile,user=Depends(require('professional'))):
     if len(secondary)>4:error(422,'Maximum 5 métiers avec métier principal')
     with authenticated_db(user,write=True) as c:
         # Do not let a verified profile modify identity and keep approval.
+        previous=c.execute('SELECT approved,subscription_active FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
         c.execute('''INSERT INTO profiles(user_id,trade,town,siren,service_areas,service_trades,approved,subscription_active)
                VALUES(?,?,?,?,?,?,0,0) ON CONFLICT(user_id) DO UPDATE SET
                trade=excluded.trade,town=excluded.town,siren=excluded.siren,service_areas=excluded.service_areas,
@@ -681,6 +688,8 @@ def save_profile(body:Profile,user=Depends(require('professional'))):
         c.execute('UPDATE enterprise_accounts SET manager_artisan_active=0 WHERE owner_id=?',(user['id'],))
         # A change of professional scope invalidates pending proposals on earlier terms.
         c.execute("UPDATE applications SET status='rejected' WHERE professional_id=? AND status='pending'",(user['id'],))
+        if previous and (previous['approved'] or previous['subscription_active']):
+            queue_notice(c,user['id'],'profile_review_required',user['id'])
         c.execute('COMMIT')
     return {'ok':True,'approved':False,'note':'SIREN saisi non vérifié — revue admin obligatoire'}
 
@@ -1104,6 +1113,7 @@ def approve(uid:int,user=Depends(require('admin'))):
         p=c.execute('SELECT * FROM profiles WHERE user_id=?',(uid,)).fetchone()
         if not p:error(404,'Profil introuvable')
         c.execute('UPDATE profiles SET approved=1,approved_at=? WHERE user_id=?',(now(),uid))
+        if not p['approved']:queue_notice(c,uid,'profile_test_authorized',uid)
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                    (user['id'],'approve_professional','professional',uid,now()))
     return {'ok':True,'note':'Validation de simulation ; aucun contrôle officiel SIREN intégré'}
@@ -1111,9 +1121,10 @@ def approve(uid:int,user=Depends(require('admin'))):
 @app.post('/api/admin/professionals/{uid}/activate-test-subscription')
 def activate_subscription(uid:int,user=Depends(require('admin'))):
     with authenticated_db(user,write=True) as c:
-        p=c.execute('SELECT approved FROM profiles WHERE user_id=?',(uid,)).fetchone()
+        p=c.execute('SELECT approved,subscription_active FROM profiles WHERE user_id=?',(uid,)).fetchone()
         if not p or not p['approved']:error(409,'Artisan non approuvé')
         c.execute('UPDATE profiles SET subscription_active=1 WHERE user_id=?',(uid,))
+        if not p['subscription_active']:queue_notice(c,uid,'test_access_activated',uid)
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                    (user['id'],'activate_simulated_subscription','professional',uid,now()))
     return {'ok':True,'payment':'NONE — simulation uniquement'}
@@ -1121,9 +1132,13 @@ def activate_subscription(uid:int,user=Depends(require('admin'))):
 @app.post('/api/admin/professionals/{uid}/suspend')
 def suspend(uid:int,user=Depends(require('admin'))):
     with authenticated_db(user,write=True) as c:
+        previous=c.execute('SELECT approved,subscription_active FROM profiles WHERE user_id=?',(uid,)).fetchone()
+        manager=c.execute('SELECT manager_artisan_active FROM enterprise_accounts WHERE owner_id=?',(uid,)).fetchone()
         r=c.execute('UPDATE profiles SET approved=0,subscription_active=0 WHERE user_id=?',(uid,))
         if r.rowcount==0:error(404,'Profil introuvable')
         c.execute('UPDATE enterprise_accounts SET manager_artisan_active=0 WHERE owner_id=?',(uid,))
+        if previous and (previous['approved'] or previous['subscription_active'] or (manager and manager['manager_artisan_active'])):
+            queue_notice(c,uid,'profile_test_suspended',uid)
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                    (user['id'],'suspend_professional','professional',uid,now()))
     return {'ok':True}
