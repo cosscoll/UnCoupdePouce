@@ -59,15 +59,16 @@ else:
     if not app_script:errors.append('avancement.html: script du menu mobile absent')
     if not any(t=='a' and a.get('class')=='skip' and a.get('href')=='#main' for t,a in avancement.nodes):errors.append('avancement.html: lien d’évitement non stylable absent')
     visible_text=' '.join(' '.join(avancement.text).split())
-    required_text=['20 octobre 2026','QA-54','415 contrôles synthétiques','plateforme n\'est pas encore ouverte au public','Ces contrôles n\'incluent pas de navigateur réel.']
+    required_text=['préproduction privée','plateforme n\'est pas encore ouverte au public','Aucun paiement réel','Recette visuelle','Android/iPhone','Ces contrôles n\'incluent pas de navigateur réel.']
     for expected in required_text:
         if expected not in visible_text:errors.append('avancement.html: preuve publique absente : '+expected)
     if '16 octobre 2026' in visible_text:errors.append('avancement.html: date obsolète encore publiée')
     proof_links={a.get('href') for t,a in avancement.nodes if t=='a' and a.get('href')}
     for expected in [
-        'https://github.com/cosscoll/UnCoupdePouce/pull/2',
-        'https://github.com/cosscoll/UnCoupdePouce/commit/8da708c0815221c0fbef9fdbb24976aeacbb4a96',
-        'https://github.com/cosscoll/UnCoupdePouce/actions/runs/39387060851',
+        'https://github.com/cosscoll/UnCoupdePouce/pull/34',
+        'https://ucp-preproduction.vercel.app',
+        'https://github.com/cosscoll/UnCoupdePouce/blob/main/docs/MATRICE_ACCEPTATION_CDC.md',
+        'https://github.com/cosscoll/UnCoupdePouce/actions/runs/40689692570',
         'https://cosscoll.github.io/Avancement-Projet/#/ucp/overview',
     ]:
         if expected not in proof_links:errors.append('avancement.html: lien de preuve absent : '+expected)
@@ -82,7 +83,7 @@ for label,page,required in [
     else:
         text=' '.join(' '.join(page.text).split())
         if required not in text:errors.append(label+': statut de projet durable absent')
-        if not any(t=='a' and a.get('href')==progress_url for t,a in page.nodes):errors.append(label+': lien vers les preuves publiques absent')
+        if not any(t=='a' and a.get('href')==('../avancement.html' if label.startswith('en/') else 'avancement.html') for t,a in page.nodes):errors.append(label+': lien vers les preuves publiques absent')
 for f,page in pages.items():
     visible=' '.join(' '.join(page.text).split())
     if '14 octobre 2026' in visible or '14 October 2026' in visible:errors.append(str(f.relative_to(DIST))+': date éditoriale périmée')

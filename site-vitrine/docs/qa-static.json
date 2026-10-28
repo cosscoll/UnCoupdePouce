@@ -2,38 +2,38 @@
   "status": "PASS",
   "pages": [
     {
-      "page": "informations.html",
-      "checks": 64,
-      "h1": 1,
-      "lang": "fr"
-    },
-    {
-      "page": "projet.html",
-      "checks": 71,
-      "h1": 1,
-      "lang": "fr"
-    },
-    {
-      "page": "404.html",
-      "checks": 64,
-      "h1": 1,
-      "lang": "fr"
-    },
-    {
-      "page": "index.html",
-      "checks": 101,
-      "h1": 1,
-      "lang": "fr"
-    },
-    {
       "page": "avancement.html",
       "checks": 29,
       "h1": 1,
       "lang": "fr"
     },
     {
+      "page": "informations.html",
+      "checks": 66,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "404.html",
+      "checks": 66,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "projet.html",
+      "checks": 75,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "index.html",
+      "checks": 103,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
       "page": "en/index.html",
-      "checks": 68,
+      "checks": 72,
       "h1": 1,
       "lang": "en"
     }
@@ -82,9 +82,24 @@
   ],
   "assets": [
     {
+      "file": "avancement.html",
+      "bytes": 5074,
+      "gzip_bytes": 2263
+    },
+    {
       "file": "informations.html",
-      "bytes": 7819,
-      "gzip_bytes": 2948
+      "bytes": 7775,
+      "gzip_bytes": 2922
+    },
+    {
+      "file": "robots.txt",
+      "bytes": 26,
+      "gzip_bytes": 46
+    },
+    {
+      "file": "404.html",
+      "bytes": 4502,
+      "gzip_bytes": 1675
     },
     {
       "file": "_headers",
@@ -93,28 +108,33 @@
     },
     {
       "file": "projet.html",
-      "bytes": 10928,
-      "gzip_bytes": 4109
-    },
-    {
-      "file": "404.html",
-      "bytes": 4546,
-      "gzip_bytes": 1701
+      "bytes": 10840,
+      "gzip_bytes": 4081
     },
     {
       "file": "index.html",
-      "bytes": 19859,
-      "gzip_bytes": 6308
+      "bytes": 19815,
+      "gzip_bytes": 6279
     },
     {
-      "file": "robots.txt",
-      "bytes": 26,
-      "gzip_bytes": 46
+      "file": "assets/app.js",
+      "bytes": 8631,
+      "gzip_bytes": 2382
     },
     {
-      "file": "avancement.html",
-      "bytes": 4551,
-      "gzip_bytes": 2044
+      "file": "assets/style.css",
+      "bytes": 18876,
+      "gzip_bytes": 4883
+    },
+    {
+      "file": "assets/logo.svg",
+      "bytes": 159256,
+      "gzip_bytes": 28162
+    },
+    {
+      "file": "assets/house.svg",
+      "bytes": 2990,
+      "gzip_bytes": 1208
     },
     {
       "file": "assets/social.svg",
@@ -127,44 +147,14 @@
       "gzip_bytes": 1358
     },
     {
-      "file": "assets/logo.svg",
-      "bytes": 159256,
-      "gzip_bytes": 28162
-    },
-    {
-      "file": "assets/app.js",
-      "bytes": 8631,
-      "gzip_bytes": 2382
-    },
-    {
       "file": "assets/social.png",
       "bytes": 109312,
       "gzip_bytes": 99847
     },
     {
-      "file": "assets/house.svg",
-      "bytes": 2990,
-      "gzip_bytes": 1208
-    },
-    {
-      "file": "assets/style.css",
-      "bytes": 18876,
-      "gzip_bytes": 4883
-    },
-    {
       "file": "en/index.html",
-      "bytes": 11109,
-      "gzip_bytes": 3925
-    },
-    {
-      "file": "assets/fonts/anton-OFL.txt",
-      "bytes": 4484,
-      "gzip_bytes": 2008
-    },
-    {
-      "file": "assets/fonts/anton.woff2",
-      "bytes": 47088,
-      "gzip_bytes": 47121
+      "bytes": 11024,
+      "gzip_bytes": 3894
     },
     {
       "file": "assets/fonts/montserrat-400.woff2",
@@ -172,14 +162,24 @@
       "gzip_bytes": 61906
     },
     {
-      "file": "assets/fonts/montserrat-700.woff2",
-      "bytes": 63596,
-      "gzip_bytes": 63634
-    },
-    {
       "file": "assets/fonts/montserrat-OFL.txt",
       "bytes": 4400,
       "gzip_bytes": 1964
+    },
+    {
+      "file": "assets/fonts/anton.woff2",
+      "bytes": 47088,
+      "gzip_bytes": 47121
+    },
+    {
+      "file": "assets/fonts/anton-OFL.txt",
+      "bytes": 4484,
+      "gzip_bytes": 2008
+    },
+    {
+      "file": "assets/fonts/montserrat-700.woff2",
+      "bytes": 63596,
+      "gzip_bytes": 63634
     },
     {
       "file": "assets/fonts/montserrat-600.woff2",

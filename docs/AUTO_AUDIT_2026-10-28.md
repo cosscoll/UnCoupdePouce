@@ -59,4 +59,29 @@ après correction. La suite locale complète réussit : **151 tests Python**, av
 7 contrôles PostgreSQL réservés à la CI, et **42 tests DOM/worker**.
 Les scénarios complémentaires couvrent la candidature déjà existante, le dialogue
 remplacé pendant une revue, l’ancien 401 et l’effacement des mots de passe.
-La validation PostgreSQL et la publication sont requises avant livraison.
+La [CI 40689692570](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40689692570)
+a ensuite réussi : **158 tests Python et 42 tests DOM/worker**, avec PostgreSQL 17.
+Le commit applicatif `d94cd0d` est publié à Francfort, protection privée conservée.
+Les [trois échecs avant correction](qa/auto-audit-avant.txt) et leur
+[réussite après correction](qa/auto-audit-apres.txt) sont conservés comme preuves.
+
+## Incohérence du suivi public
+
+La page vitrine « Avancement » affirmait encore, au 20 octobre, que l'application
+n'existait que localement. Son contrôle statique exigeait même ces anciennes preuves.
+Le lot documentaire actualise cette page avec la préproduction, les preuves actuelles
+et les limites restantes ; le contrôle ne fige plus l'ancienne date. Les 55 tests
+JavaScript de la vitrine et ses contrôles statiques sont réussis localement.
+
+
+## Recette du service publié
+
+Les quatre groupes de contrôles HTTPS sont réussis sur le commit applicatif
+`d94cd0d` : détail limité au compte autorisé, candidature personnelle envoyée puis
+retirée, doublon refusé et correctifs JavaScript effectivement servis. Une coupure
+du proxy de l'outil a interrompu la lecture d'un fichier ; la recette a été reprise
+sur le même projet sans recréation. Ce projet fictif est maintenant clôturé.
+
+La navigation Avancement de la vitrine conduit désormais au rapport actualisé du
+dépôt UCP. Le lien vers le pilotage externe reste disponible, avec son libellé
+distinct, dans cette page. Aucun état du dépôt de pilotage externe n'est inventé.

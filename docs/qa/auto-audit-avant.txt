@@ -1,0 +1,61 @@
+✖ audit: old account response cannot return private data after logout (171.119297ms)
+✖ audit: delayed project detail never overwrites a newer navigation (71.022641ms)
+✖ audit: action completion preserves a comparison disabled while the request was pending (42.183595ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 0
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 775.843107
+
+✖ failing tests:
+
+test at application/qa/frontend.test.cjs:386:1
+✖ audit: old account response cannot return private data after logout (171.119297ms)
+  AssertionError [ERR_ASSERTION]: a successful stale response must be discarded
+      at TestContext.<anonymous> (/workspace/scratch/85cd527d0d9a/UnCoupdePouce/application/qa/frontend.test.cjs:391:37)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at application/qa/frontend.test.cjs:394:1
+✖ audit: delayed project detail never overwrites a newer navigation (71.022641ms)
+  AssertionError [ERR_ASSERTION]: The input was expected to not match the regular expression /Ancien projet privé/. Input:
+  
+  '← Mes projetsUN COUP DE POUCEAncien projet privéToulouse · PlomberieOuvert aux candidaturesLe projet en quelques motsAncienne description privée.Début souhaité : flexibleBudget indicatif : Non renseigné. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.Les professionnels intéressésComparez les profils déclarés avant de choisir. Une candidature ne constitue pas un devis. Dans cette préproduction, le chat nécessite une sélection et des droits de test actifs.Pas encore de candidatureVotre demande reste disponible pour les professionnels éligibles.Clôturer le projetModifier la demandeSignaler un problème'
+  
+      at TestContext.<anonymous> (/workspace/scratch/85cd527d0d9a/UnCoupdePouce/application/qa/frontend.test.cjs:399:10)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: '← Mes projetsUN COUP DE POUCEAncien projet privéToulouse · PlomberieOuvert aux candidaturesLe projet en quelques motsAncienne description privée.Début souhaité : flexibleBudget indicatif : Non renseigné. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.Les professionnels intéressésComparez les profils déclarés avant de choisir. Une candidature ne constitue pas un devis. Dans cette préproduction, le chat nécessite une sélection et des droits de test actifs.Pas encore de candidatureVotre demande reste disponible pour les professionnels éligibles.Clôturer le projetModifier la demandeSignaler un problème',
+    expected: /Ancien projet privé/,
+    operator: 'doesNotMatch',
+    diff: 'simple'
+  }
+
+test at application/qa/frontend.test.cjs:403:1
+✖ audit: action completion preserves a comparison disabled while the request was pending (42.183595ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at TestContext.<anonymous> (/workspace/scratch/85cd527d0d9a/UnCoupdePouce/application/qa/frontend.test.cjs:409:42)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
