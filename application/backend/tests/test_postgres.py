@@ -264,3 +264,10 @@ def test_postgres_saved_searches_are_private_exportable_and_deletable(pg):
     owner,_=client_for(pg,'saved-owner@ucp.test','professional')
     other,_=client_for(pg,'saved-other@ucp.test','professional')
     exercise_private_saved_searches(pg,owner,other)
+
+
+def test_postgres_initial_draft_retries_preserve_owner_and_version_boundaries(pg):
+    from test_draft_autosave import exercise_draft_creation_recovery
+    owner,_=client_for(pg,'draft-retry-owner@ucp.test','requester')
+    other,_=client_for(pg,'draft-retry-other@ucp.test','requester')
+    exercise_draft_creation_recovery(pg,owner,other)

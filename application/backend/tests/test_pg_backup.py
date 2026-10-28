@@ -81,7 +81,9 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
     password='Backup-fictitious-only!0123456789';seed(module=pg,password=password)
     c=TestClient(pg.app);r=c.post('/api/login',json={'email':'camille@ucp.test','password':password});assert r.status_code==200
     c.headers['x-ucp-csrf']=r.json()['csrf']
-    d=c.post('/api/v4/drafts',json={'title':'Photo de sauvegarde','trades':['peinture'],'town':'Toulouse'}).json()['id']
+    draft_body={'title':'Photo de sauvegarde','trades':['peinture'],'town':'Toulouse'}
+    draft_headers={'Idempotency-Key':'backup-draft-fictional-001'}
+    d=c.post('/api/v4/drafts',json=draft_body,headers=draft_headers).json()['id']
     from PIL import Image
     import io,base64
     image=io.BytesIO();Image.new('RGB',(8,8),'orange').save(image,'PNG')
@@ -105,6 +107,7 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
     assert metadata['tables']['support_tickets']==1
     assert metadata['tables']['professional_showcases']==1
     assert metadata['tables']['saved_searches']==1
+    assert metadata['tables']['draft_creation_retries']==1
     assert metadata['tables']['photos']==1 and archive.stat().st_mode&0o077==0
     assert password not in Path(str(archive)+'.json').read_text()
     with pytest.raises(ops.BackupError,match='écrasement'):ops.backup(source,archive,pg.DATABASE_SCHEMA)
@@ -124,6 +127,8 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
         logged=copy.post('/api/login',json={'email':'camille@ucp.test','password':password});assert logged.status_code==200
         copy.headers['x-ucp-csrf']=logged.json()['csrf']
         assert copy.get(f'/api/v4/photos/{photo_id}').content==source_photo
+        assert copy.post('/api/v4/drafts',json=draft_body,headers=draft_headers).json()=={'id':d,'version':1,'changed_since_creation':True}
+        assert copy.put(f'/api/v4/drafts/{d}',json=draft_body|{'version':1}).status_code==409
         budget_copy=copy.get(f'/api/v4/projects/{budget_id}').json();assert (budget_copy['budget_min'],budget_copy['budget_max'])==(1200,4500)
         assert next(t for t in copy.get('/api/v4/support').json()['items'] if t['id']==support_id)['body']=='Demande fictive à retrouver après restauration.'
         conversations=copy.get('/api/conversations').json()['items'];assert conversations
