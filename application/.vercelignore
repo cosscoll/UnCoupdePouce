@@ -8,3 +8,8 @@ backups
 __pycache__
 backend/tests
 docs/qa
+
+*.dump
+*.dump.json
+*.pgdump
+*.pgdump.json

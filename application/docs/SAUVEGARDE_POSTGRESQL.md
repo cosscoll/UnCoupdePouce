@@ -46,7 +46,11 @@ python application/backend/pg_backup.py restore /chemin-prive/ucp.dump --confirm
 
 Les mots de passe passent au client PostgreSQL via son environnement, jamais dans
 ses arguments, le manifeste ou les journaux. Les URL ne sont ni demandées par le site
-ni renvoyées au navigateur. Les sorties d'erreur des clients ne sont pas publiées.
+ni renvoyées au navigateur. Les sorties d'erreur des clients ne sont pas publiées. Les fichiers `.dump` et
+leurs manifestes sont exclus de Git et du bundle Vercel ; conserver malgré tout
+les archives opérateur dans un répertoire privé extérieur au dépôt. Les paramètres
+PG implicites de routage doivent être retirés pour éviter une cible différente
+entre les contrôles Python et les clients PostgreSQL.
 
 ## Recette et limites
 

@@ -1,0 +1,16 @@
+{
+  "date": "2026-10-28",
+  "result": "PASS",
+  "https_checks": 5,
+  "project_ids": [
+    7,
+    8
+  ],
+  "source": "dd0e47e05e2daeebc02256e73e52d00d067d3fdd",
+  "ci_run": 40670902567,
+  "python_passed": 143,
+  "dom_passed": 23,
+  "worker_passed": 3,
+  "native_pg_dump_restore_isolated": true,
+  "neon_backup_restore_executed": false
+}

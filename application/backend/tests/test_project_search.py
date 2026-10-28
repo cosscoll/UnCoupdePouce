@@ -62,5 +62,5 @@ def test_search_never_returns_hidden_suspended_or_unapproved_projects(setup):
 
 def test_search_rejects_invalid_parameters(setup):
     c=setup['pro']
-    for params in [{'q':'a'*121},{'trade':'a'*61},{'town':'a'*91},{'category':'a'*81},{'timing':'tomorrow'},{'published_within':0},{'published_within':366},{'sort':'secret'},{'status':'private'}]:
+    for params in [{'q':'a'*121},{'trade':'a'*62},{'town':'a'*91},{'category':'a'*81},{'timing':'tomorrow'},{'published_within':0},{'published_within':366},{'sort':'secret'},{'status':'private'}]:
         assert c.get('/api/projects',params=params).status_code==422

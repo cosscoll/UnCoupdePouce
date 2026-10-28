@@ -84,7 +84,10 @@ Aucun déclencheur horaire, paiement, email ou tâche autonome n'a été ajouté
 ## Sauvegardes et recette de réception
 
 Les tests SQLite existants vérifient sauvegarde/restauration et révocation des
-sessions. Pour PostgreSQL, utiliser `pg_dump --format=custom --schema=ucp_private`
+sessions. L’outil manuel `backend/pg_backup.py` est maintenant testé avec les vrais
+clients PostgreSQL 17 et une base jetable de CI ; voir SAUVEGARDE_POSTGRESQL.md.
+Il ne fournit aucune API de sauvegarde et ne touche pas au projet Neon réel.
+Pour une intervention opérateur brute PostgreSQL, utiliser `pg_dump --format=custom --schema=ucp_private`
 avec les identifiants dans l'environnement opérateur, puis `pg_restore` dans une
 **base vide distincte**. Révoquer sessions/codes de récupération dans cette copie et
 rejouer le parcours. Ne pas mettre une URL avec mot de passe dans les arguments de

@@ -18,3 +18,9 @@ htmlcov/
 backups/
 .DS_Store
 Thumbs.db
+
+# Private PostgreSQL operator archives
+*.dump
+*.dump.json
+*.pgdump
+*.pgdump.json

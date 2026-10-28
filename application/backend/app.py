@@ -747,7 +747,7 @@ def close_project(project_id:int,user=Depends(require('requester'))):
 
 @app.get('/api/projects')
 def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
-             trade:Annotated[str,Query(max_length=60)]='',town:Annotated[str,Query(max_length=90)]='',
+             trade:Annotated[str,Query(max_length=61)]='',town:Annotated[str,Query(max_length=90)]='',
              category:Annotated[str,Query(max_length=80)]='',
              timing:Literal['flexible','month','quarter','urgent']|None=None,
              status:Literal['open','selected','closed']|None=None,

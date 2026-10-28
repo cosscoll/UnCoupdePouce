@@ -1,3 +1,33 @@
+# Recherche et reprise PostgreSQL — 28 octobre 2026
+
+Source fonctionnelle : `dd0e47e05e2daeebc02256e73e52d00d067d3fdd`.
+[Exécution GitHub Actions](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40670902567) :
+**143 tests Python réussis**, **23 tests DOM + 3 tests worker réussis**.
+
+Recherche : combinaison des filtres, mots-clés/synonymes sans accents, tri, délais
+et ancienneté ; aucun élargissement des droits ; profil lié exact ; exclusion des
+projets cachés et des demandeurs suspendus ; conservation des résultats après panne.
+L’API conserve le contrat des appels internes de contrôle des photos/projets.
+
+**Vrai dump/restore PostgreSQL 17 réussi sur base fictive isolée** : snapshot exporté,
+archive privée, contrôle des volumes, données/messages/photos/séquences restaurés,
+anciennes sessions absentes de la copie, sessions source toujours valides et
+refus de restaurer sur la source ou sur une base non vide. Le job détruit seulement
+la base de copie qu’il a créée. Les erreurs et arguments n’exposent pas les mots
+de passe ; les variables de routage PG implicites sont refusées.
+
+**Recette HTTPS recherche réussie** : publication fictive de deux missions, filtres
+combinés et accents, motif individuel/profil lié actif, absence de mission hors
+périmètre malgré un identifiant connu, tri dans les deux sens, validation des
+paramètres et interface JavaScript effectivement servie. Voir
+`qa/recherche-reprise-2026-10-28.json`.
+
+Aucun dump de Neon réel ni secret de connexion Vercel n’a été récupéré. Ce test
+isolé ne valide ni un stockage de sauvegarde externe, ni la rétention/chiffrement,
+ni un exercice de reprise du projet distant. Voir SAUVEGARDE_POSTGRESQL.md.
+
+---
+
 # Installation web et reprise réseau — 28 octobre 2026
 
 Source fonctionnelle : `f38c19c6e3d51b373bca6eb735bc617aa431fa44`.
