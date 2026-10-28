@@ -154,12 +154,23 @@ async function openCandidateShowcase(projectId,a){
  if(result&&epoch===renderEpoch&&dialogToken===dialogEpoch)showDialog('Présentation · '+(a.linked_artisan_alias||a.professional_name),showcaseContent(result));
 }
 async function renderShowcaseManagement(n){
- const data=await api('/enterprise');
- const box=panel('Votre présentation et vos réalisations','Décrivez votre savoir-faire avec des exemples fictifs. Chaque profil lié conserve sa propre présentation. Les demandeurs la consultent seulement depuis une candidature reçue.');
- const scopes=[{id:null,alias:'Mon profil individuel'},...data.members.map(m=>({id:m.id,alias:m.alias,active:!!m.is_active}))];
- for(const scope of scopes)box.append(el('div',{class:'item'},el('h4',{text:scope.alias}),scope.active===false?el('p',{class:'hint',text:'Profil inactif : sa présentation n’est pas visible aux demandeurs.'}):null,
-  el('div',{class:'row'},button('Modifier · '+scope.alias,()=>editShowcase(scope.id)),button('Aperçu · '+scope.alias,()=>previewShowcase(scope.id)))));
- n.append(box);
+ const epoch=renderEpoch,box=panel('Votre présentation et vos réalisations','Décrivez votre savoir-faire avec des exemples fictifs. Chaque profil lié conserve sa propre présentation. Les demandeurs la consultent seulement depuis une candidature reçue.');
+ const scopeRow=scope=>el('div',{class:'item'},el('h4',{text:scope.alias}),scope.active===false?el('p',{class:'hint',text:'Profil inactif : sa présentation n’est pas visible aux demandeurs.'}):null,
+  el('div',{class:'row'},button('Modifier · '+scope.alias,()=>editShowcase(scope.id)),button('Aperçu · '+scope.alias,()=>previewShowcase(scope.id))));
+ box.append(scopeRow({id:null,alias:'Mon profil individuel'}));
+ const linked=el('div');box.append(linked);n.append(box);
+ async function loadLinked(){
+  try{
+   const data=await api('/enterprise');if(epoch!==renderEpoch)return false;clear(linked);
+   for(const member of data.members)linked.append(scopeRow({id:member.id,alias:member.alias,active:!!member.is_active}));
+   return {ok:true};
+  }catch(e){
+   if(e.stale||e.status===401||epoch!==renderEpoch)return false;
+   clear(linked);linked.append(el('p',{class:'hint',text:'Les profils liés n’ont pas pu être chargés. Votre profil individuel reste disponible.'}),button('Réessayer les profils liés',()=>action(loadLinked)));
+   return false;
+  }
+ }
+ await loadLinked();
 }
 async function previewShowcase(linked){
  const epoch=renderEpoch,dialogToken=dialogEpoch;
