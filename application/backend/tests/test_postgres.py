@@ -69,6 +69,8 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     assert pro.get('/api/projects',params={'town':'Paris'}).json()['items']==[]
     r=pro.post(f'/api/projects/{project_id}/apply');assert r.status_code==201,r.text
     aid=r.json()['id']
+    assert pro.get(f'/api/v4/projects/{project_id}').json()['own_application']=={'id':aid,'status':'pending'}
+    assert 'own_application' not in requester.get(f'/api/v4/projects/{project_id}').json()
     assert pro.post(f'/api/projects/{project_id}/apply').status_code==409
     path=f'/api/conversations/{aid}/messages'
     assert pro.get(path).status_code==403

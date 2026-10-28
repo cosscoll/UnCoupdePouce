@@ -206,6 +206,9 @@ def install(m):
             draft=c.execute('SELECT payload FROM drafts WHERE project_id=?',(id,)).fetchone()
             row['timing']=json.loads(draft['payload']).get('timing','flexible') if draft else 'flexible'
             row['photos']=photos if user['role'] in ('requester','admin') or c.execute("SELECT 1 FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone() else []
+            if user['role']=='professional':
+                own=c.execute('SELECT id,status FROM applications WHERE project_id=? AND professional_id=?',(id,user['id'])).fetchone()
+                row['own_application']=dict(own) if own else None
             return row
 
     @app.post('/api/v4/reports',status_code=201)

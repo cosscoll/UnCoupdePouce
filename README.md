@@ -14,6 +14,8 @@ Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en rela
 - [Recherche de missions et explications](application/docs/RECHERCHE.md)
 - [Sauvegarde PostgreSQL : outil manuel et limites](application/docs/SAUVEGARDE_POSTGRESQL.md)
 - [Installation web et reprise réseau](application/docs/PWA.md)
+- [Auto-audit technique et limites](docs/AUTO_AUDIT_2026-10-28.md)
+- [Matrice des 92 exigences et acceptation](docs/MATRICE_ACCEPTATION_CDC.md)
 - [Avancement vérifié du cahier des charges](application/docs/AVANCEMENT_CDC.md)
 - [Audit de reprise du 27 octobre](application/docs/REPRISE_2026-10-27.md)
 - [Sources de la vitrine](site-vitrine/dist/index.html)

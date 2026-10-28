@@ -44,3 +44,19 @@ def test_linked_application_explains_inactive_profile_without_opening_chat(setup
     item=v['pro'].get('/api/my-applications').json()['items'][0]
     assert item['linked_artisan_alias']=='Profil fictif' and item['conversation_state']=='linked_inactive'
     assert v['pro'].get(f'/api/conversations/{aid}/messages').status_code==403
+
+
+def test_project_detail_returns_only_the_viewers_application(setup):
+    v=setup;approve(v);approve(v,who='intruder');pid=project(v);call=v['call']
+    # A second eligible professional sees no application belonging to the first.
+    assert call(v['intruder'],v['icsrf'],'post','/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456790'}).status_code==200
+    approve(v,who='intruder')
+    path=f'/api/v4/projects/{pid}'
+    assert v['pro'].get(path).json()['own_application'] is None
+    aid=call(v['pro'],v['pcsrf'],'post',f'/api/projects/{pid}/apply').json()['id']
+    assert v['pro'].get(path).json()['own_application']=={'id':aid,'status':'pending'}
+    assert v['intruder'].get(path).json()['own_application'] is None
+    assert 'own_application' not in v['requester'].get(path).json()
+    assert v['other'].get(path).status_code==404
+    assert call(v['pro'],v['pcsrf'],'post',f'/api/applications/{aid}/withdraw').status_code==200
+    assert v['pro'].get(path).json()['own_application']=={'id':aid,'status':'withdrawn'}
