@@ -1,0 +1,11 @@
+✔ audit: old account response cannot return private data after logout (154.621742ms)
+✔ audit: delayed project detail never overwrites a newer navigation (61.895545ms)
+✔ audit: action completion preserves a comparison disabled while the request was pending (38.30688ms)
+ℹ tests 3
+ℹ suites 0
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 619.125064

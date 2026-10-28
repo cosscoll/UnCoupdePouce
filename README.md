@@ -48,8 +48,8 @@ Sous Windows, utilisez `application/DEMARRER.bat`. Ces commandes lancent le dév
 
 ## Vérifications de référence
 
-- Application : 157 tests Python réussis sur GitHub Actions le 28/10/2026 (SQLite et PostgreSQL 17).
-- Interface de l'application : 32 tests DOM et 3 tests de service worker réussis.
+- Application : 158 tests Python réussis sur GitHub Actions le 28/10/2026 (SQLite et PostgreSQL 17).
+- Interface de l'application : 39 tests DOM et 3 tests de service worker réussis.
 - Vitrine : contrôles statiques et tests des scénarios de brief réussis.
 - Parcours HTTPS réel publication → candidature → sélection → messagerie et refus inter-comptes réussis sur la préproduction.
 - Vitrine ouverte dans un navigateur réel ; rendu mobile sur appareils, installation/réouverture PWA et restauration PostgreSQL distante restent à vérifier.
