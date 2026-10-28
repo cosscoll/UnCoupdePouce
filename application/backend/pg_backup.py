@@ -18,12 +18,28 @@ def schema_name(value):
     return value
 
 def connection_info(url):
+    if any(os.environ.get(k) for k in ('PGSERVICE','PGSERVICEFILE','PGHOSTADDR','PGOPTIONS')):
+        raise BackupError('Retirez les paramètres PG implicites ; utilisez uniquement les URL opérateur explicites.')
     if urlsplit(url).scheme not in ('postgres','postgresql'):raise BackupError('URL PostgreSQL explicite requise.')
     try:info=psycopg.conninfo.conninfo_to_dict(url)
     except Exception:raise BackupError('Configuration PostgreSQL invalide.') from None
+    allowed={'host','hostaddr','port','user','password','dbname','sslmode','sslrootcert','channel_binding','connect_timeout'}
+    if set(info)-allowed:raise BackupError('Options de connexion non prises en charge par cet outil.')
+    if not info.get('host') or not info.get('user'):raise BackupError('Hôte et utilisateur explicites requis.')
     if not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_$-]{0,62}',info.get('dbname','')):raise BackupError('Nom de base simple explicite requis.')
-    if info.get('host') not in ('localhost','127.0.0.1','::1') and info.get('sslmode')!='verify-full':
-        raise BackupError('TLS verify-full requis pour une base distante.')
+    local=info['host'] in ('localhost','127.0.0.1','::1')
+    if info.get('hostaddr'):
+        import ipaddress
+        try:local=local and ipaddress.ip_address(info['hostaddr']).is_loopback
+        except ValueError:local=False
+    if not local and info.get('sslmode')!='verify-full':raise BackupError('TLS verify-full requis pour une base distante.')
+    if not local and not info.get('password'):raise BackupError('Identifiants distants explicites requis.')
+    # The guard connection and CLI must not inherit a different PGHOSTADDR/service.
+    import certifi
+    info.setdefault('port','5432');info.setdefault('password','');info.setdefault('hostaddr','')
+    info.setdefault('sslmode','prefer');info.setdefault('sslrootcert',certifi.where())
+    info.setdefault('channel_binding','prefer')
+    info.update(options='',sslcert='',sslkey='',gssencmode='disable',passfile=os.devnull,connect_timeout='10')
     return info
 
 def fingerprint(info):
@@ -32,7 +48,7 @@ def fingerprint(info):
 def pg_env(info):
     env={k:v for k,v in os.environ.items() if not k.startswith(('PG','UCP_'))}
     mapping={'host':'PGHOST','hostaddr':'PGHOSTADDR','port':'PGPORT','user':'PGUSER','password':'PGPASSWORD','dbname':'PGDATABASE',
-             'sslmode':'PGSSLMODE','sslrootcert':'PGSSLROOTCERT','channel_binding':'PGCHANNELBINDING'}
+             'sslmode':'PGSSLMODE','sslrootcert':'PGSSLROOTCERT','channel_binding':'PGCHANNELBINDING','gssencmode':'PGGSSENCMODE','passfile':'PGPASSFILE'}
     for key,name in mapping.items():
         if key in info:env[name]=info[key]
     env['PGCONNECT_TIMEOUT']='10'
@@ -41,7 +57,7 @@ def pg_env(info):
     return env
 
 def connect(url):
-    try:return psycopg.connect(url,connect_timeout=10)
+    try:return psycopg.connect(**connection_info(url))
     except Exception:raise BackupError('Connexion PostgreSQL impossible ; vérifiez la configuration opérateur.') from None
 
 def digest(path):

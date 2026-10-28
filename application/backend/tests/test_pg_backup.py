@@ -66,6 +66,7 @@ def test_backup_configuration_requires_private_schema_and_remote_tls():
         with pytest.raises(ops.BackupError):ops.schema_name(value)
     with pytest.raises(ops.BackupError,match='TLS'):ops.connection_info('postgresql://u:p@db.example/neondb?sslmode=require')
     assert ops.connection_info('postgresql://u:p@db.example/neondb?sslmode=verify-full')['sslmode']=='verify-full'
+    with pytest.raises(ops.BackupError,match='TLS'):ops.connection_info('postgresql://u:p@localhost/db?hostaddr=192.0.2.1')
 
 
 def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessions(pg,tmp_path,monkeypatch):
