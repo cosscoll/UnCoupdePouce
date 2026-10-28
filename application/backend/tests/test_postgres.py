@@ -75,7 +75,9 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     assert other.post(f'/api/applications/{aid}/accept').status_code==403
     assert requester.post(f'/api/applications/{aid}/accept').status_code==200
     assert pro.get(path).status_code==403
+    assert pro.get('/api/my-applications').json()['items'][0]['conversation_state']=='test_access_required'
     assert admin.post(f'/api/admin/professionals/{pid}/activate-test-subscription').status_code==200
+    assert pro.get('/api/my-applications').json()['items'][0]['conversation_state']=='available'
     for _ in range(2):
         r=pro.post(path,json={'body':'Bonjour, échange fictif.'},headers={'Idempotency-Key':'test-retry-1234567890'})
         assert r.status_code==201,r.text
@@ -107,6 +109,7 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     exercise_support_flow(pg,requester,other,admin)
     assert admin.post(f'/api/admin/professionals/{pid}/suspend').status_code==200
     assert requester.get(path).status_code==403
+    assert next(x for x in pro.get('/api/my-applications').json()['items'] if x['id']==aid)['conversation_state']=='unavailable'
 
 
 def test_postgres_drafts_and_private_photos(pg):

@@ -17,8 +17,9 @@ missions hors droits, nom de demandeur ou brouillon brut n'est renvoyé.
 
 Le matching d'autorisation garde la règle existante par métier et commune déclarée.
 La normalisation des filtres n'élargit pas les autorisations. Aucun rayon, distance
-réelle, classement de pertinence ou budget imaginaire n'est ajouté. Budget, géocodage
-et recherche avancée sur un grand volume restent à développer et valider.
+réelle ou classement de pertinence n'est ajouté. Le budget facultatif déclaré
+est désormais filtrable par recoupement ; voir BUDGET.md. Géocodage et recherche
+sur un grand volume restent à développer et valider.
 
 L'explication n'expose que les missions déjà autorisées. Une mission extérieure au
 périmètre demeure invisible ; son existence n'est pas révélée pour expliquer un refus.
