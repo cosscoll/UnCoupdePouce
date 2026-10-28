@@ -381,3 +381,62 @@ test('application tracking distinguishes closed projects and filters without sug
   select.value='withdrawn';select.dispatchEvent(new x.w.Event('change'));assert.match(x.w.document.querySelector('#view [aria-live]').textContent,/Aucune candidature pour ce filtre/);
  }finally{x.close()}
 });
+
+// Adversarial audit: delayed responses and changing interface permissions.
+test('audit: old account response cannot return private data after logout',async()=>{
+ let finish;const x=await boot({'/api/slow-private':()=>new Promise(resolve=>finish=resolve),'POST /api/logout':{ok:true}});
+ try{
+  const pending=x.w.api('/slow-private').then(v=>({value:v}),e=>({error:e}));await tick();
+  x.w.document.querySelector('#logout').click();await tick();finish({body:'Private previous account'});
+  const result=await pending;assert.ok(result.error?.stale,'a successful stale response must be discarded');
+ }finally{x.close()}
+});
+test('audit: delayed project detail never overwrites a newer navigation',async()=>{
+ let finish;const x=await boot({'/api/v4/projects/91':()=>new Promise(resolve=>finish=resolve),'/api/projects/91/applications':{items:[]},'/api/notifications':{items:[]}});
+ try{
+  const pending=x.w.projectDetail({id:91});await tick();await x.w.go('notifications');
+  finish({id:91,title:'Ancien projet privé',description:'Ancienne description privée.',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'open',photos:[]});await pending;
+  assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/Ancien projet privé/);
+  assert.match(x.w.document.querySelector('#view').textContent,/actualité/);
+ }finally{x.close()}
+});
+test('audit: action completion preserves a comparison disabled while the request was pending',async()=>{
+ let finish;const x=await boot();try{
+  const box=x.w.document.querySelector('#view');x.w.renderCandidateCards(box,[{id:1,professional_name:'Pro un',status:'rejected',trade:'plomberie',town:'Toulouse'},{id:2,professional_name:'Pro deux',status:'rejected',trade:'plomberie',town:'Toulouse'}]);
+  const checks=box.querySelectorAll('.candidate-choice input');for(const c of checks){c.checked=true;c.dispatchEvent(new x.w.Event('change'))}
+  const compare=[...box.querySelectorAll('button')].find(b=>b.textContent==='Comparer les profils sélectionnés');assert.equal(compare.disabled,false);
+  const pending=x.w.action(()=>new Promise(resolve=>finish=resolve));checks[0].checked=false;checks[0].dispatchEvent(new x.w.Event('change'));assert.equal(compare.disabled,true);
+  finish({ok:true});await pending;assert.equal(compare.disabled,true);
+ }finally{x.close()}
+});
+
+test('audit: existing candidature replaces the apply action even after withdrawal',async()=>{
+ for(const status of ['pending','accepted','rejected','withdrawn']){
+  const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/v4/projects/91':{id:91,title:'Projet fictif',description:'Description fictive du projet.',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'open',photos:[],own_application:{id:61,status}}});
+  try{await x.w.projectDetail({id:91});assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/Proposer ma candidature/);assert.match(x.w.document.querySelector('#view').textContent,/déjà enregistrée/);assert.ok([...x.w.document.querySelectorAll('#view button')].some(b=>b.textContent==='Voir ma candidature'))}finally{x.close()}
+ }
+});
+test('audit: closed project does not offer an application and dialog has an accessible name',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/v4/projects/91':{id:91,title:'Projet fictif',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'closed',photos:[],own_application:null}});
+ try{await x.w.projectDetail({id:91});assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/Proposer ma candidature/);x.w.showDialog('Dossier de test',x.w.el('p',{text:'Texte'}));const d=x.w.document.querySelector('#dialog');assert.equal(x.w.document.getElementById(d.getAttribute('aria-labelledby')).textContent,'Dossier de test')}finally{x.close()}
+});
+
+test('audit: old unauthorized response cannot log out a newly connected account and passwords clear',async()=>{
+ let finish;const x=await boot({'/api/old-session':()=>new Promise(resolve=>finish=resolve),'POST /api/logout':{ok:true},'POST /api/login':{user_id:8,name:'Second compte',role:'requester',csrf:'new-csrf'}});
+ try{
+  const pending=x.w.api('/old-session').catch(e=>e);await tick();
+  input(x.w,'#login-form [name=password]','Old-test-password');x.w.document.querySelector('#logout').click();await tick();assert.equal(x.w.document.querySelector('#login-form [name=password]').value,'');
+  input(x.w,'#login-form [name=email]','second@ucp.test');input(x.w,'#login-form [name=password]','New-fictional-password');submit(x.w,'#login-form');await tick();
+  assert.equal(x.w.document.querySelector('#login-form [name=password]').value,'');
+  finish({status:401,data:{detail:'Old session expired'}});const result=await pending;assert.equal(result.stale,true);
+  assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.match(x.w.document.querySelector('#actor-title').textContent,/Second compte/);
+ }finally{x.close()}
+});
+test('audit: late support review cannot replace a dialog the administrator opened afterwards',async()=>{
+ let finish;const x=await boot({'POST /api/v4/admin/support/7/review':()=>new Promise(resolve=>finish=resolve)});
+ try{
+  x.w.reviewSupportTicket(7,{other:'Autre'});input(x.w,'#dialog [name=reason]','Examen fictif du dossier.');submit(x.w,'#dialog form');await tick();
+  x.w.showDialog('Autre dossier',x.w.el('p',{text:'Écran plus récent'}));finish({ticket:{subject:'Ancien dossier',body:'Corps privé retardé',category:'other'}});await tick();
+  assert.match(x.w.document.querySelector('#dialog').textContent,/Écran plus récent/);assert.doesNotMatch(x.w.document.querySelector('#dialog').textContent,/Corps privé retardé/);
+ }finally{x.close()}
+});
