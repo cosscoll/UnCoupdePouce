@@ -119,6 +119,7 @@ def init_db():
             created_at TEXT NOT NULL);
           CREATE INDEX IF NOT EXISTS idx_linked_artisans_parent ON enterprise_artisans(enterprise_id);
           CREATE INDEX IF NOT EXISTS idx_notifications_owner ON notifications(recipient_id,id DESC);
+          CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(recipient_id,id DESC) WHERE read_at IS NULL;
           CREATE INDEX IF NOT EXISTS idx_project_matching ON projects(trade,town,status);
           CREATE INDEX IF NOT EXISTS idx_applications_pid ON applications(project_id);
           CREATE INDEX IF NOT EXISTS idx_messages_app ON messages(application_id);
@@ -247,32 +248,33 @@ def authenticated_db(user,write=False):
             raise
 
 @app.get('/api/notifications')
-def list_notifications(user=Depends(get_user)):
+def list_notifications(user=Depends(get_user),before_id:Annotated[int|None,Query(ge=1)]=None,unread_only:bool=False):
     with authenticated_db(user,write=False) as c:
-        records=c.execute('SELECT id,event_type,entity_id,created_at,read_at FROM notifications WHERE recipient_id=? ORDER BY id DESC LIMIT 100',
-                          (user['id'],)).fetchall()
-        unread=c.execute('SELECT COUNT(*) FROM notifications WHERE recipient_id=? AND read_at IS NULL',
-                         (user['id'],)).fetchone()[0]
-    return {'unread':unread, 'items':[dict(r)|{'message':NOTIFICATION_TYPES[r['event_type']]} for r in records],
-            'channel':'LAB_LOCAL_ONLY'}
+        where='recipient_id=?';params=[user['id']]
+        if before_id is not None:where+=' AND id<?';params.append(before_id)
+        if unread_only:where+=' AND read_at IS NULL'
+        records=c.execute('SELECT id,event_type,entity_id,created_at,read_at FROM notifications WHERE '+where+' ORDER BY id DESC LIMIT 51',tuple(params)).fetchall()
+        unread=c.execute('SELECT COUNT(*) FROM notifications WHERE recipient_id=? AND read_at IS NULL',(user['id'],)).fetchone()[0]
+    page=records[:50]
+    return {'unread':unread,'items':[dict(r)|{'message':NOTIFICATION_TYPES[r['event_type']]} for r in page],
+            'next_before_id':page[-1]['id'] if len(records)>50 else None,
+            'channel':'LAB_LOCAL_ONLY'}  # Historical API label; delivery is internal only, also on staging.
 
 @app.post('/api/notifications/{notification_id}/read')
 def mark_notification_read(notification_id:int,user=Depends(get_user)):
     with authenticated_db(user,write=True) as c:
-        row=c.execute('SELECT read_at FROM notifications WHERE id=? AND recipient_id=?',
-                      (notification_id,user['id'])).fetchone()
+        row=c.execute('SELECT read_at FROM notifications WHERE id=? AND recipient_id=?',(notification_id,user['id'])).fetchone()
         if row is None:error(404,'Notification introuvable')
-        if row['read_at'] is None:
-            c.execute('UPDATE notifications SET read_at=? WHERE id=? AND recipient_id=?',
-                      (now(),notification_id,user['id']))
-    return {'ok':True}
+        read_at=row['read_at'] or now()
+        if row['read_at'] is None:c.execute('UPDATE notifications SET read_at=? WHERE id=? AND recipient_id=?',(read_at,notification_id,user['id']))
+        unread=c.execute('SELECT COUNT(*) FROM notifications WHERE recipient_id=? AND read_at IS NULL',(user['id'],)).fetchone()[0]
+    return {'ok':True,'read_at':read_at,'unread':unread}
 
 @app.post('/api/notifications/read-all')
 def mark_all_notifications_read(user=Depends(get_user)):
     with authenticated_db(user,write=True) as c:
-        result=c.execute('UPDATE notifications SET read_at=? WHERE recipient_id=? AND read_at IS NULL',
-                         (now(),user['id']))
-    return {'ok':True,'count':result.rowcount}
+        result=c.execute('UPDATE notifications SET read_at=? WHERE recipient_id=? AND read_at IS NULL',(now(),user['id']))
+    return {'ok':True,'count':result.rowcount,'unread':0}
 
 
 def require(role):

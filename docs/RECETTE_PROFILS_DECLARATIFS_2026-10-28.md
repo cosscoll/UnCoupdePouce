@@ -42,3 +42,14 @@ périmées refusées, lecture exacte des deux candidatures d’un même projet, 
 inter-comptes et export personnel limité au gestionnaire. L’interface publiée
 contient bien les présentations et leur comparaison. Le projet fictif de recette
 est le nº 11, avec deux candidatures ; aucun paiement n’a été effectué.
+
+## Exemple accessible au compte de démonstration
+
+Le compte demandeur `camille@ucp.test` possède un projet intitulé
+« Découvrir les réalisations fictives 9089603d », avec deux candidatures et leurs
+réalisations. Le contenu et sa séparation entre individuel et profil lié sont
+conservés après redéploiement. Aucun mot de passe n'est ajouté au dépôt.
+
+La vue d'ensemble professionnelle est publiée par la pull request 38 après
+validation de 165 tests Python et 52 tests DOM/worker. Elle complète F30 sans
+inventer de droit, tarif ou nombre de messages non lus.
