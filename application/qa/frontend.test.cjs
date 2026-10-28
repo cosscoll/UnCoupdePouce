@@ -248,3 +248,32 @@ test('late failure from an old conversation cannot hide the current chat or stop
   assert.equal(cleared.includes(current),false);assert.equal(holder.querySelector('button[type=submit]').disabled,false);
  }finally{x.close()}
 });
+
+test('search sends combined criteria to server, explains the applying profile and resets filters',async()=>{
+ const item={id:3,title:'Fuite fictive',description:'Description',trade:'plomberie',town:'Toulouse',status:'open',timing:'urgent',match:{profile:'linked',alias:'Équipe test',trades:['plomberie'],town:'Toulouse'}};
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[item],search_scope:'ready'},'/api/projects?q=fuite&trade=plomberie&town=Toulouse&timing=urgent&published_within=7&sort=oldest':{items:[item]},'/api/projects?sort=newest':{items:[item]}});
+ try{
+  input(x.w,'.project-search [name=q]','fuite');
+  for(const [name,value] of Object.entries({trade:'plomberie',town:'Toulouse',timing:'urgent',published_within:'7',sort:'oldest'}))x.w.document.querySelector('.project-search [name='+name+']').value=value;
+  submit(x.w,'.project-search');await tick();
+  assert.ok(x.calls.some(c=>c.url.includes('q=fuite&trade=plomberie&town=Toulouse&timing=urgent&published_within=7&sort=oldest')));
+  assert.match(x.w.document.querySelector('.match-reason').textContent,/Équipe test.*Plomberie.*Toulouse/);
+  assert.match(x.w.document.querySelector('#view').textContent,/Aucun rayon/);
+  [...x.w.document.querySelectorAll('.project-search button')].find(b=>b.textContent==='Effacer les filtres').click();await tick();
+  assert.ok(x.calls.some(c=>c.url==='/api/projects?sort=newest'));assert.equal(x.w.document.querySelector('[name=q]').value,'');
+ }finally{x.close()}
+});
+test('an empty search still offers the form and a failed request retains the last results',async()=>{
+ const item={id:3,title:'Projet à conserver',description:'Description',trade:'plomberie',town:'Toulouse',status:'open'};
+ const x=await boot({'/api/projects':{items:[item]},'/api/projects?q=panne&sort=newest':()=>{throw Error('offline')},'/api/projects?q=aucun&sort=newest':{items:[]}});
+ try{
+  input(x.w,'.project-search [name=q]','panne');submit(x.w,'.project-search');await tick();
+  assert.match(x.w.document.querySelector('.project-row').textContent,/Projet à conserver/);assert.match(x.w.document.querySelector('.count').textContent,/résultats précédents/);
+  input(x.w,'.project-search [name=q]','aucun');submit(x.w,'.project-search');await tick();
+  assert.equal(x.w.document.querySelectorAll('.project-row').length,0);assert.ok(x.w.document.querySelector('.project-search'));
+ }finally{x.close()}
+});
+test('unapproved professional sees an explanation without mission identifiers',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[],search_scope:'pending_review'}});
+ try{assert.match(x.w.document.querySelector('#view').textContent,/profil attend son examen/);assert.equal(x.w.document.querySelectorAll('.project-row').length,0);}finally{x.close()}
+});

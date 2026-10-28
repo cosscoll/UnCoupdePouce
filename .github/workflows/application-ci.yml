@@ -29,6 +29,17 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r application/backend/requirements-lock.txt
+      - name: Native PostgreSQL tools for isolated backup tests
+        env:
+          UCP_PG_TEST_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/ucp-pg-bin"
+          cp application/qa/pg-client.sh "$RUNNER_TEMP/ucp-pg-bin/pg_dump"
+          cp application/qa/pg-client.sh "$RUNNER_TEMP/ucp-pg-bin/pg_restore"
+          chmod 700 "$RUNNER_TEMP/ucp-pg-bin/pg_dump" "$RUNNER_TEMP/ucp-pg-bin/pg_restore"
+          echo "$RUNNER_TEMP/ucp-pg-bin" >> "$GITHUB_PATH"
+          echo "UCP_PG_TEST_CONTAINER=$UCP_PG_TEST_CONTAINER" >> "$GITHUB_ENV"
+          echo "UCP_TEST_PG_BACKUP=1" >> "$GITHUB_ENV"
       - run: python -m pytest -q application/backend/tests
       - uses: actions/setup-node@v4
         with:

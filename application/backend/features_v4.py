@@ -64,6 +64,7 @@ def install(m):
         CREATE TABLE IF NOT EXISTS resets(token_hash TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,expires INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS admin_decisions(id INTEGER PRIMARY KEY,actor_id INTEGER NOT NULL REFERENCES users(id),kind TEXT NOT NULL,target_id INTEGER NOT NULL,reason TEXT NOT NULL,created_at TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS idx_drafts_owner ON drafts(owner_id);
+        CREATE INDEX IF NOT EXISTS idx_drafts_project ON drafts(project_id);
         CREATE INDEX IF NOT EXISTS idx_photos_draft ON photos(draft_id);
         CREATE TABLE IF NOT EXISTS message_retries(application_id INTEGER NOT NULL REFERENCES applications(id),sender_id INTEGER NOT NULL REFERENCES users(id),retry_key TEXT NOT NULL,message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,body_hash TEXT NOT NULL,PRIMARY KEY(application_id,sender_id,retry_key));
         ''')

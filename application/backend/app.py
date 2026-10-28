@@ -6,9 +6,9 @@ import os, sqlite3, hashlib, hmac, secrets, re, time, json
 from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Annotated
 
-from fastapi import FastAPI, Request, Response, HTTPException, Depends
+from fastapi import FastAPI, Request, Response, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -746,41 +746,54 @@ def close_project(project_id:int,user=Depends(require('requester'))):
     return {'ok':True,'status':'closed','chat_access':False}
 
 @app.get('/api/projects')
-def projects(user=Depends(get_user)):
+def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
+             trade:Annotated[str,Query(max_length=60)]='',town:Annotated[str,Query(max_length=90)]='',
+             category:Annotated[str,Query(max_length=80)]='',
+             timing:Literal['flexible','month','quarter','urgent']|None=None,
+             status:Literal['open','selected','closed']|None=None,
+             published_within:Annotated[int|None,Query(ge=1,le=365)]=None,
+             sort:Literal['newest','oldest']='newest'):
+    from project_search import decorate, filter_projects
+    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,
+        (SELECT payload FROM drafts WHERE project_id=p.id ORDER BY id LIMIT 1) AS draft_payload'''
+    discovery='not_applicable'
     with authenticated_db(user,write=False) as c:
         if user['role']=='requester':
-            rs=c.execute('SELECT id,title,description,trade,town,status,trades_json,hidden,created_at FROM projects WHERE requester_id=? ORDER BY id DESC',(user['id'],)).fetchall()
+            rs=[decorate(r) for r in c.execute('SELECT '+columns+' FROM projects p WHERE p.requester_id=? ORDER BY p.id DESC',(user['id'],))]
         elif user['role']=='professional':
             p=c.execute('SELECT * FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
-            # Do not reveal requester identity to artisans; matching limited to same city and métier.
-            possible=c.execute('SELECT id,title,description,trade,town,status,trades_json,hidden,created_at FROM projects WHERE status=? ORDER BY id DESC',
-                         ('open',)).fetchall() if p and p['approved'] else []
+            discovery='profile_required' if not p else 'pending_review' if not p['approved'] else 'ready'
+            # Authorization precedes all filters. No requester identity or outside counts.
+            possible=c.execute('SELECT '+columns+''' FROM projects p JOIN users u ON u.id=p.requester_id
+                WHERE p.status=? AND p.hidden=0 AND u.suspended=0 ORDER BY p.id DESC''',('open',)).fetchall() if p and p['approved'] else []
             eligible={zone.casefold() for zone in json.loads(p['service_areas'] or '[]')} if p else set()
             valid_trades={p['trade'],*json.loads(p['service_trades'] or '[]')} if p else set()
-            if p: eligible.add(p['town'].casefold())
-            member_profiles=c.execute('''SELECT a.id,a.service_trades,a.service_areas FROM enterprise_artisans a
-                JOIN enterprise_accounts e ON e.id=a.enterprise_id WHERE e.owner_id=? AND a.is_active=1''',
+            if p:eligible.add(p['town'].casefold())
+            members=c.execute('''SELECT a.id,a.alias,a.service_trades,a.service_areas FROM enterprise_artisans a
+                JOIN enterprise_accounts e ON e.id=a.enterprise_id WHERE e.owner_id=? AND a.is_active=1 ORDER BY a.id''',
                 (user['id'],)).fetchall() if p and p['approved'] else []
             rs=[]
             for pr in possible:
-                if pr['hidden'] or c.execute('SELECT suspended FROM users JOIN projects ON projects.requester_id=users.id WHERE projects.id=?',(pr['id'],)).fetchone()[0]: continue
-                try:
-                    # Fail closed on grandfathered v3.5 lab rows that bypassed v3.6 input checks.
-                    precontact_safe(' '.join(str(pr[key]) for key in ('title','description','town')))
-                except ValueError:
-                    continue
-                owner_match=bool(project_trades(pr) & valid_trades) and pr['town'].casefold() in eligible
-                linked_match=next((r['id'] for r in member_profiles
-                    if bool(project_trades(pr) & set(json.loads(r['service_trades']))) and
-                    pr['town'].casefold() in {t.casefold() for t in json.loads(r['service_areas'])}),None)
-                if owner_match or linked_match:
-                    row=dict(pr)
-                    row['matching_linked_profile_id']=linked_match
+                try:precontact_safe(' '.join(str(pr[key]) for key in ('title','description','town')))
+                except ValueError:continue
+                scope=project_trades(pr)
+                owner_match=bool(scope & valid_trades) and pr['town'].casefold() in eligible
+                linked=next((r for r in members if bool(scope & set(json.loads(r['service_trades']))) and
+                             pr['town'].casefold() in {t.casefold() for t in json.loads(r['service_areas'])}),None)
+                if owner_match or linked:
+                    row=decorate(pr)
+                    row['matching_linked_profile_id']=linked['id'] if linked else None
                     row['matching_individual_profile']=bool(owner_match)
+                    row['match']={'profile':'individual' if owner_match else 'linked',
+                                  'alias':None if owner_match else linked['alias'],
+                                  'trades':sorted(scope & (valid_trades if owner_match else set(json.loads(linked['service_trades'])))),
+                                  'town':pr['town']}
                     rs.append(row)
-        else:
-            rs=[]
-    return {'items':[dict(x) for x in rs]}
+        else:rs=[]
+        taxonomy=[dict(r) for r in c.execute('SELECT id,label,group_name,synonyms FROM taxonomy')]
+        filtered=filter_projects(rs,taxonomy,q=q,trade=trade,town=town,category=category,timing=timing,status=status,
+                                 published_within=published_within,sort=sort)
+    return {'items':filtered,'search_scope':discovery}
 
 @app.post('/api/projects/{project_id}/apply',status_code=201)
 def apply(project_id:int,user=Depends(require('professional'))):

@@ -62,6 +62,9 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     assert pro.get('/api/projects').json()['items']==[]
     assert admin.post(f'/api/admin/professionals/{pid}/approve').status_code==200
     assert pro.get('/api/projects').json()['items'][0]['id']==project_id
+    listing=pro.get('/api/projects',params={'q':'SALLE bain','town':'Toulouse','trade':'plomberie','timing':'flexible','published_within':7,'sort':'oldest'}).json()['items']
+    assert listing[0]['id']==project_id and listing[0]['match']['trades']==['plomberie']
+    assert pro.get('/api/projects',params={'town':'Paris'}).json()['items']==[]
     r=pro.post(f'/api/projects/{project_id}/apply');assert r.status_code==201,r.text
     aid=r.json()['id']
     assert pro.post(f'/api/projects/{project_id}/apply').status_code==409
