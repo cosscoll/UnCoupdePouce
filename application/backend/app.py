@@ -1027,6 +1027,7 @@ def account_export(user=Depends(get_user)):
         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
         import base64
         own_photos=[{'id':r['id'],'draft_id':r['draft_id'],'jpeg_base64':base64.b64encode(r['body']).decode()} for r in c.execute('SELECT photos.id,draft_id,body FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.owner_id=?',(user['id'],))]
+        own_showcases=[{'linked_profile_id':r['linked_profile_id'],'version':r['version'],'updated_at':r['updated_at'],**json.loads(r['payload'])} for r in c.execute('SELECT linked_profile_id,version,updated_at,payload FROM professional_showcases WHERE owner_id=?',(user['id'],))]
         own_support=[dict(r) for r in c.execute('SELECT id,subject,category,body,status,response,created_at,resolved_at FROM support_tickets WHERE owner_id=?',(user['id'],))]
         own_reports=[dict(r) for r in c.execute('SELECT kind,target_id,reason,status,resolution,created_at FROM reports WHERE reporter_id=?',(user['id'],))]
         applications_owned=[dict(r) for r in c.execute('SELECT id,project_id,status,created_at FROM applications WHERE professional_id=?',(user['id'],))]
@@ -1042,7 +1043,7 @@ def account_export(user=Depends(get_user)):
             'profile':dict(profile) if profile else None,'beta_interest':dict(interest) if interest else None,
             'own_projects':projects_owned,'own_applications':applications_owned,'own_messages':messages_owned,
             'own_notifications':own_notices,'own_activity':own_activity,'own_enterprise':dict(own_enterprise) if own_enterprise else None,
-            'own_linked_artisans':own_linked_artisans,'own_drafts':own_drafts,'own_photos':own_photos,'own_reports':own_reports,'own_support':own_support}
+            'own_linked_artisans':own_linked_artisans,'own_drafts':own_drafts,'own_photos':own_photos,'own_reports':own_reports,'own_support':own_support,'own_showcases':own_showcases}
 
 @app.delete('/api/beta-interest')
 def revoke_interest(user=Depends(require('professional'))):
@@ -1152,6 +1153,7 @@ def service_worker():
 
 from features_v4 import install
 from support_cases import install as install_support
+from professional_showcase import install as install_showcase
 if DATABASE_URL:
     from postgres import initialize_schema
     initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
@@ -1161,6 +1163,7 @@ with initialization:
     init_db()
     install(sys.modules[__name__])
     install_support(sys.modules[__name__])
+    install_showcase(sys.modules[__name__])
     # Optional, one-time fictional seed under the initialization lock.
     if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
         with connect() as c:

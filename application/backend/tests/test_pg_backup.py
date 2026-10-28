@@ -94,9 +94,13 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
         maximum=db.execute('SELECT MAX(id) FROM projects').fetchone()[0]
     support=c.post('/api/v4/support',json={'subject':'Question de restauration','category':'account','body':'Demande fictive à retrouver après restauration.'});assert support.status_code==201
     support_id=support.json()['id']
+    pro=TestClient(pg.app);logged=pro.post('/api/login',json={'email':'atelier@ucp.test','password':password});pro.headers['x-ucp-csrf']=logged.json()['csrf']
+    from test_professional_showcase import BODY
+    assert pro.put('/api/v4/showcase',json=BODY).status_code==200
     archive=tmp_path/'fictional.dump';metadata=ops.backup(source,archive,pg.DATABASE_SCHEMA)
     assert metadata['tables']['sessions']==0 and metadata['tables']['resets']==0
     assert metadata['tables']['support_tickets']==1
+    assert metadata['tables']['professional_showcases']==1
     assert metadata['tables']['photos']==1 and archive.stat().st_mode&0o077==0
     assert password not in Path(str(archive)+'.json').read_text()
     with pytest.raises(ops.BackupError,match='écrasement'):ops.backup(source,archive,pg.DATABASE_SCHEMA)
@@ -125,6 +129,9 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
         with psycopg.connect(target) as db:
             tables=db.execute('SELECT relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname=%s AND c.relkind=%s',(pg.DATABASE_SCHEMA,'r')).fetchall()
             assert tables and all(row[0] for row in tables)
+        restored_pro=TestClient(restored.app);restored_pro.post('/api/login',json={'email':'atelier@ucp.test','password':password})
+        assert restored_pro.get('/api/v4/showcase').json()['intro']==BODY['intro']
+        restored_pro.close();pro.close()
         copy.close()
     finally:
         c.close();sys.modules.pop(module_name,None)
