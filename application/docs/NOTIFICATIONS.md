@@ -55,6 +55,23 @@ Les événements déjà présents restent : candidature reçue, acceptée, refus
 retirée, projet clôturé, nouveau message, réponse au support et au signalement.
 Les nouveaux statuts ne créent ni email, ni push, ni tâche planifiée.
 
+| Événement existant | Déclencheur | Destinataire | Objet `entity_id` |
+| --- | --- | --- | --- |
+| `new_application` | Candidature individuelle ou liée créée | Propriétaire du projet | Candidature |
+| `application_accepted` | Sélection d'une candidature | Compte professionnel candidat | Candidature |
+| `application_rejected` | Refus explicite ou autre candidature sélectionnée selon la règle de test existante | Compte professionnel candidat | Candidature |
+| `application_withdrawn` | Retrait par le professionnel | Propriétaire du projet | Candidature |
+| `project_closed` | Clôture d'un projet ayant une candidature en attente ou acceptée | Comptes professionnels concernés | Projet |
+| `new_message` | Nouveau message inséré, hors réessai idempotent | Autre participant à la conversation | Candidature / conversation |
+| `support_resolved` | Réponse administrative à une demande d'assistance ouverte | Auteur de la demande | Demande d'assistance |
+| `report_resolved` | Réponse administrative à un signalement ouvert | Auteur du signalement | Signalement |
+
+Pour les six statuts, `entity_id` identifie le compte affecté. Les identifiants ne
+sont pas des liens d'accès et ne dispensent jamais du contrôle d'autorisation de
+l'objet. L'alerte devient disponible après validation de la transaction, à la
+prochaine consultation explicite du centre ; aucun délai de livraison externe
+n'est promis. Aucun réglage de désactivation sélective n'est ajouté à ce stade.
+
 Les emails transactionnels, notifications système sur téléphone, liens directs
 vers chaque objet et politique de conservation définitive restent à réaliser.
 La pagination n'est pas une preuve de rendu ou d'accessibilité sur appareil réel.

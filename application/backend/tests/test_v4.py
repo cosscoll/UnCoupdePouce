@@ -20,6 +20,7 @@ def test_notification_failure_rolls_back_application_without_false_duplicate(set
         assert r.status_code==201
         path+=f'-linked/{r.json()["id"]}'
     with v['mod'].connect() as db:
+        notices_before=[tuple(r) for r in db.execute('SELECT * FROM notifications ORDER BY id')]
         db.execute("CREATE TRIGGER fail_notice BEFORE INSERT ON notifications BEGIN SELECT RAISE(ABORT,'test notification failure'); END")
     client=TestClient(v['mod'].app,raise_server_exceptions=False)
     client.cookies.update(v['pro'].cookies)
@@ -28,7 +29,7 @@ def test_notification_failure_rolls_back_application_without_false_duplicate(set
     assert 'test notification failure' not in r.text
     with v['mod'].connect() as db:
         assert db.execute('SELECT COUNT(*) FROM applications').fetchone()[0]==0
-        assert db.execute('SELECT COUNT(*) FROM notifications').fetchone()[0]==0
+        assert [tuple(r) for r in db.execute('SELECT * FROM notifications ORDER BY id')]==notices_before
         assert db.execute("SELECT COUNT(*) FROM audit WHERE action IN ('apply_individual','apply_enterprise')").fetchone()[0]==0
         db.execute('DROP TRIGGER fail_notice')
     assert v['call'](client,v['pcsrf'],'post',path).status_code==201
