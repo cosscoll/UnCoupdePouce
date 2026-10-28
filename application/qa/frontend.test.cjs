@@ -484,3 +484,12 @@ test('a pending showcase comparison is discarded when the chosen profiles change
   finish({intro:'Ancienne sélection',works:[]});await tick();assert.equal(x.w.document.querySelector('#dialog').open,false);
  }finally{x.close()}
 });
+
+test('a failure loading linked showcase profiles never hides the editable professional profile',async()=>{
+ let attempts=0;const x=await boot({'/api/my-profile':{profile:{trade:'plomberie',additional_trades:[],town:'Toulouse',service_zones:['Toulouse'],siren:'123456782',approved:true}},'/api/enterprise':()=>++attempts===1?{status:503,data:{detail:'Erreur temporaire'}}:{members:[{id:7,alias:'Équipe fictive',is_active:true}]}});
+ try{
+  await x.w.go('profile');assert.ok(x.w.document.querySelector('#view [name=siren]'));assert.match(x.w.document.querySelector('#view').textContent,/Modifier · Mon profil individuel/);
+  input(x.w,'#view [name=town]','Blagnac');[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Réessayer les profils liés').click();await tick();
+  assert.equal(x.w.document.querySelector('#view [name=town]').value,'Blagnac');assert.match(x.w.document.querySelector('#view').textContent,/Équipe fictive/);
+ }finally{x.close()}
+});
