@@ -365,3 +365,19 @@ test('previous wizard step refuses an invalid budget without discarding the ente
   assert.match(x.w.document.querySelector('#alert').textContent,/Corrigez les montants/);
  }finally{x.close()}
 });
+
+test('application tracking distinguishes closed projects and filters without suggesting inaccessible messages',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/my-applications':{items:[
+  {id:31,title:'Projet fermé',trade:'plomberie',town:'Toulouse',status:'accepted',project_status:'closed',conversation_state:'closed'},
+  {id:32,title:'Projet actif',trade:'plomberie',town:'Toulouse',status:'accepted',project_status:'selected',conversation_state:'test_access_required',linked_artisan_alias:'<img src=x>'},
+  {id:33,title:'Projet en attente',trade:'plomberie',town:'Toulouse',status:'pending',project_status:'open',conversation_state:'not_selected'}
+ ]}});try{
+  await x.w.go('applications');assert.match(x.w.document.querySelector('#view').textContent,/Projet clôturé : les échanges sont fermés/);
+  assert.match(x.w.document.querySelector('#view').textContent,/doit être activé par l’administrateur/);assert.equal(x.w.document.querySelector('#view img'),null);
+  const select=x.w.document.querySelector('[name=application_status]');select.value='closed';select.dispatchEvent(new x.w.Event('change'));
+  assert.match(x.w.document.querySelector('#view [aria-live]').textContent,/Projet fermé/);assert.doesNotMatch(x.w.document.querySelector('#view [aria-live]').textContent,/Projet actif/);
+  assert.equal(x.w.document.querySelector('#view [aria-live] button'),null);
+  select.value='accepted';select.dispatchEvent(new x.w.Event('change'));assert.match(x.w.document.querySelector('#view [aria-live]').textContent,/Projet actif/);
+  select.value='withdrawn';select.dispatchEvent(new x.w.Event('change'));assert.match(x.w.document.querySelector('#view [aria-live]').textContent,/Aucune candidature pour ce filtre/);
+ }finally{x.close()}
+});

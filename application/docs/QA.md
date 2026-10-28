@@ -162,3 +162,15 @@ Brouillons privés et verrou optimiste, publication idempotente, métiers multip
 ## Réserves de livraison
 
 Validation visuelle/accessibilité de l'application, concurrence multi-processus en environnement cible, migrations sur copie représentative, pagination/charge, politique de rétention/effacement, MFA et sécurité de production, vérifications pro réelles, email transactionnel, Stripe TEST idempotent, PWA et validation commerciale restent à traiter. Le PASS local ne constitue ni une certification ni un produit prêt à ouvrir au public.
+
+## Budget facultatif et assistance générale — 28 octobre 2026
+
+L'assistance générale a été exercée sur le service HTTPS privé : création par les
+deux rôles, doublons refusés, liste propriétaire, examen administratif tracé et
+obligatoire, réponse/notification puis clôture et export limités au déclarant.
+Deux dossiers fictifs ont été créés et traités ; les cinq groupes de contrôles ont réussi.
+
+Le lot budget est validé par Application CI, exécution 40677583672 : **154 tests
+Python et 34 tests DOM/worker réussis**, incluant PostgreSQL 17 et une restauration
+isolée avec les bornes de budget conservées. Cette restauration fictive ne vaut
+pas restauration de la base Neon déployée. Le commit intégré est 437a1d4.

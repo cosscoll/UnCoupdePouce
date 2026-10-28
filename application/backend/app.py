@@ -868,11 +868,28 @@ def reject_application(application_id:int,user=Depends(require('requester'))):
 @app.get('/api/my-applications')
 def my_applications(user=Depends(require('professional'))):
     with authenticated_db(user,write=False) as c:
-        rows=c.execute('''SELECT applications.id,applications.status,projects.title,projects.trade,projects.town,
+        rows=c.execute('''SELECT applications.id,applications.status,applications.created_at AS submitted_at,
+        projects.title,projects.trade,projects.town,projects.status AS project_status,
         linked.alias AS linked_artisan_alias FROM applications JOIN projects ON projects.id=applications.project_id
         LEFT JOIN enterprise_artisans linked ON linked.id=applications.linked_profile_id
         WHERE applications.professional_id=? ORDER BY applications.id DESC''',(user['id'],)).fetchall()
-    return {'items':[dict(r) for r in rows]}
+        items=[]
+        for row in rows:
+            item=dict(row)
+            state='not_selected'
+            if row['project_status']=='closed':state='closed'
+            elif row['status']=='accepted':
+                try:access=check_conversation(c,row['id'],user['id'],allow_locked=True)
+                except HTTPException as exc:
+                    if exc.status_code not in (403,404):raise
+                    state='unavailable'
+                else:
+                    if access['linked_profile_id'] and not access['linked_active']:state='linked_inactive'
+                    elif not access['subscription_active']:state='test_access_required'
+                    else:state='available'
+            item['conversation_state']=state
+            items.append(item)
+    return {'items':items}
 
 @app.get('/api/projects/{project_id}/applications')
 def get_applications(project_id:int,user=Depends(require('requester'))):
