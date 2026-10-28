@@ -173,6 +173,52 @@ async function renderProjects(n){
   }
   form.addEventListener('submit',e=>{e.preventDefault();action(()=>load())});
   if(Object.values(saved).some(Boolean))await load();else draw(items);
+  if(!req)renderSavedSearches(n,form,load,()=>epoch===renderEpoch&&appState.user?.id===owner);
+}
+function renderSavedSearches(n,searchForm,load,valid){
+ const box=panel('Mes recherches enregistrées','Conservez jusqu’à 10 jeux de critères privés. Les résultats sont recalculés selon vos droits actuels. Aucune alerte automatique.');box.classList.add('saved-searches');n.insertBefore(box,searchForm.nextSibling);
+ const choice=field('Recherche enregistrée','saved_search','select',{required:false,options:{'':'Choisir une recherche'}}),select=choice.querySelector('select');
+ const status=el('p',{class:'hint',role:'status'}),label=field('Nom de cette recherche','label','text',{minlength:2,maxlength:60,placeholder:'Ex. Plomberie à Toulouse'}),saveForm=el('form',{},label,el('button',{type:'submit',class:'outline',text:'Enregistrer ces critères'}));
+ let stored=[],sequence=0;
+ const selected=()=>stored.find(s=>String(s.id)===select.value);
+ const apply=button('Appliquer la recherche',()=>action(async()=>{
+  const item=selected();if(!item||!valid())return false;
+  for(const input of searchForm.querySelectorAll('[name]')){
+   const value=item.criteria[input.name]??(input.name==='sort'?'newest':'');
+   if(input.tagName==='SELECT'&&![...input.options].some(o=>o.value===String(value)))input.append(el('option',{value,text:String(value)+' · critère enregistré'}));
+   input.value=String(value);
+  }
+  searchForm.querySelector('details').open=true;
+  return await load();
+ }));
+ const remove=button('Supprimer la recherche',()=>{
+  const item=selected();if(!item||!valid())return;
+  showDialog('Supprimer cette recherche ?',el('div',{},el('p',{text:'Supprimer « '+item.label+' » ? Les projets et les critères actuellement saisis restent conservés.'}),button('Supprimer',async()=>{
+   const result=await action(()=>api('/saved-searches/'+item.id,{method:'DELETE'}),'Recherche supprimée.');
+   if(result&&valid()){$('#dialog').close();await refresh()}
+  },'primary')));
+ });
+ function controls(){apply.disabled=remove.disabled=!selected()}
+ select.addEventListener('change',controls);controls();
+ box.append(choice,el('div',{class:'row'},apply,remove,button('Actualiser les recherches',()=>refresh())),status,el('p',{class:'hint',text:'L’enregistrement conserve les critères du formulaire, même si vous n’avez pas encore lancé la recherche.'}),saveForm);
+ async function refresh(preferred=select.value){
+  const token=++sequence;status.textContent='Chargement des recherches enregistrées…';
+  try{
+   const data=await api('/saved-searches');if(!valid()||token!==sequence)return false;
+   if(!Array.isArray(data.items))throw Error('Réponse incomplète');
+   stored=data.items;select.replaceChildren(el('option',{value:'',text:'Choisir une recherche'}),...stored.map(s=>el('option',{value:s.id,text:s.label})));
+   select.value=stored.some(s=>String(s.id)===String(preferred))?String(preferred):'';controls();
+   status.textContent=stored.length+' / 10 recherches enregistrées dans votre compte.';return true;
+  }catch(e){if(!e.stale&&valid()&&token===sequence)status.textContent='Impossible de charger les recherches enregistrées. Les critères saisis et les derniers résultats restent disponibles.';return false}
+ }
+ saveForm.addEventListener('submit',async e=>{
+  e.preventDefault();if(!valid()||!searchForm.reportValidity())return;
+  const raw=formValue(searchForm),criteria={};
+  for(const key of ['q','trade','town','category','timing','published_within','sort','budget_from','budget_to'])if(raw[key])criteria[key]=['published_within','budget_from','budget_to'].includes(key)?Number(raw[key]):raw[key];
+  const result=await action(()=>api('/saved-searches',{method:'POST',body:{label:formValue(saveForm).label,criteria}}),'Critères enregistrés dans votre compte.');
+  if(result&&valid()){saveForm.reset();await refresh(result.id)}
+ });
+ refresh();
 }
 const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 async function projectDetail(p){if(acting)return;const epoch=++renderEpoch,actor=appState.user,sourceView=appState.view;await action(async()=>{const d=await api('/v4/projects/'+p.id);if(epoch!==renderEpoch||actor!==appState.user)return false;const n=el('div'),req=actor.role==='requester';n.append(button(sourceView==='professional-home'?'← Vue d’ensemble':actor.role==='professional'?'← Trouver des projets':'← Mes projets',()=>go(sourceView),'link'),heading(d.title,d.town+' · '+tradeNames(d)),badge(d.status),el('section',{class:'panel'},el('h3',{text:'Le projet en quelques mots'}),el('p',{text:d.description}),el('p',{class:'small muted',text:'Début souhaité : '+({flexible:'flexible',month:'dans le mois',quarter:'dans les trois mois',urgent:'dès que possible'}[d.timing]||'flexible')})));n.append(el('p',{class:'hint',text:'Budget indicatif : '+budgetText(d)+'. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.'}));if(!req&&p.match)n.append(matchExplanation(p));if(d.photos.length)n.append(el('div',{class:'photos'},...d.photos.map(id=>el('a',{href:'/api/v4/photos/'+id,target:'_blank',rel:'noopener'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de test du projet',width:160,height:120})))));

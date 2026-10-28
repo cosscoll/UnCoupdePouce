@@ -97,10 +97,14 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
     pro=TestClient(pg.app);logged=pro.post('/api/login',json={'email':'atelier@ucp.test','password':password});pro.headers['x-ucp-csrf']=logged.json()['csrf']
     from test_professional_showcase import BODY
     assert pro.put('/api/v4/showcase',json=BODY).status_code==200
+    saved=pro.post('/api/saved-searches',json={'label':'Critères à restaurer','criteria':{'town':'Toulouse','budget_from':0}})
+    assert saved.status_code==201
+    saved_search=saved.json()
     archive=tmp_path/'fictional.dump';metadata=ops.backup(source,archive,pg.DATABASE_SCHEMA)
     assert metadata['tables']['sessions']==0 and metadata['tables']['resets']==0
     assert metadata['tables']['support_tickets']==1
     assert metadata['tables']['professional_showcases']==1
+    assert metadata['tables']['saved_searches']==1
     assert metadata['tables']['photos']==1 and archive.stat().st_mode&0o077==0
     assert password not in Path(str(archive)+'.json').read_text()
     with pytest.raises(ops.BackupError,match='écrasement'):ops.backup(source,archive,pg.DATABASE_SCHEMA)
@@ -131,6 +135,7 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
             assert tables and all(row[0] for row in tables)
         restored_pro=TestClient(restored.app);restored_pro.post('/api/login',json={'email':'atelier@ucp.test','password':password})
         assert restored_pro.get('/api/v4/showcase').json()['intro']==BODY['intro']
+        assert restored_pro.get('/api/saved-searches').json()['items']==[saved_search]
         restored_pro.close();pro.close()
         copy.close()
     finally:
