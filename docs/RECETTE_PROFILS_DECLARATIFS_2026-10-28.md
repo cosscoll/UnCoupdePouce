@@ -32,4 +32,13 @@ visuelle sur téléphone et l'accessibilité complète ne sont pas validées.
 Une panne du chargement des profils liés n’empêche plus l’édition du profil
 individuel. Le réessai recharge uniquement la liste liée et conserve la commune
 en cours de saisie. Le scénario DOM correspondant est réussi, portant la suite
-locale à 48 tests DOM/worker, en attente de la validation CI du correctif.
+locale à 48 tests DOM/worker. La [CI 40708921879](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40708921879) du correctif est réussie.
+
+## Recette HTTPS
+
+Les quatre groupes de contrôles sur le service publié sont réussis : séparation
+des présentations individuelles/gestionnaire/profil lié, coordonnées et versions
+périmées refusées, lecture exacte des deux candidatures d’un même projet, refus
+inter-comptes et export personnel limité au gestionnaire. L’interface publiée
+contient bien les présentations et leur comparaison. Le projet fictif de recette
+est le nº 11, avec deux candidatures ; aucun paiement n’a été effectué.

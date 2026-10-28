@@ -493,3 +493,34 @@ test('a failure loading linked showcase profiles never hides the editable profes
   assert.equal(x.w.document.querySelector('#view [name=town]').value,'Blagnac');assert.match(x.w.document.querySelector('#view').textContent,/Équipe fictive/);
  }finally{x.close()}
 });
+
+test('professional overview counts only active applications and conversations actually accessible',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[{id:91,title:'Mission autorisée',town:'Toulouse',trade:'plomberie',status:'open'}],search_scope:'ready'},'/api/my-applications':{items:[{id:1,title:'En attente',status:'pending',project_status:'open'},{id:2,title:'Historique clôturé',status:'pending',project_status:'closed'},{id:3,title:'Sélection active',status:'accepted',project_status:'selected'}]},'/api/conversations':{items:[{application_id:3,subscription_active:1,linked_profile_id:null},{application_id:4,subscription_active:0},{application_id:5,subscription_active:1,linked_profile_id:7,linked_active:0}]},'/api/notifications':{unread:2,items:[{message:'Notification fictive',read_at:null}]},'/api/my-profile':{profile:{approved:true,subscription_active:true}}});try{
+  await x.w.go('professional-home');const panels=[...x.w.document.querySelectorAll('.overview-grid>.panel')],get=title=>panels.find(p=>p.querySelector('h3').textContent===title);
+  assert.equal(get('Missions ouvertes accessibles').querySelector('.overview-count').textContent,'1');
+  assert.deepEqual([...get('Vos candidatures').querySelectorAll('dd')].map(n=>n.textContent),['1','1']);
+  assert.equal(get('Conversations accessibles').querySelector('.overview-count').textContent,'1');assert.match(get('Conversations accessibles').textContent,/2 échange/);
+  assert.equal(get('Notifications non lues').querySelector('.overview-count').textContent,'2');assert.match(get('Profil et accès de test').textContent,/autorisé pour les tests/);
+  assert.equal(x.calls.some(c=>c.method!=='GET'),false);
+ }finally{x.close()}
+});
+test('professional overview isolates a failed section, never invents a zero and retries only that source',async()=>{
+ let attempts=0;const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':()=>++attempts===2?{status:503,data:{detail:'Erreur temporaire'}}:{items:[],search_scope:'ready'},'/api/my-applications':{items:[]},'/api/conversations':{items:[]},'/api/notifications':{unread:3,items:[]}});try{
+  await x.w.go('professional-home');const find=title=>[...x.w.document.querySelectorAll('.overview-grid>.panel')].find(p=>p.querySelector('h3').textContent===title);
+  const failed=find('Missions ouvertes accessibles');assert.match(failed.textContent,/Information indisponible/);assert.equal(failed.querySelector('.overview-count'),null);
+  assert.equal(find('Notifications non lues').querySelector('.overview-count').textContent,'3');const before=x.calls.length;
+  [...failed.querySelectorAll('button')].find(b=>b.textContent==='Réessayer cette rubrique').click();await tick();
+  assert.equal(x.calls.length,before+1);assert.equal(failed.querySelector('.overview-count').textContent,'0');
+ }finally{x.close()}
+});
+test('professional overview navigation stays reserved to the professional menu',async()=>{
+ const x=await boot();try{assert.equal([...x.w.document.querySelectorAll('#tabs button')].some(b=>b.textContent==='Vue d’ensemble'),false);await x.w.go('professional-home');assert.match(x.w.document.querySelector('#view').textContent,/réservée à l’espace professionnel/);assert.equal(x.calls.some(c=>c.url==='/api/my-applications'),false)}finally{x.close()}
+});
+
+test('a mission opened from the professional overview returns to that overview',async()=>{
+ const project={id:91,title:'Mission fictive',description:'Description entièrement fictive de la mission.',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'open',photos:[],own_application:null};
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[project],search_scope:'ready'},'/api/my-applications':{items:[]},'/api/conversations':{items:[]},'/api/notifications':{unread:0,items:[]},'/api/v4/projects/91':project});try{
+  await x.w.go('professional-home');[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Consulter ce projet').click();await tick();
+  const back=[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='← Vue d’ensemble');assert.ok(back);back.click();await tick();assert.ok(x.w.document.querySelector('.overview-grid'));
+ }finally{x.close()}
+});
