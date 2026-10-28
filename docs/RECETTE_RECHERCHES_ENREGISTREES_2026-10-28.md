@@ -23,6 +23,29 @@ la création refusée sans perte de saisie, la suppression confirmée sans perte
 formulaire et le rejet d'une réponse tardive après navigation. Les noms sont rendus
 comme texte et aucun service externe n'est appelé.
 
+La [CI 40743078659](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40743078659)
+valide **186 tests Python et 64 tests DOM/worker**, dont PostgreSQL 17 et la
+restauration réelle en base fictive isolée. La [pull request 41](https://github.com/cosscoll/UnCoupdePouce/pull/41)
+est fusionnée au commit applicatif `9e1343a`. La suite locale complète réussit
+175 tests Python, les onze contrôles PostgreSQL étant exécutés par cette CI.
+
+## Recette HTTPS de la version publiée
+
+Quatre groupes de contrôles réussissent sur la préproduction : persistance des
+critères et de zéro, doublon de nom et paramètres invalides ; liste, export et
+suppression limités au propriétaire professionnel ; réapplication par la recherche
+autorisée actuelle ; suppression ciblée et présence des contrôles dans l'interface
+effectivement publiée. La recherche temporaire est supprimée et sa seconde
+suppression renvoie 404. Aucun projet ou profil existant n'est modifié.
+
+Une recherche « Plomberie Toulouse · démo » suivie d'un identifiant de recette est
+conservée sur le compte fictif `atelier@ucp.test`, dans **Trouver des projets → Mes
+recherches enregistrées**. Les accès privés déjà remis ne sont pas publiés dans le
+dépôt. Le déploiement `9e1343a` est READY sur le projet privé `ucp-preproduction`.
+
+La page d'avancement publique présente aussi ce lot ; les contrôles statiques de
+la vitrine et ses 55 tests réussissent après cette modification.
+
 ## Limites
 
 Les contrôles DOM simulent les interactions et les réponses API. Ils ne prouvent
