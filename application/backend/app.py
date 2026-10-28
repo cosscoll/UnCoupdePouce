@@ -1047,13 +1047,15 @@ def account_export(user=Depends(get_user)):
         messages_owned=[dict(r) for r in c.execute('SELECT application_id,body,created_at FROM messages WHERE sender_id=?',(user['id'],))]
         own_notices=[dict(r) for r in c.execute('SELECT event_type,entity_id,created_at,read_at FROM notifications WHERE recipient_id=?',(user['id'],))]
         own_activity=[dict(r) for r in c.execute('SELECT action,target_type,target_id,created_at FROM audit WHERE actor_id=? ORDER BY id DESC',(user['id'],))]
+        from saved_searches import serialize as serialize_search
+        own_searches=[serialize_search(r) for r in c.execute('SELECT id,label,payload,created_at FROM saved_searches WHERE owner_id=? ORDER BY id DESC',(user['id'],))]
         own_enterprise=c.execute('SELECT id,label,created_at FROM enterprise_accounts WHERE owner_id=?',(user['id'],)).fetchone()
         own_linked_artisans=([dict(r) for r in c.execute('SELECT id,alias,service_trades,service_areas,is_active,created_at FROM enterprise_artisans WHERE enterprise_id=?',(own_enterprise['id'],))]
                               if own_enterprise else [])
     return {'laboratory':True,'user':{'email':user['email'],'name':user['name'],'role':user['role']},
             'profile':dict(profile) if profile else None,'beta_interest':dict(interest) if interest else None,
             'own_projects':projects_owned,'own_applications':applications_owned,'own_messages':messages_owned,
-            'own_notifications':own_notices,'own_activity':own_activity,'own_enterprise':dict(own_enterprise) if own_enterprise else None,
+            'own_notifications':own_notices,'own_activity':own_activity,'own_saved_searches':own_searches,'own_enterprise':dict(own_enterprise) if own_enterprise else None,
             'own_linked_artisans':own_linked_artisans,'own_drafts':own_drafts,'own_photos':own_photos,'own_reports':own_reports,'own_support':own_support,'own_showcases':own_showcases}
 
 @app.delete('/api/beta-interest')
@@ -1171,6 +1173,7 @@ def service_worker():
 from features_v4 import install
 from support_cases import install as install_support
 from professional_showcase import install as install_showcase
+from saved_searches import install as install_saved_searches
 if DATABASE_URL:
     from postgres import initialize_schema
     initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
@@ -1181,6 +1184,7 @@ with initialization:
     install(sys.modules[__name__])
     install_support(sys.modules[__name__])
     install_showcase(sys.modules[__name__])
+    install_saved_searches(sys.modules[__name__])
     # Optional, one-time fictional seed under the initialization lock.
     if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
         with connect() as c:

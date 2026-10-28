@@ -14,7 +14,7 @@ async function boot(overrides={},configure=null){
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};
  w.HTMLDialogElement.prototype.close=function(){this.open=false};
  w.crypto.randomUUID=crypto.randomUUID;
- const defaults={'/api/catalog':{items:JSON.parse(fs.readFileSync(path.join(root,'../taxonomy.json'),'utf8'))},'/api/session':{id:1,name:'Camille',role:'requester',csrf:'test-token'},'/api/projects':{items:[]},'/api/v4/drafts':{items:[]},'/api/my-profile':{profile:null},'/api/v4/reports':{items:[],next_before_id:null},'/api/v4/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}},'/api/v4/admin/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}}};
+ const defaults={'/api/catalog':{items:JSON.parse(fs.readFileSync(path.join(root,'../taxonomy.json'),'utf8'))},'/api/session':{id:1,name:'Camille',role:'requester',csrf:'test-token'},'/api/projects':{items:[]},'/api/saved-searches':{items:[],limit:10},'/api/v4/drafts':{items:[]},'/api/my-profile':{profile:null},'/api/v4/reports':{items:[],next_before_id:null},'/api/v4/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}},'/api/v4/admin/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}}};
  w.fetch=async(url,opts={})=>{
   const call={url,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null,headers:opts.headers};calls.push(call);
   let r=overrides[call.method+' '+url]??overrides[url]??defaults[url];
@@ -554,5 +554,87 @@ test('marking all notifications read preserves the unread filter and refreshes i
   const mark=[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Tout marquer comme lu');mark.click();await tick();await tick();
   assert.equal(filter.value,'unread');assert.equal(mark.disabled,true);assert.equal(x.w.document.querySelectorAll('#view article').length,0);assert.match(x.w.document.querySelector('#view').textContent,/0 notification\(s\) non lue/);
   assert.equal(x.calls.find(c=>c.method==='POST').headers['x-ucp-csrf'],'test-token');
+ }finally{x.close()}
+});
+
+const savedProSession={id:2,name:'Pro fictif',role:'professional',csrf:'pro-token'};
+function savedButton(w,label,scope='.saved-searches'){return [...w.document.querySelectorAll(scope+' button')].find(b=>b.textContent===label)}
+function chooseSaved(w,id){const s=w.document.querySelector('[name=saved_search]');s.value=String(id);s.dispatchEvent(new w.Event('change'))}
+
+test('saved search persists entered criteria including zero and prevents a double submission',async()=>{
+ let stored=[];
+ const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[],search_scope:'ready'},'/api/saved-searches':()=>({items:stored}),
+ 'POST /api/saved-searches':c=>{const item={id:6,...c.body};stored=[item];return item}});
+ try{
+  input(x.w,'.project-search [name=q]','fuite');input(x.w,'.project-search [name=budget_from]','0');input(x.w,'.saved-searches [name=label]','Mes critères');
+  submit(x.w,'.saved-searches form');submit(x.w,'.saved-searches form');await tick();await tick();
+  const posts=x.calls.filter(c=>c.method==='POST');assert.equal(posts.length,1);assert.equal(posts[0].body.criteria.budget_from,0);assert.equal(posts[0].body.criteria.q,'fuite');assert.equal(posts[0].headers['x-ucp-csrf'],'pro-token');
+  assert.equal(x.w.document.querySelector('[name=saved_search]').value,'6');assert.equal(x.w.document.querySelector('.project-search [name=q]').value,'fuite');assert.match(x.w.document.querySelector('.saved-searches').textContent,/1 \/ 10/);
+ }finally{x.close()}
+});
+
+test('applying a stored search queries current authorized results with all its criteria',async()=>{
+ const criteria={q:'fuite',trade:'plomberie',town:'Toulouse',budget_from:0,sort:'oldest'};
+ const path='/api/projects?q=fuite&trade=plomberie&town=Toulouse&budget_from=0&sort=oldest';
+ const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[],search_scope:'ready'},'/api/saved-searches':{items:[{id:6,label:'Toulouse',criteria}]},[path]:{items:[]}});
+ try{
+  chooseSaved(x.w,6);savedButton(x.w,'Appliquer la recherche').click();await tick();
+  assert.ok(x.calls.some(c=>c.url===path));assert.equal(x.w.document.querySelector('.project-search [name=budget_from]').value,'0');assert.equal(x.w.document.querySelector('.project-search [name=q]').value,'fuite');
+  assert.match(x.w.document.querySelector('.count').textContent,/0 projet/);assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
+ }finally{x.close()}
+});
+
+test('a saved-search outage does not block project results or erase criteria on retry',async()=>{
+ let rejectPending,attempts=0;
+ const first=new Promise((resolve,reject)=>{rejectPending=reject});
+ const project={id:7,title:'Projet à conserver',town:'Toulouse',trade:'plomberie',status:'open'};
+ const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[project],search_scope:'ready'},'/api/saved-searches':()=>++attempts===1?first:{items:[{id:6,label:'<img src=x onerror=oops()>',criteria:{}}]}});
+ try{
+  assert.match(x.w.document.querySelector('.project-list').textContent,/Projet à conserver/);input(x.w,'.project-search [name=q]','Ma saisie');rejectPending(Error('offline'));await tick();
+  assert.match(x.w.document.querySelector('.saved-searches').textContent,/Impossible de charger/);savedButton(x.w,'Actualiser les recherches').click();await tick();
+  assert.equal(x.w.document.querySelector('.project-search [name=q]').value,'Ma saisie');assert.match(x.w.document.querySelector('.project-list').textContent,/Projet à conserver/);assert.equal(x.w.document.querySelector('.saved-searches img'),null);assert.match(x.w.document.querySelector('[name=saved_search]').textContent,/<img src=x/);
+ }finally{x.close()}
+});
+
+test('a rejected saved-search creation retains the chosen name and unsent search criteria',async()=>{
+ const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[],search_scope:'ready'},'POST /api/saved-searches':{status:409,data:{detail:'Une recherche porte déjà ce nom.'}}});
+ try{
+  input(x.w,'.project-search [name=q]','À conserver');input(x.w,'.saved-searches [name=label]','Nom existant');submit(x.w,'.saved-searches form');await tick();
+  assert.equal(x.w.document.querySelector('.project-search [name=q]').value,'À conserver');assert.equal(x.w.document.querySelector('.saved-searches [name=label]').value,'Nom existant');assert.match(x.w.document.querySelector('#alert').textContent,/déjà ce nom/);
+ }finally{x.close()}
+});
+
+test('deleting a stored search requires its confirmation and preserves the current search form',async()=>{
+ let stored=[{id:6,label:'À supprimer',criteria:{q:'ancien'}}];
+ const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[],search_scope:'ready'},'/api/saved-searches':()=>({items:stored}),'DELETE /api/saved-searches/6':()=>{stored=[];return {ok:true}}});
+ try{
+  input(x.w,'.project-search [name=q]','Ma recherche actuelle');chooseSaved(x.w,6);savedButton(x.w,'Supprimer la recherche').click();assert.equal(x.calls.filter(c=>c.method==='DELETE').length,0);
+  savedButton(x.w,'Supprimer','#dialog').click();await tick();await tick();
+  assert.equal(x.calls.filter(c=>c.method==='DELETE').length,1);assert.equal(x.w.document.querySelector('.project-search [name=q]').value,'Ma recherche actuelle');assert.match(x.w.document.querySelector('.saved-searches').textContent,/0 \/ 10/);
+ }finally{x.close()}
+});
+
+test('late saved-search results cannot replace a page visited afterwards',async()=>{
+ let release;const pending=new Promise(resolve=>{release=resolve});
+ const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[],search_scope:'ready'},'/api/saved-searches':()=>pending,'/api/notifications':{items:[],unread:0,next_before_id:null}});
+ try{
+  await x.w.go('notifications');release({items:[{id:6,label:'Ancienne page privée',criteria:{}}]});await tick();
+  assert.equal(x.w.document.querySelector('.saved-searches'),null);assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/Ancienne page privée/);
+ }finally{x.close()}
+});
+
+test('requester project navigation does not request or display professional saved searches',async()=>{
+ const x=await boot();try{assert.equal(x.w.document.querySelector('.saved-searches'),null);assert.ok(!x.calls.some(c=>c.url==='/api/saved-searches'))}finally{x.close()}
+});
+
+test('unavailable stored options remain explicit and a failed application preserves previous results',async()=>{
+ const criteria={trade:'ancien-metier',town:'Commune sans missions',published_within:14,sort:'newest'};
+ const query='/api/projects?trade=ancien-metier&town=Commune+sans+missions&published_within=14&sort=newest';
+ const project={id:7,title:'Derniers résultats autorisés',town:'Toulouse',trade:'plomberie',status:'open'};
+ const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[project],search_scope:'ready'},'/api/saved-searches':{items:[{id:6,label:'Ancien périmètre',criteria}]},[query]:{status:503,data:{detail:'Indisponible'}}});
+ try{
+  chooseSaved(x.w,6);savedButton(x.w,'Appliquer la recherche').click();await tick();
+  assert.equal(x.w.document.querySelector('.project-search [name=trade]').value,'ancien-metier');assert.equal(x.w.document.querySelector('.project-search [name=town]').value,'Commune sans missions');assert.equal(x.w.document.querySelector('.project-search [name=published_within]').value,'14');
+  assert.match(x.w.document.querySelector('.project-list').textContent,/Derniers résultats autorisés/);assert.match(x.w.document.querySelector('.count').textContent,/Recherche non appliquée/);assert.match(x.w.document.querySelector('.project-search [name=trade]').textContent,/critère enregistré/);
  }finally{x.close()}
 });

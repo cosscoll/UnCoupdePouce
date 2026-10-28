@@ -11,7 +11,8 @@ missions hors droits, nom de demandeur ou brouillon brut n'est renvoyé.
 - Raison de correspondance : métier(s) commun(s), commune couverte et profil
   individuel ou profil lié effectivement utilisé pour candidater.
 - Les filtres restent en mémoire pendant la navigation du même compte. Effacer
-  les filtres est explicite. Aucun stockage navigateur ni recherche enregistrée.
+  les filtres est explicite. Aucun stockage navigateur. Les professionnels peuvent
+  désormais [enregistrer leurs critères dans leur compte](RECHERCHES_ENREGISTREES.md).
 - Profil absent/en attente : explication adaptée, sans aucune mission privée.
 - Échec réseau : saisie et derniers résultats conservés avec état d'erreur.
 

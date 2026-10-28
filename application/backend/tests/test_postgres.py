@@ -257,3 +257,10 @@ def test_postgres_lifecycle_notifications_are_owner_scoped_and_not_duplicated(pg
     other,_=client_for(pg,'events-other@ucp.test','requester')
     assert pro.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
     exercise_lifecycle_notices(pg,admin,pro,pid,other)
+
+
+def test_postgres_saved_searches_are_private_exportable_and_deletable(pg):
+    from test_saved_searches import exercise_private_saved_searches
+    owner,_=client_for(pg,'saved-owner@ucp.test','professional')
+    other,_=client_for(pg,'saved-other@ucp.test','professional')
+    exercise_private_saved_searches(pg,owner,other)
