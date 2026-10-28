@@ -1,3 +1,31 @@
+# Installation web et reprise réseau — 28 octobre 2026
+
+Source fonctionnelle : `f38c19c6e3d51b373bca6eb735bc617aa431fa44`.
+[GitHub Actions](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40664953890) :
+**133 tests Python réussis** (SQLite/PostgreSQL 17), **20 tests DOM + 3 tests worker réussis**.
+Exécution locale : 127 réussis et six tests PostgreSQL ignorés faute de base locale.
+
+- Ressources PWA privées : manifeste, icônes officielles PNG 192/512, maskable,
+  icône Apple, worker de portée `/` et CSP explicite. Accès refusé sans protection.
+- Installation déclenchée uniquement par clic lorsque le navigateur le permet ;
+  aide manuelle sinon. Aucune confirmation inventée à l'acceptation de la demande.
+- Worker sans cache de données : API non interceptées, réponses d'authentification
+  conservées, page générique uniquement lors d'un échec de navigation réseau.
+- Chat : historique/saisie conservés après panne ; refus 403/404 masque l'historique ;
+  relecture explicite, pas de renvoi automatique ; ancien chat sans effet sur le courant.
+
+**Recette HTTPS réussie** : manifeste et icônes valides, empreintes SHA-256 des
+icônes/scripts identiques aux sources testées, worker servi avec sa portée/CSP et
+no-store, manifeste refusé sans protection, nouvelle interface effectivement servie
+et conversation existante toujours accessible après publication.
+
+Les tests de worker/installation sont des simulations. Aucun téléphone réel ni
+installation Android/iPhone n'est déclaré testé. La navigation visuelle à 320–430 px,
+le zoom 200 %, le lecteur d'écran et la réouverture avec les accès privés restent
+à vérifier. Voir [PWA.md](PWA.md) et `qa/pwa-2026-10-28.json`.
+
+---
+
 # Compléments fonctionnels — signalements, assistance et comparaison
 
 Source : `644c7380c7cc75c8c8794e66f1483d4296960fcd`, publiée depuis `main`.

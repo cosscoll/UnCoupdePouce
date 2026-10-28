@@ -95,9 +95,9 @@ Recette HTTPS réussie : persistance après redéploiement, accès privé, inscr
 distincte, annonce → candidature → sélection → messages, photos et refus inter-comptes,
 cookies HTTPS. Restent mobile/clavier et restauration PostgreSQL distante.
 Vercel limite la taille des requêtes : les photos volumineuses du laboratoire
-peuvent être refusées par la plateforme ; réduire les images avant envoi. Pas de
-PWA ou fonctionnement hors connexion promis ; les API privées ne doivent pas être
-mises en cache par un futur service worker.
+peuvent être refusées par la plateforme ; réduire les images avant envoi. Le parcours PWA est décrit dans PWA.md ; son installation sur appareil reste
+à vérifier. Le worker ne met aucune API privée en cache et ne propose pas de
+consultation hors connexion des données métier.
 
 ## Limites restantes
 

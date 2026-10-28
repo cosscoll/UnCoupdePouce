@@ -1,0 +1,13 @@
+{
+  "date": "2026-10-28",
+  "result": "PASS",
+  "https_resource_checks": 5,
+  "device_installation_verified": false,
+  "source": "f38c19c6e3d51b373bca6eb735bc617aa431fa44",
+  "ci_run": 40664953890,
+  "python_passed": 133,
+  "dom_passed": 20,
+  "worker_passed": 3,
+  "background_sync": false,
+  "private_cache": false
+}
