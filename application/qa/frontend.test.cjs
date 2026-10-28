@@ -162,7 +162,7 @@ test('requester comparison selects two or three profiles, stays textual and show
   assert.equal(compare.disabled,true);
   for(const c of checks.slice(0,3)){c.checked=true;c.dispatchEvent(new x.w.Event('change'));}
   assert.equal(compare.disabled,false);assert.equal(checks[3].disabled,true);
-  compare.click();
+  compare.click();await tick();
   assert.equal(x.w.document.querySelectorAll('.comparison-card').length,3);assert.equal(x.w.document.querySelector('#dialog img'),null);
   const card=x.w.document.querySelector('.comparison-card');assert.match(card.textContent,/Plomberie/);assert.match(card.textContent,/Blagnac/);assert.doesNotMatch(card.textContent,/Électricité/);
   assert.match(x.w.document.querySelector('#dialog').textContent,/aucune certification réelle/);
@@ -438,5 +438,49 @@ test('audit: late support review cannot replace a dialog the administrator opene
   x.w.reviewSupportTicket(7,{other:'Autre'});input(x.w,'#dialog [name=reason]','Examen fictif du dossier.');submit(x.w,'#dialog form');await tick();
   x.w.showDialog('Autre dossier',x.w.el('p',{text:'Écran plus récent'}));finish({ticket:{subject:'Ancien dossier',body:'Corps privé retardé',category:'other'}});await tick();
   assert.match(x.w.document.querySelector('#dialog').textContent,/Écran plus récent/);assert.doesNotMatch(x.w.document.querySelector('#dialog').textContent,/Corps privé retardé/);
+ }finally{x.close()}
+});
+
+test('declared showcase editor preserves a conflicting form and sends the correct linked scope and version',async()=>{
+ const original={intro:'Présentation fictive à adapter.',works:[{title:'Réalisation fictive',description:'Description suffisamment longue et entièrement fictive.',trade:'peinture',year:2025}],version:3,scope:{name:'Équipe liée',trades:['peinture'],active:true}};
+ const x=await boot({'/api/v4/showcase?linked_profile_id=7':original,'PUT /api/v4/showcase?linked_profile_id=7':{status:409,data:{detail:'Cette présentation a changé.'}}});try{
+  await x.w.editShowcase(7);input(x.w,'#dialog [name=intro]','Ma saisie fictive à conserver.');submit(x.w,'#dialog form');await tick();
+  const call=x.calls.find(c=>c.method==='PUT');assert.equal(call.url,'/api/v4/showcase?linked_profile_id=7');assert.equal(call.body.version,3);assert.equal(call.body.works[0].trade,'peinture');assert.equal(call.body.works[0].year,2025);
+  assert.equal(x.w.document.querySelector('#dialog [name=intro]').value,'Ma saisie fictive à conserver.');assert.equal(x.w.document.querySelector('#dialog').open,true);
+  x.w.dispatchEvent(new x.w.Event('online'));await tick();assert.equal(x.calls.filter(c=>c.method==='PUT').length,1);
+ }finally{x.close()}
+});
+test('candidate comparison loads the two authorized showcases and renders declarations as text',async()=>{
+ const x=await boot({'/api/projects/5/applications/31/showcase':{intro:'<script>never()</script>',works:[],profile_name:'Pro un'},'/api/projects/5/applications/32/showcase':{intro:'Présentation de l’équipe liée.',works:[{title:'Exemple fictif',description:'<img src=x onerror=never()>',trade:'peinture',year:2024}],profile_name:'Équipe liée'}});try{
+  const box=x.w.document.querySelector('#view');x.w.renderCandidateCards(box,[{id:31,professional_name:'Pro un',status:'pending',trade:'plomberie',town:'Toulouse'},{id:32,professional_name:'Gestionnaire',linked_artisan_alias:'Équipe liée',status:'pending',trade:'peinture',town:'Toulouse'}],5);
+  assert.equal(x.calls.some(c=>c.url.endsWith('/showcase')),false);
+  for(const c of box.querySelectorAll('.candidate-choice input')){c.checked=true;c.dispatchEvent(new x.w.Event('change'))}
+  [...box.querySelectorAll('button')].find(b=>b.textContent==='Comparer les profils sélectionnés').click();await tick();
+  const dialog=x.w.document.querySelector('#dialog');assert.match(dialog.textContent,/Présentation de l’équipe liée/);assert.match(dialog.textContent,/<script>never/);assert.equal(dialog.querySelector('script,img'),null);
+  assert.equal(dialog.querySelectorAll('.comparison-card').length,2);assert.match(dialog.textContent,/Réalisations déclarées/);
+ }finally{x.close()}
+});
+test('showcase editor limits works to six and supports explicit clearing without erasing the private legal profile',async()=>{
+ const works=Array.from({length:6},(_,i)=>({title:'Réalisation '+i,description:'Exemple de chantier entièrement fictif à présenter.',trade:'plomberie',year:null}));
+ const x=await boot({'/api/v4/showcase':{intro:'',works,version:1,scope:{name:'Pro',trades:['plomberie'],active:true}},'PUT /api/v4/showcase':{ok:true,version:2}});try{
+  await x.w.editShowcase(null);const add=[...x.w.document.querySelectorAll('#dialog button')].find(b=>b.textContent==='Ajouter une réalisation');assert.equal(add.disabled,true);
+  for(const b of [...x.w.document.querySelectorAll('#dialog button')].filter(b=>b.textContent==='Retirer de ce formulaire'))b.click();assert.equal(add.disabled,false);
+  submit(x.w,'#dialog form');await tick();const body=x.calls.find(c=>c.method==='PUT').body;assert.equal(body.works.length,0);assert.equal(body.intro,'');assert.equal(body.version,1);
+  assert.equal(x.calls.some(c=>c.url==='/api/profile'),false);
+ }finally{x.close()}
+});
+test('saving a showcase cannot close a newer dialog',async()=>{
+ let finish;const x=await boot({'/api/v4/showcase':{intro:'Texte fictif.',works:[],version:1,scope:{name:'Pro',trades:['plomberie'],active:true}},'PUT /api/v4/showcase':()=>new Promise(resolve=>finish=resolve)});try{
+  await x.w.editShowcase(null);submit(x.w,'#dialog form');await tick();x.w.showDialog('Nouvelle fenêtre',x.w.el('p',{text:'Nouvel écran'}));finish({ok:true,version:2});await tick();
+  assert.equal(x.w.document.querySelector('#dialog').open,true);assert.match(x.w.document.querySelector('#dialog').textContent,/Nouvel écran/);
+ }finally{x.close()}
+});
+
+test('a pending showcase comparison is discarded when the chosen profiles change',async()=>{
+ let finish;const x=await boot({'/api/projects/5/applications/31/showcase':()=>new Promise(resolve=>finish=resolve),'/api/projects/5/applications/32/showcase':{intro:'Exemple',works:[]}});try{
+  const box=x.w.document.querySelector('#view');x.w.renderCandidateCards(box,[{id:31,professional_name:'Pro un',status:'rejected',trade:'plomberie',town:'Toulouse'},{id:32,professional_name:'Pro deux',status:'rejected',trade:'plomberie',town:'Toulouse'}],5);
+  const checks=box.querySelectorAll('.candidate-choice input');for(const c of checks){c.checked=true;c.dispatchEvent(new x.w.Event('change'))}
+  [...box.querySelectorAll('button')].find(b=>b.textContent==='Comparer les profils sélectionnés').click();await tick();checks[0].checked=false;checks[0].dispatchEvent(new x.w.Event('change'));
+  finish({intro:'Ancienne sélection',works:[]});await tick();assert.equal(x.w.document.querySelector('#dialog').open,false);
  }finally{x.close()}
 });

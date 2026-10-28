@@ -225,3 +225,17 @@ def test_database_diagnostic_never_exposes_credentials(monkeypatch):
     assert password not in str(exc.value)
     assert 'fictional-user' not in str(exc.value)
     assert '[redacted]' in str(exc.value)
+
+
+def test_postgres_declared_showcase_privacy_and_versions(pg):
+    from test_professional_showcase import exercise_showcase
+    admin=TestClient(pg.app)
+    assert admin.post('/api/admin/bootstrap',json={'secret':'test-bootstrap-only-0123456789','email':'admin@ucp.test','password':'Fictif-Long-Test!9326'}).status_code==200
+    admin.headers['x-ucp-csrf']=admin.post('/api/login',json={'email':'admin@ucp.test','password':'Fictif-Long-Test!9326'}).json()['csrf']
+    requester,_=client_for(pg,'showcase-requester@ucp.test','requester')
+    pro,pid=client_for(pg,'showcase-professional@ucp.test','professional')
+    other,_=client_for(pg,'showcase-other@ucp.test','requester')
+    assert pro.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
+    assert admin.post(f'/api/admin/professionals/{pid}/approve').status_code==200
+    exercise_showcase(pro,requester,other)
+    with pg.connect() as db:assert db.execute('SELECT COUNT(*) FROM professional_showcases').fetchone()[0]==1

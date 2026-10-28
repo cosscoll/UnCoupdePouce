@@ -16,7 +16,7 @@ from psycopg.pq import TransactionStatus
 IDENTITY_TABLES = {
     'users', 'projects', 'applications', 'messages', 'beta_interest', 'audit',
     'notifications', 'enterprise_accounts', 'enterprise_artisans', 'drafts',
-    'photos', 'reports', 'admin_decisions', 'support_tickets',
+    'photos', 'reports', 'admin_decisions', 'support_tickets', 'professional_showcases',
 }
 
 class Row(dict):

@@ -7,7 +7,8 @@ Ils ne valent ni ouverture commerciale ni validation des décisions D01–D13.
 |---|---|---|
 | F09/F12/F25 — Budget facultatif | Bornes indépendantes en euros entiers, brouillon versionné, récapitulatif, publication idempotente, consultation selon droits et filtre par recoupement. Valeur absente distincte de zéro. | Montant indicatif déclaré, sans devis ni paiement. Modification bloquée après candidature selon la règle existante. |
 | F30/F33/F34 — Suivi des candidatures | Compteurs personnels, filtres par état, distinction du projet clôturé et motif d’indisponibilité de la messagerie. Profil lié identifié sans coordonnées privées. | Aucun état « examinée » inventé. Les droits entreprise et abonnement restent simulés. |
-| F16 — Comparaison | Jusqu’à trois profils actuels, métiers et communes déclarés, date de candidature, statut de test et disponibilité de sélection. Le comparatif distingue le profil lié de son gestionnaire et exclut coordonnées et facturation. | Avis, réalisations, assurances et vérification réelle restent absents ; aucune note ou certification inventée. |
+| F35 — Présentation et réalisations | Présentation courte, six réalisations textuelles, aperçu personnel, sauvegarde versionnée et séparation de chaque profil lié. Consultation depuis les seules candidatures reçues. | Déclarations non vérifiées ; photos, justificatifs, assurances, certifications et avis non livrés. |
+| F16 — Comparaison | Jusqu’à trois profils actuels, métiers et communes déclarés, date de candidature, statut de test et disponibilité de sélection. Le comparatif distingue le profil lié de son gestionnaire et exclut coordonnées et facturation. | Réalisations textuelles déclarées consultables et comparables. Avis, photos, assurances et vérification réelle restent absents ; aucune note ou certification inventée. |
 | F24–F25 — Recherche | Filtres combinés après autorisation : mots-clés/synonymes, métier, commune, catégorie, délai, ancienneté et date. Explication du profil et du métier correspondants ; pas de missions hors droits. | Géocodage, pertinence et pagination grand volume restent à traiter. Aucun rayon calculé à partir d’une commune. |
 | Reprise PostgreSQL | Outil opérateur manuel avec snapshot cohérent, fichiers privés, checksum, refus d’une cible non vide ; vrai dump/restore en base fictive isolée, photos/séquences contrôlées et anciennes sessions exclues. | Sauvegarde/restauration du projet Neon réel, chiffrement, stockage externe et rétention non exécutés. |
 | F50 — Reprise réseau | Saisie et clé de réessai conservées dans la page ; relecture explicite et envoi réactivé après contrôle ; réponse tardive d’un ancien chat ignorée. | La fermeture/recharge peut perdre une saisie non enregistrée. Tests de pannes sur téléphone à réaliser. |
@@ -43,7 +44,7 @@ réussis. Voir RECHERCHE.md et SAUVEGARDE_POSTGRESQL.md pour les périmètres ex
 
 ## Priorités suivantes
 
-- F16 : enrichir les profils avec des réalisations et justificatifs réels après définition du parcours de vérification ; avis liés à D10.
+- F16/F35 : compléter les réalisations textuelles par des photos et justificatifs après définition de leur confidentialité et du parcours de vérification ; avis liés à D10.
 - F88/F91 : recette visuelle mobile, clavier, zoom 200 % et lecteur d’écran.
 - F89 : vérifier l’installation et la réouverture sur Android/iPhone avec les accès privés. Voir [PWA.md](PWA.md).
 - Exécuter la sauvegarde/restauration du projet Neon réel sur une cible isolée avec les accès opérateur ; le test PostgreSQL fictif de CI est réussi.
