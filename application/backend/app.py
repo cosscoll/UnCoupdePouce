@@ -677,7 +677,7 @@ def save_profile(body:Profile,user=Depends(require('professional'))):
         if trade!=body.trade and trade not in secondary: secondary.append(trade)
     if len(secondary)>4:error(422,'Maximum 5 métiers avec métier principal')
     with authenticated_db(user,write=True) as c:
-        # Do not let a verified profile modify identity and keep approval.
+        # A test-authorized profile must lose approval when its scope changes.
         previous=c.execute('SELECT approved,subscription_active FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
         c.execute('''INSERT INTO profiles(user_id,trade,town,siren,service_areas,service_trades,approved,subscription_active)
                VALUES(?,?,?,?,?,?,0,0) ON CONFLICT(user_id) DO UPDATE SET

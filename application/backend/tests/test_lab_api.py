@@ -486,8 +486,9 @@ def test_failed_actions_cannot_enqueue_notifications(setup):
     aid=v['call'](v['pro'],v['pcsrf'],'post',f'/api/projects/{j}/apply').json()['id']
     assert v['call'](v['pro'],v['pcsrf'],'post',f'/api/projects/{j}/apply').status_code==409
     assert len(v['requester'].get('/api/notifications').json()['items'])==1
+    before=v['pro'].get('/api/notifications').json()
     assert v['call'](v['other'],v['ocsrf'],'post',f'/api/applications/{aid}/accept').status_code==403
-    assert v['pro'].get('/api/notifications').json()['items']==[]
+    assert v['pro'].get('/api/notifications').json()==before
 
 
 def test_notification_access_requires_session_and_csrf(env):

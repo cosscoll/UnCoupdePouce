@@ -1,6 +1,5 @@
 """Real state transitions must atomically notify only their affected account."""
 import pytest
-from fastapi.testclient import TestClient
 from test_lab_api import env,setup
 
 
