@@ -56,7 +56,7 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     pro,pid=client_for(pg,'artisan@ucp.test','professional')
     other,_=client_for(pg,'other@ucp.test','requester')
     assert pro.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
-    r=requester.post('/api/projects',json={'title':'Salle de bain fictive','description':'Remplacer un lavabo dans une salle de bain fictive.','trade':'plomberie','town':'Toulouse'})
+    r=requester.post('/api/projects',json={'title':'Salle de bain fictive','description':'Remplacer un lavabo dans une salle de bain fictive.','trade':'plomberie','town':'Toulouse','budget_min':1200,'budget_max':2500})
     assert r.status_code==201,r.text
     project_id=r.json()['id']
     assert pro.get('/api/projects').json()['items']==[]
@@ -64,6 +64,8 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     assert pro.get('/api/projects').json()['items'][0]['id']==project_id
     listing=pro.get('/api/projects',params={'q':'SALLE bain','town':'Toulouse','trade':'plomberie','timing':'flexible','published_within':7,'sort':'oldest'}).json()['items']
     assert listing[0]['id']==project_id and listing[0]['match']['trades']==['plomberie']
+    assert (listing[0]['budget_min'],listing[0]['budget_max'])==(1200,2500)
+    assert pro.get('/api/projects',params={'budget_from':3000}).json()['items']==[]
     assert pro.get('/api/projects',params={'town':'Paris'}).json()['items']==[]
     r=pro.post(f'/api/projects/{project_id}/apply');assert r.status_code==201,r.text
     aid=r.json()['id']

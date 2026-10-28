@@ -319,3 +319,49 @@ test('session expiry clears private dialogs and the previous account view',async
   assert.equal(x.w.document.querySelector('#anonymous').hidden,false);
  }finally{x.close()}
 });
+
+test('wizard preserves optional budget, distinguishes explicit zero and refuses invalid autosave',async()=>{
+ for(const minimum of ['', '0']){
+  let version=0;
+  const x=await boot({'POST /api/v4/drafts':()=>({id:61,version:++version}),'PUT /api/v4/drafts/61':()=>({id:61,version:++version})});
+  try{
+   x.w.startWizard();input(x.w,'.wizard [name=title]','Budget de test');input(x.w,'.wizard [name=description]','Travaux fictifs pour la recette du budget facultatif.');
+   const trade=x.w.document.querySelector('.wizard input[value=plomberie]');trade.checked=true;trade.dispatchEvent(new x.w.Event('change',{bubbles:true}));submit(x.w,'.wizard form');await tick();
+   input(x.w,'.wizard [name=budget_min]','-1');const leave=[...x.w.document.querySelectorAll('#tabs button')].find(b=>b.textContent==='Messages');leave.click();await tick();
+   assert.equal(x.calls.filter(c=>c.method==='PUT').length,0);assert.match(x.w.document.querySelector('#alert').textContent,/Corrigez les montants/);
+   input(x.w,'.wizard [name=budget_min]',minimum);input(x.w,'.wizard [name=budget_max]',minimum===''?'':'1200');submit(x.w,'.wizard form');await tick();
+   const sent=x.calls.filter(c=>c.method==='PUT').at(-1).body;
+   assert.equal(sent.budget_min,minimum===''?null:0);assert.equal(sent.budget_max,minimum===''?null:1200);
+   const review=x.w.document.querySelector('.review');assert.match(review.textContent,/Budget indicatif/);assert.match(review.textContent,/Début souhaité/);
+   if(minimum==='')assert.match(review.textContent,/Non renseigné/);else assert.match(review.textContent,/0/);
+  }finally{x.close()}
+ }
+});
+test('budget search sends explicit zero bounds and explains missing budgets',async()=>{
+ const x=await boot({'/api/projects?budget_from=0&budget_to=0&sort=newest':{items:[]}});try{
+  input(x.w,'.project-search [name=budget_from]','0');input(x.w,'.project-search [name=budget_to]','0');submit(x.w,'.project-search');await tick();
+  assert.ok(x.calls.some(c=>c.url==='/api/projects?budget_from=0&budget_to=0&sort=newest'));
+  assert.match(x.w.document.querySelector('.budget-filter-note').textContent,/sans budget sont exclus/);
+ }finally{x.close()}
+});
+test('project editor sends numeric budget values and explicit null for a cleared bound',async()=>{
+ const x=await boot({'PUT /api/projects/18':{ok:true}});try{
+  x.w.editProject({id:18,title:'Budget de travaux fictif',description:'Description fictive suffisamment longue pour la modification.',trade:'plomberie',town:'Toulouse',budget_min:1000,budget_max:3000});
+  input(x.w,'#dialog [name=budget_min]','');input(x.w,'#dialog [name=budget_max]','0');submit(x.w,'#dialog form');await tick();
+  const sent=x.calls.find(c=>c.method==='PUT');assert.equal(sent.body.budget_min,null);assert.equal(sent.body.budget_max,0);
+ }finally{x.close()}
+});
+
+
+test('previous wizard step refuses an invalid budget without discarding the entered value',async()=>{
+ const x=await boot({'POST /api/v4/drafts':{id:61,version:1},'PUT /api/v4/drafts/61':{id:61,version:2}});
+ try{
+  x.w.startWizard({id:61,version:1,title:'Projet fictif',description:'Description suffisamment longue pour une demande fictive.',town:'Toulouse',trades:['plomberie'],timing:'flexible',photos:[]});
+  submit(x.w,'.wizard form');await tick();
+  input(x.w,'.wizard [name=budget_min]','-2');const count=x.calls.filter(c=>c.method==='PUT').length;
+  [...x.w.document.querySelectorAll('.wizard button')].find(b=>b.textContent==='← Précédent').click();await tick();
+  assert.equal(x.w.document.querySelector('.wizard [name=budget_min]').value,'-2');
+  assert.equal(x.calls.filter(c=>c.method==='PUT').length,count);
+  assert.match(x.w.document.querySelector('#alert').textContent,/Corrigez les montants/);
+ }finally{x.close()}
+});

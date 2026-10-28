@@ -3,8 +3,9 @@ import base64, binascii, io, json, re, secrets, sqlite3, time, unicodedata
 from fastapi import Depends, Response, Query
 from pydantic import BaseModel, Field, field_validator
 from PIL import Image, ImageOps, UnidentifiedImageError
+from project_budget import Budget
 
-class Draft(BaseModel):
+class Draft(Budget):
     title: str = Field(default='',max_length=120)
     description: str = Field(default='',max_length=5000)
     town: str = Field(default='',max_length=90)
@@ -86,7 +87,7 @@ def install(m):
         if publishing:
             if not body.trades:error(422,'Choisissez un métier ou « Je ne sais pas »')
             # Reuse the tested v3 input/contact guards.
-            try:m.Project.model_validate(dict(title=body.title,description=body.description,town=body.town,trade=body.trades[0]),context={'connection':c})
+            try:m.Project.model_validate(dict(title=body.title,description=body.description,town=body.town,trade=body.trades[0],budget_min=body.budget_min,budget_max=body.budget_max),context={'connection':c})
             except ValueError:error(422,'Complétez le titre (5 caractères), la description (20) et la commune. Ne donnez pas de coordonnées directes.')
     def visible_project(c,id,user):
         row=c.execute('SELECT * FROM projects WHERE id=?',(id,)).fetchone()
@@ -144,7 +145,7 @@ def install(m):
                 return {'id':r['project_id'],'status':current['status'],'already_published':True}
             if r['version']!=body.get('version'):error(409,'Le brouillon a changé. Rechargez le récapitulatif.')
             d=Draft(**json.loads(r['payload']));validate_draft(c,d,True)
-            cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at,trades_json) VALUES(?,?,?,?,?,?,?)',(user['id'],d.title.strip(),d.description.strip(),d.trades[0],d.town.strip(),now(),json.dumps(list(dict.fromkeys(d.trades)))))
+            cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at,trades_json,budget_min,budget_max) VALUES(?,?,?,?,?,?,?,?,?)',(user['id'],d.title.strip(),d.description.strip(),d.trades[0],d.town.strip(),now(),json.dumps(list(dict.fromkeys(d.trades))),d.budget_min,d.budget_max))
             pid=cur.lastrowid
             c.execute('UPDATE drafts SET project_id=? WHERE id=?',(pid,id));audit(c,user,'project_published','project',pid);c.execute('COMMIT')
             return {'id':pid,'status':'open'}
@@ -201,7 +202,7 @@ def install(m):
         with m.authenticated_db(user,write=False) as c:
             r=visible_project(c,id,user)
             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
-            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at')};row['trades']=list(m.project_trades(r))
+            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max')};row['trades']=list(m.project_trades(r))
             draft=c.execute('SELECT payload FROM drafts WHERE project_id=?',(id,)).fetchone()
             row['timing']=json.loads(draft['payload']).get('timing','flexible') if draft else 'flexible'
             row['photos']=photos if user['role'] in ('requester','admin') or c.execute("SELECT 1 FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone() else []
