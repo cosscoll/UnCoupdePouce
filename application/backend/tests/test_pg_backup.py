@@ -90,8 +90,11 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
     with pg.connect() as db:
         assert db.execute('SELECT COUNT(*) FROM sessions').fetchone()[0]>0
         maximum=db.execute('SELECT MAX(id) FROM projects').fetchone()[0]
+    support=c.post('/api/v4/support',json={'subject':'Question de restauration','category':'account','body':'Demande fictive à retrouver après restauration.'});assert support.status_code==201
+    support_id=support.json()['id']
     archive=tmp_path/'fictional.dump';metadata=ops.backup(source,archive,pg.DATABASE_SCHEMA)
     assert metadata['tables']['sessions']==0 and metadata['tables']['resets']==0
+    assert metadata['tables']['support_tickets']==1
     assert metadata['tables']['photos']==1 and archive.stat().st_mode&0o077==0
     assert password not in Path(str(archive)+'.json').read_text()
     with pytest.raises(ops.BackupError,match='écrasement'):ops.backup(source,archive,pg.DATABASE_SCHEMA)
@@ -111,6 +114,7 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
         logged=copy.post('/api/login',json={'email':'camille@ucp.test','password':password});assert logged.status_code==200
         copy.headers['x-ucp-csrf']=logged.json()['csrf']
         assert copy.get(f'/api/v4/photos/{photo_id}').content==source_photo
+        assert next(t for t in copy.get('/api/v4/support').json()['items'] if t['id']==support_id)['body']=='Demande fictive à retrouver après restauration.'
         conversations=copy.get('/api/conversations').json()['items'];assert conversations
         assert len(copy.get('/api/conversations/'+str(conversations[0]['application_id'])+'/messages').json()['items'])==1
         new=copy.post('/api/projects',json={'title':'Après restauration','description':'Projet entièrement fictif créé après restauration.','town':'Toulouse','trade':'plomberie'})

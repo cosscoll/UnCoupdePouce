@@ -101,6 +101,8 @@ def test_postgres_full_journey_persistence_and_confidentiality(pg):
     assert 'siren' not in candidate and 'subscription_active' not in candidate
     from test_reports import exercise_report_flow
     exercise_report_flow(pg,admin,requester,pro,other,aid)
+    from test_support_cases import exercise_support_flow
+    exercise_support_flow(pg,requester,other,admin)
     assert admin.post(f'/api/admin/professionals/{pid}/suspend').status_code==200
     assert requester.get(path).status_code==403
 

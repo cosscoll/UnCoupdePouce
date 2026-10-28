@@ -193,6 +193,7 @@ NOTIFICATION_TYPES = {
     'application_withdrawn': 'Une candidature sur votre projet a été retirée.',
     'project_closed': 'Un projet auquel vous avez candidaté a été clôturé.',
     'new_message': 'Un nouveau message fictif vous attend dans une conversation.',
+    'support_resolved': 'Une réponse à votre demande d’assistance est disponible dans Assistance.',
     'report_resolved': 'Une réponse à votre signalement est disponible dans Assistance.',
 }
 
@@ -999,6 +1000,7 @@ def account_export(user=Depends(get_user)):
         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
         import base64
         own_photos=[{'id':r['id'],'draft_id':r['draft_id'],'jpeg_base64':base64.b64encode(r['body']).decode()} for r in c.execute('SELECT photos.id,draft_id,body FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.owner_id=?',(user['id'],))]
+        own_support=[dict(r) for r in c.execute('SELECT id,subject,category,body,status,response,created_at,resolved_at FROM support_tickets WHERE owner_id=?',(user['id'],))]
         own_reports=[dict(r) for r in c.execute('SELECT kind,target_id,reason,status,resolution,created_at FROM reports WHERE reporter_id=?',(user['id'],))]
         applications_owned=[dict(r) for r in c.execute('SELECT id,project_id,status,created_at FROM applications WHERE professional_id=?',(user['id'],))]
         profile=c.execute('SELECT trade,town,siren,service_areas,service_trades,approved,subscription_active FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
@@ -1013,7 +1015,7 @@ def account_export(user=Depends(get_user)):
             'profile':dict(profile) if profile else None,'beta_interest':dict(interest) if interest else None,
             'own_projects':projects_owned,'own_applications':applications_owned,'own_messages':messages_owned,
             'own_notifications':own_notices,'own_activity':own_activity,'own_enterprise':dict(own_enterprise) if own_enterprise else None,
-            'own_linked_artisans':own_linked_artisans,'own_drafts':own_drafts,'own_photos':own_photos,'own_reports':own_reports}
+            'own_linked_artisans':own_linked_artisans,'own_drafts':own_drafts,'own_photos':own_photos,'own_reports':own_reports,'own_support':own_support}
 
 @app.delete('/api/beta-interest')
 def revoke_interest(user=Depends(require('professional'))):
@@ -1104,7 +1106,8 @@ def delete_own_account(user=Depends(get_user)):
         apps=c.execute('SELECT COUNT(*) FROM applications WHERE professional_id=?',(user['id'],)).fetchone()[0]
         msgs=c.execute('SELECT COUNT(*) FROM messages WHERE sender_id=?',(user['id'],)).fetchone()[0]
         audits=c.execute('SELECT COUNT(*) FROM audit WHERE actor_id=?',(user['id'],)).fetchone()[0]
-        if any([children,apps,msgs,audits]):error(409,'Suppression liée à des événements : procédure interne manuelle nécessaire dans ce prototype')
+        support=c.execute('SELECT COUNT(*) FROM support_tickets WHERE owner_id=?',(user['id'],)).fetchone()[0]
+        if any([children,apps,msgs,audits,support]):error(409,'Suppression liée à des événements : procédure interne manuelle nécessaire dans ce prototype')
         c.execute('DELETE FROM users WHERE id=?',(user['id'],))
     return {'ok':True}
 
@@ -1121,6 +1124,7 @@ def service_worker():
                         headers={'Service-Worker-Allowed':'/'})
 
 from features_v4 import install
+from support_cases import install as install_support
 if DATABASE_URL:
     from postgres import initialize_schema
     initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
@@ -1129,6 +1133,7 @@ else:
 with initialization:
     init_db()
     install(sys.modules[__name__])
+    install_support(sys.modules[__name__])
     # Optional, one-time fictional seed under the initialization lock.
     if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
         with connect() as c:

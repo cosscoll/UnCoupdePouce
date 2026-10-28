@@ -14,7 +14,7 @@ async function boot(overrides={},configure=null){
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};
  w.HTMLDialogElement.prototype.close=function(){this.open=false};
  w.crypto.randomUUID=crypto.randomUUID;
- const defaults={'/api/catalog':{items:JSON.parse(fs.readFileSync(path.join(root,'../taxonomy.json'),'utf8'))},'/api/session':{id:1,name:'Camille',role:'requester',csrf:'test-token'},'/api/projects':{items:[]},'/api/v4/drafts':{items:[]},'/api/my-profile':{profile:null}};
+ const defaults={'/api/catalog':{items:JSON.parse(fs.readFileSync(path.join(root,'../taxonomy.json'),'utf8'))},'/api/session':{id:1,name:'Camille',role:'requester',csrf:'test-token'},'/api/projects':{items:[]},'/api/v4/drafts':{items:[]},'/api/my-profile':{profile:null},'/api/v4/reports':{items:[],next_before_id:null},'/api/v4/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}},'/api/v4/admin/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}}};
  w.fetch=async(url,opts={})=>{
   const call={url,method:opts.method||'GET',body:opts.body?JSON.parse(opts.body):null,headers:opts.headers};calls.push(call);
   let r=overrides[call.method+' '+url]??overrides[url]??defaults[url];
@@ -276,4 +276,46 @@ test('an empty search still offers the form and a failed request retains the las
 test('unapproved professional sees an explanation without mission identifiers',async()=>{
  const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[],search_scope:'pending_review'}});
  try{assert.match(x.w.document.querySelector('#view').textContent,/profil attend son examen/);assert.equal(x.w.document.querySelectorAll('.project-row').length,0);}finally{x.close()}
+});
+
+test('general support creates a categorized case and displays its private response as text',async()=>{
+ let created=false;
+ const x=await boot({'/api/v4/support':()=>({items:created?[{id:71,subject:'Question de test',category:'other',body:'Mon besoin entièrement fictif.',status:'resolved',response:'<script>never()</script>',created_at:'2026-10-28T10:00:00Z'}]:[],next_before_id:null,categories:{other:'Autre demande'}}),'POST /api/v4/support':()=>{created=true;return {id:71,status:'open'}}});
+ try{
+  await x.w.go('support');[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Nouvelle demande d’assistance').click();
+  input(x.w,'#dialog [name=subject]','Question de test');x.w.document.querySelector('#dialog [name=category]').value='other';
+  input(x.w,'#dialog [name=body]','Mon besoin entièrement fictif.');submit(x.w,'#dialog form');await tick();await tick();
+  const sent=x.calls.find(c=>c.method==='POST'&&c.url==='/api/v4/support');assert.equal(sent.body.category,'other');assert.equal(sent.headers['x-ucp-csrf'],'test-token');
+  assert.match(x.w.document.querySelector('#view').textContent,/Question de test/);assert.match(x.w.document.querySelector('#view').textContent,/<script>never/);assert.equal(x.w.document.querySelector('#view script'),null);
+ }finally{x.close()}
+});
+test('support failure keeps the form and never resends automatically',async()=>{
+ const x=await boot({'POST /api/v4/support':()=>{throw Error('response lost')}});try{
+  await x.w.go('support');[...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Nouvelle demande d’assistance').click();
+  input(x.w,'#dialog [name=subject]','Demande à conserver');x.w.document.querySelector('#dialog [name=category]').value='other';input(x.w,'#dialog [name=body]','Texte privé non perdu lors de la panne.');
+  submit(x.w,'#dialog form');await tick();
+  assert.equal(x.w.document.querySelector('#dialog').open,true);assert.equal(x.w.document.querySelector('#dialog [name=body]').value,'Texte privé non perdu lors de la panne.');
+  x.w.dispatchEvent(new x.w.Event('online'));await tick();assert.equal(x.calls.filter(c=>c.method==='POST').length,1);
+ }finally{x.close()}
+});
+test('admin general support review is explicit and precedes its response action',async()=>{
+ const x=await boot({'/api/session':{id:99,name:'Admin',role:'admin',csrf:'admin-token'},'/api/admin/metrics':{counts:{}},'/api/admin/queue':{items:[]},'/api/admin/audit':{items:[]},'/api/v4/admin':{reports:[],projects:[],users:[]},'/api/v4/admin/support':{items:[{id:71,subject:'Question de test',category:'other',status:'open',created_at:'2026-10-28T10:00:00Z'}],next_before_id:null,categories:{other:'Autre demande'}},'POST /api/v4/admin/support/71/review':{ticket:{id:71,subject:'Question de test',category:'other',body:'<img src=x>',owner_name:'Camille'}},'POST /api/v4/admin/support/71/resolve':{ok:true,status:'resolved'}});
+ try{
+  await x.w.go('moderation');assert.equal(x.calls.some(c=>c.url.endsWith('/71/review')),false);
+  [...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Examiner la demande').click();
+  input(x.w,'#dialog [name=reason]','Examen pour répondre au dossier.');submit(x.w,'#dialog form');await tick();
+  assert.equal(x.w.document.querySelector('#dialog img'),null);assert.match(x.w.document.querySelector('#dialog').textContent,/<img src=x>/);
+  [...x.w.document.querySelectorAll('#dialog button')].find(b=>b.textContent==='Répondre et clôturer la demande').click();
+  assert.match(x.w.document.querySelector('#dialog label').textContent,/visible dans Assistance/);
+  input(x.w,'#dialog [name=reason]','Votre demande de test a été examinée.');submit(x.w,'#dialog form');await tick();
+  assert.ok(x.calls.some(c=>c.url.endsWith('/71/resolve')&&c.body.reason.includes('examinée')));
+ }finally{x.close()}
+});
+test('session expiry clears private dialogs and the previous account view',async()=>{
+ const x=await boot({'/api/expired-private-request':{status:401,data:{detail:'Session expirée'}}});try{
+  x.w.document.querySelector('#view').textContent='Contenu privé du compte précédent';x.w.showDialog('Dossier privé',x.w.el('p',{text:'Corps privé du support'}));
+  await assert.rejects(()=>x.w.api('/expired-private-request'),/session a expiré/);
+  assert.equal(x.w.document.querySelector('#dialog').open,false);assert.equal(x.w.document.querySelector('#dialog-content').textContent,'');assert.equal(x.w.document.querySelector('#view').textContent,'');
+  assert.equal(x.w.document.querySelector('#anonymous').hidden,false);
+ }finally{x.close()}
 });
