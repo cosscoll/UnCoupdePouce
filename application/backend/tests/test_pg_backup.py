@@ -87,6 +87,8 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
     image=io.BytesIO();Image.new('RGB',(8,8),'orange').save(image,'PNG')
     photo=c.post(f'/api/v4/drafts/{d}/photos',json={'data':base64.b64encode(image.getvalue()).decode()});assert photo.status_code==201
     photo_id=photo.json()['id'];source_photo=c.get(f'/api/v4/photos/{photo_id}').content
+    budget_project=c.post('/api/projects',json={'title':'Budget de sauvegarde','description':'Travaux fictifs pour contrôler la restauration des montants déclarés.','town':'Toulouse','trade':'plomberie','budget_min':1200,'budget_max':4500});assert budget_project.status_code==201
+    budget_id=budget_project.json()['id']
     with pg.connect() as db:
         assert db.execute('SELECT COUNT(*) FROM sessions').fetchone()[0]>0
         maximum=db.execute('SELECT MAX(id) FROM projects').fetchone()[0]
@@ -114,6 +116,7 @@ def test_native_pg_backup_restore_keeps_data_photos_sequences_and_revokes_sessio
         logged=copy.post('/api/login',json={'email':'camille@ucp.test','password':password});assert logged.status_code==200
         copy.headers['x-ucp-csrf']=logged.json()['csrf']
         assert copy.get(f'/api/v4/photos/{photo_id}').content==source_photo
+        budget_copy=copy.get(f'/api/v4/projects/{budget_id}').json();assert (budget_copy['budget_min'],budget_copy['budget_max'])==(1200,4500)
         assert next(t for t in copy.get('/api/v4/support').json()['items'] if t['id']==support_id)['body']=='Demande fictive à retrouver après restauration.'
         conversations=copy.get('/api/conversations').json()['items'];assert conversations
         assert len(copy.get('/api/conversations/'+str(conversations[0]['application_id'])+'/messages').json()['items'])==1

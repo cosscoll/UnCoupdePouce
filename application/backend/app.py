@@ -17,6 +17,7 @@ ROOT = Path(__file__).parent
 import sys
 sys.path.insert(0, str(ROOT))
 from hosting import Hosting, database_url
+from project_budget import Budget, MAX_BUDGET
 HOSTING = Hosting.from_env()
 DATABASE_URL = database_url()
 DATABASE_SCHEMA = os.getenv('UCP_DATABASE_SCHEMA', 'ucp_private')
@@ -127,6 +128,9 @@ def init_db():
             c.execute("ALTER TABLE profiles ADD COLUMN service_areas TEXT NOT NULL DEFAULT '[]'")
         if 'service_trades' not in cols:
             c.execute("ALTER TABLE profiles ADD COLUMN service_trades TEXT NOT NULL DEFAULT '[]'")
+        project_cols=[r['name'] for r in c.execute('PRAGMA table_info(projects)').fetchall()]
+        for column in ('budget_min','budget_max'):
+            if column not in project_cols:c.execute(f'ALTER TABLE projects ADD COLUMN {column} INTEGER CHECK ({column}>=0)')
         application_cols=[r['name'] for r in c.execute('PRAGMA table_info(applications)').fetchall()]
         if 'linked_profile_id' not in application_cols:
             c.execute('ALTER TABLE applications ADD COLUMN linked_profile_id INTEGER REFERENCES enterprise_artisans(id)')
@@ -337,7 +341,7 @@ class BetaInterest(BaseModel):
     wants_interview: Literal['yes','maybe','no']
     consent: Literal[True]
 
-class Project(BaseModel):
+class Project(Budget):
     title: str = Field(min_length=5,max_length=120)
     description: str = Field(min_length=20,max_length=5000)
     trade: str
@@ -359,7 +363,7 @@ class Project(BaseModel):
 class Message(BaseModel):
     body: str = Field(min_length=1,max_length=2000)
 
-class EditProject(BaseModel):
+class EditProject(Budget):
     title: str = Field(min_length=5,max_length=120)
     description: str = Field(min_length=20,max_length=5000)
     trade: str
@@ -703,8 +707,8 @@ def my_profile(user=Depends(require('professional'))):
 @app.post('/api/projects',status_code=201)
 def create_project(body:Project,user=Depends(require('requester'))):
     with authenticated_db(user,write=True) as c:
-        cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at) VALUES(?,?,?,?,?,?)',
-                  (user['id'],body.title.strip(),body.description.strip(),body.trade,body.town.strip(),now()))
+        cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at,budget_min,budget_max) VALUES(?,?,?,?,?,?,?,?)',
+                  (user['id'],body.title.strip(),body.description.strip(),body.trade,body.town.strip(),now(),body.budget_min,body.budget_max))
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                   (user['id'],'create_project','project',cur.lastrowid,now()))
         c.execute('COMMIT')
@@ -714,15 +718,18 @@ def create_project(body:Project,user=Depends(require('requester'))):
 def edit_project(project_id:int,body:EditProject,user=Depends(require('requester'))):
     # Do not allow changing an advertised job after any professional applied.
     with authenticated_db(user,write=True) as c:
-        project=c.execute('SELECT requester_id,status,trade,trades_json FROM projects WHERE id=?',(project_id,)).fetchone()
+        project=c.execute('SELECT requester_id,status,trade,trades_json,budget_min,budget_max FROM projects WHERE id=?',(project_id,)).fetchone()
         if not project:error(404,'Projet inconnu')
         if project['requester_id']!=user['id']:error(403,'Projet appartenant à un autre demandeur')
         if project['status']!='open' or c.execute('SELECT 1 FROM applications WHERE project_id=?',(project_id,)).fetchone():
             error(409,'Projet non modifiable après une candidature ou sa fermeture')
         if body.trade!=project['trade'] and len(project_trades(project))>1:error(409,'Les métiers d’un projet multi-métiers ne peuvent être modifiés ici')
+        values={k:getattr(body,k) if k in body.model_fields_set else project[k] for k in ('budget_min','budget_max')}
+        try:Budget.model_validate(values)
+        except ValueError:error(422,'Le budget minimum ne peut pas dépasser le maximum')
         if body.trade!=project['trade']:c.execute('UPDATE projects SET trades_json=? WHERE id=?',(json.dumps([body.trade]),project_id))
-        c.execute('UPDATE projects SET title=?,description=?,trade=?,town=? WHERE id=?',
-                  (body.title.strip(),body.description.strip(),body.trade,body.town.strip(),project_id))
+        c.execute('UPDATE projects SET title=?,description=?,trade=?,town=?,budget_min=?,budget_max=? WHERE id=?',
+                  (body.title.strip(),body.description.strip(),body.trade,body.town.strip(),values['budget_min'],values['budget_max'],project_id))
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                   (user['id'],'edit_project','project',project_id,now()))
         c.execute('COMMIT')
@@ -753,9 +760,12 @@ def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
              timing:Literal['flexible','month','quarter','urgent']|None=None,
              status:Literal['open','selected','closed']|None=None,
              published_within:Annotated[int|None,Query(ge=1,le=365)]=None,
-             sort:Literal['newest','oldest']='newest'):
+             sort:Literal['newest','oldest']='newest',
+             budget_from:Annotated[int|None,Query(ge=0,le=MAX_BUDGET)]=None,
+             budget_to:Annotated[int|None,Query(ge=0,le=MAX_BUDGET)]=None):
+    if budget_from is not None and budget_to is not None and budget_from>budget_to:error(422,'Le budget minimum ne peut pas dépasser le maximum')
     from project_search import decorate, filter_projects
-    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,
+    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,
         (SELECT payload FROM drafts WHERE project_id=p.id ORDER BY id LIMIT 1) AS draft_payload'''
     discovery='not_applicable'
     with authenticated_db(user,write=False) as c:
@@ -793,7 +803,7 @@ def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
         else:rs=[]
         taxonomy=[dict(r) for r in c.execute('SELECT id,label,group_name,synonyms FROM taxonomy')]
         filtered=filter_projects(rs,taxonomy,q=q,trade=trade,town=town,category=category,timing=timing,status=status,
-                                 published_within=published_within,sort=sort)
+                                 published_within=published_within,sort=sort,budget_from=budget_from,budget_to=budget_to)
     return {'items':filtered,'search_scope':discovery}
 
 @app.post('/api/projects/{project_id}/apply',status_code=201)
@@ -996,7 +1006,7 @@ def send_message(aid:int,body:Message,request:Request,user=Depends(get_user)):
 def account_export(user=Depends(get_user)):
     # Limited lab export: only the authenticated participant's records, never another user's messages.
     with authenticated_db(user,write=False) as c:
-        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at FROM projects WHERE requester_id=?',(user['id'],))]
+        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max FROM projects WHERE requester_id=?',(user['id'],))]
         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
         import base64
         own_photos=[{'id':r['id'],'draft_id':r['draft_id'],'jpeg_base64':base64.b64encode(r['body']).decode()} for r in c.execute('SELECT photos.id,draft_id,body FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.owner_id=?',(user['id'],))]

@@ -1,4 +1,5 @@
 """Filters only an already authorized project list. Never broadens discovery rights."""
+from project_budget import overlaps
 import json
 import unicodedata
 from datetime import datetime, timedelta, timezone
@@ -15,11 +16,12 @@ def decorate(row):
     item['timing']=timing if timing in TIMINGS else 'flexible'
     return item
 
-def filter_projects(items,taxonomy,*,q='',trade='',town='',category='',timing=None,status=None,published_within=None,sort='newest'):
+def filter_projects(items,taxonomy,*,q='',trade='',town='',category='',timing=None,status=None,published_within=None,sort='newest',budget_from=None,budget_to=None):
     catalog={r['id']:r for r in taxonomy}
     terms=normalize(q).split();cutoff=datetime.now(timezone.utc)-timedelta(days=published_within) if published_within else None
     def eligible(p):
         scope=json.loads(p.get('trades_json') or '[]') or [p['trade']]
+        if not overlaps(p,budget_from,budget_to):return False
         if trade and trade not in scope:return False
         if town and normalize(p['town'])!=normalize(town.strip()):return False
         if category and not any(normalize(catalog.get(t,{}).get('group_name',''))==normalize(category) for t in scope):return False
