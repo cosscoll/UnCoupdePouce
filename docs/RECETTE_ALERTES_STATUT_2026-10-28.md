@@ -24,6 +24,24 @@ Les tests historiques sont adaptés aux alertes désormais présentes : ils vér
 que le professionnel reçoit sa propre autorisation sans recevoir la candidature
 destinée au demandeur ; la lecture globale et l'export incluent ses nouvelles alertes.
 
+La [CI 40739185282](https://github.com/cosscoll/UnCoupdePouce/actions/runs/40739185282)
+valide **178 tests Python et 56 tests DOM/worker**, avec PostgreSQL 17 et le vrai
+dump/restore en base fictive isolée. La [pull request 40](https://github.com/cosscoll/UnCoupdePouce/pull/40)
+est fusionnée au commit applicatif `a81e0ba`.
+
+## Recette HTTPS de la version publiée
+
+Quatre groupes de contrôles réussissent sur le service déployé : autorisation et
+activation répétées sans double alerte ; modification du profil et retrait des
+droits cohérents avec l'historique ; suspension/réactivation sans résurrection
+des anciennes sessions ; refus inter-comptes et export personnel sans motif privé.
+La levée de suspension ne rétablit pas l'autorisation professionnelle retirée.
+
+Un compte professionnel fictif dédié est créé pour cette recette. Les comptes
+et projets de démonstration existants ne sont pas modifiés. Le déploiement
+`a81e0ba` est READY sur le projet privé `ucp-preproduction` à Francfort.
+Les identifiants privés ne sont pas copiés dans le dépôt.
+
 ## Limites
 
 Les notifications sont internes et consultées explicitement. Un compte suspendu

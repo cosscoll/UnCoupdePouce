@@ -8,6 +8,7 @@ Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en rela
 - [Application — préproduction privée](https://ucp-preproduction.vercel.app) : FastAPI sur Vercel, PostgreSQL Neon persistant (offre Free). Accès Vercel puis identifiant de préproduction requis ; données fictives uniquement.
 - [Préproduction : configuration et blocages](application/docs/PREPRODUCTION.md)
 - [Centre de notifications et historique](application/docs/NOTIFICATIONS.md)
+- [Recette des alertes de statut et confidentialité](docs/RECETTE_ALERTES_STATUT_2026-10-28.md)
 - [Vue d’ensemble professionnelle](application/docs/TABLEAU_DE_BORD_PRO.md)
 - [Présentations et réalisations déclarées](application/docs/PROFILS_DECLARATIFS.md)
 - [Budget facultatif des travaux](application/docs/BUDGET.md)
@@ -51,7 +52,7 @@ Sous Windows, utilisez `application/DEMARRER.bat`. Ces commandes lancent le dév
 
 ## Vérifications de référence
 
-- Application : 169 tests Python réussis sur GitHub Actions le 28/10/2026 (SQLite et PostgreSQL 17).
+- Application : 178 tests Python réussis sur GitHub Actions le 28/10/2026 (SQLite et PostgreSQL 17).
 - Interface de l'application : 53 tests DOM et 3 tests de service worker réussis.
 - Vitrine : contrôles statiques et tests des scénarios de brief réussis.
 - Parcours HTTPS réel publication → candidature → sélection → messagerie et refus inter-comptes réussis sur la préproduction.
