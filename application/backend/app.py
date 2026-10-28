@@ -50,7 +50,7 @@ async def security_headers(request: Request, call_next):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
     response.headers['Cache-Control'] = 'no-store'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; object-src 'none'"
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'; object-src 'none'; worker-src 'self'; manifest-src 'self'"
     return response
 
 @contextmanager
@@ -1097,6 +1097,16 @@ def delete_own_account(user=Depends(get_user)):
 
 @app.get('/')
 def root():return FileResponse(ROOT/'static'/'index.html')
+
+@app.get('/manifest.webmanifest')
+def web_manifest():
+    return FileResponse(ROOT/'static'/'manifest.webmanifest',media_type='application/manifest+json')
+
+@app.get('/ucp-sw.js')
+def service_worker():
+    return FileResponse(ROOT/'static'/'ucp-sw.js',media_type='application/javascript',
+                        headers={'Service-Worker-Allowed':'/'})
+
 from features_v4 import install
 if DATABASE_URL:
     from postgres import initialize_schema

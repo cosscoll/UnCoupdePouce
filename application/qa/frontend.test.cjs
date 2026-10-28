@@ -7,7 +7,7 @@ const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
 const root=path.join(__dirname,'../backend/static');
 const tick=()=>new Promise(r=>setTimeout(r,12));
-async function boot(overrides={}){
+async function boot(overrides={},configure=null){
  const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://localhost:8765',runScripts:'outside-only'});
  const w=dom.window,calls=[];
  w.structuredClone=structuredClone;w.AbortSignal.timeout=AbortSignal.timeout;
@@ -22,6 +22,7 @@ async function boot(overrides={}){
   if(r===undefined)throw Error('Unhandled mock route: '+call.method+' '+url);
   return {ok:!(r.status>=400),status:r.status||200,json:async()=>r.data??r};
  };
+ if(configure)configure(w);
  w.eval(fs.readFileSync(path.join(root,'analytics.js'),'utf8'));
  new (require('node:vm').Script)(fs.readFileSync(path.join(root,'app.js'),'utf8')).runInContext(dom.getInternalVMContext());
  await tick();return {dom,w,calls,close:()=>w.close()};
@@ -175,5 +176,75 @@ test('unavailable application does not offer a select button',async()=>{
   const box=x.w.document.createElement('section');x.w.renderCandidateCards(box,[{id:1,status:'pending',professional_name:'Atelier',trade:'plomberie',town:'Toulouse',verification_status:'test_unavailable',eligible_for_selection:false}]);
   assert.equal([...box.querySelectorAll('button')].some(b=>b.textContent==='Choisir ce professionnel'),false);
   assert.match(box.textContent,/ne peut pas être sélectionnée/);
+ }finally{x.close()}
+});
+
+function loadPWA(x){x.w.eval(fs.readFileSync(path.join(root,'pwa.js'),'utf8'))}
+test('PWA registration is scoped, installation requires a user gesture and acceptance is not confirmation',async()=>{
+ let registrations=[],prompts=0;
+ const x=await boot({},w=>{
+  Object.defineProperty(w,'isSecureContext',{value:true});w.matchMedia=()=>({matches:false,addEventListener(){}});
+  Object.defineProperty(w.navigator,'serviceWorker',{value:{register:async(...args)=>{registrations.push(args)}}});
+ });try{
+  loadPWA(x);assert.equal(registrations[0][0],'/ucp-sw.js');assert.equal(registrations[0][1].scope,'/');assert.equal(registrations[0][1].updateViaCache,'none');
+  const e=new x.w.Event('beforeinstallprompt',{cancelable:true});e.prompt=async()=>{prompts++};e.userChoice=Promise.resolve({outcome:'accepted'});
+  x.w.dispatchEvent(e);assert.equal(e.defaultPrevented,true);assert.equal(prompts,0);
+  x.w.document.querySelector('#install-app').click();
+  const b=[...x.w.document.querySelectorAll('#dialog button')].find(b=>b.textContent==='Lancer l’installation');b.click();b.click();await tick();
+  assert.equal(prompts,1);assert.match(x.w.document.querySelector('#alert').textContent,/Demande d’installation acceptée/);
+  assert.equal(x.w.document.querySelector('#install-app').hidden,false);
+  x.w.dispatchEvent(new x.w.Event('appinstalled'));assert.equal(x.w.document.querySelector('#install-app').hidden,true);
+ }finally{x.close()}
+});
+test('manual installation help works without a service worker or install event',async()=>{
+ const x=await boot();try{
+  loadPWA(x);x.w.document.querySelector('#install-help').click();const text=x.w.document.querySelector('#dialog').textContent;
+  assert.match(text,/iPhone · Safari/);assert.match(text,/Android/);assert.match(text,/sans téléchargement depuis un store/);
+  assert.match(text,/connexion Internet/);assert.equal([...x.w.document.querySelectorAll('#dialog button')].some(b=>b.textContent==='Lancer l’installation'),false);
+ }finally{x.close()}
+});
+test('standalone mode is detected without storing an installation flag',async()=>{
+ const x=await boot({},w=>{w.matchMedia=()=>({matches:true,addEventListener(){}})});try{
+  loadPWA(x);assert.equal(x.w.document.querySelector('#install-app').hidden,true);
+  x.w.document.querySelector('#install-help').click();assert.match(x.w.document.querySelector('#dialog').textContent,/ouvert en mode application/);
+ }finally{x.close()}
+});
+test('online/offline events preserve text and never replay writes',async()=>{
+ const x=await boot({'GET /api/conversations/12/messages':{items:[]}});try{
+  loadPWA(x);const holder=x.w.document.createElement('section');x.w.document.body.append(holder);
+  await x.w.openChat(holder,{application_id:12,peer:'Atelier',title:'Test'});holder.querySelector('textarea').value='Texte privé non envoyé';
+  x.w.dispatchEvent(new x.w.Event('offline'));assert.match(x.w.document.querySelector('#connection-status').textContent,/hors connexion/);
+  x.w.dispatchEvent(new x.w.Event('online'));assert.match(x.w.document.querySelector('#connection-status').textContent,/rien n’a été envoyé/);
+  assert.equal(holder.querySelector('textarea').value,'Texte privé non envoyé');assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+ }finally{x.close()}
+});
+
+for(const errorStatus of [0,403])test('chat recovers after '+(errorStatus?'revoked rights':'a network failure')+' without losing draft or replaying a message',async()=>{
+ let reads=0,timers=[];
+ const data={items:[{id:8,sender_id:2,body:'Message serveur déjà reçu',created_at:'2026-10-28T10:00:00Z'}]};
+ const x=await boot({'GET /api/conversations/12/messages':()=>{if(++reads===2){if(!errorStatus)throw Error('offline');return {status:errorStatus,data:{detail:'Accès suspendu'}}}return data}},w=>{
+  Object.defineProperty(w.document,'hidden',{value:false});w.setInterval=fn=>{timers.push(fn);return timers.length};w.clearInterval=()=>{};
+ });try{
+  const holder=x.w.document.createElement('section');x.w.document.body.append(holder);await x.w.openChat(holder,{application_id:12,peer:'Atelier',title:'Test'});
+  holder.querySelector('textarea').value='Mon brouillon privé';timers[0]();await tick();
+  assert.equal(holder.querySelector('textarea').value,'Mon brouillon privé');assert.equal(holder.querySelector('form').hidden,false);
+  assert.equal(holder.querySelector('button[type=submit]').disabled,true);
+  assert.equal(holder.querySelector('.chat-log').textContent.includes('Message serveur déjà reçu'),!errorStatus);
+  const retry=[...holder.querySelectorAll('button')].find(b=>b.textContent==='Réessayer de charger les messages');assert.equal(retry.hidden,false);retry.click();await tick();
+  assert.match(holder.querySelector('.chat-log').textContent,/Message serveur déjà reçu/);assert.equal(holder.querySelector('button[type=submit]').disabled,false);
+  assert.equal(holder.querySelector('textarea').value,'Mon brouillon privé');assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+ }finally{x.close()}
+});
+test('late failure from an old conversation cannot hide the current chat or stop its timer',async()=>{
+ let finish,timers=[],cleared=[];
+ const x=await boot({'GET /api/conversations/11/messages':()=>new Promise(r=>finish=r),'GET /api/conversations/12/messages':{items:[{sender_id:2,body:'Conversation actuelle',created_at:'2026-10-28T10:00:00Z'}]}},w=>{
+  w.setInterval=fn=>{timers.push(fn);return timers.length};w.clearInterval=id=>cleared.push(id);
+ });try{
+  const holder=x.w.document.createElement('section');x.w.document.body.append(holder);
+  const old=x.w.openChat(holder,{application_id:11,peer:'Ancien',title:'Ancien'});
+  await x.w.openChat(holder,{application_id:12,peer:'Actuel',title:'Actuel'});const current=timers.length;
+  finish({status:403,data:{detail:'Ancien accès révoqué'}});await old;
+  assert.match(holder.textContent,/Conversation actuelle/);assert.doesNotMatch(holder.textContent,/Ancien accès révoqué/);
+  assert.equal(cleared.includes(current),false);assert.equal(holder.querySelector('button[type=submit]').disabled,false);
  }finally{x.close()}
 });
