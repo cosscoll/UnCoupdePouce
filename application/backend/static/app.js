@@ -58,8 +58,8 @@ async function action(fn,success){
 async function go(v){if(currentDraft){const saved=await action(saveDraft,'Brouillon enregistré avant de changer de page.');if(!saved)return;currentDraft=null}appState.view=v;await render()}
 function showDialog(title,content){++dialogEpoch;const n=clear($('#dialog-content'));n.append(el('h3',{id:'dialog-title',text:title}),content);$('#dialog').setAttribute('aria-labelledby','dialog-title');$('#dialog').showModal()}
 function ask(title,desc,fn){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const r=await action(fn);if(r){$('#dialog').close();await render()}},'primary'));showDialog(title,body)}
-function menu(){const r=appState.user.role;const items=r==='requester'?[['projects','Mes projets','projects'],['conversations','Messages','messages']]:r==='professional'?[['projects','Trouver des projets','projects'],['applications','Mes candidatures','check'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','settings']]:[['admin','Vue d’ensemble','settings'],['moderation','Modération','projects'],['catalog','Métiers du bâtiment','settings']];items.push(['support','Assistance','messages'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']);const n=clear($('#tabs'));for(const[key,t,i]of items)n.append(el('button',{class:'navlink '+(appState.view===key?'active':''),type:'button','aria-current':appState.view===key?'page':'false',onClick:()=>go(key)},icon(i),t))}
-async function render(){++chatEpoch;const epoch=++renderEpoch;clearInterval(chatTimer);chatTimer=null;const u=appState.user;$('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#logout').hidden=!u;if(!u)return;$('#actor-role').textContent={requester:'ESPACE PARTICULIER',professional:'ESPACE PROFESSIONNEL',admin:'ADMINISTRATION'}[u.role];$('#actor-title').textContent='Bonjour, '+u.name;if(!appState.view)appState.view=u.role==='admin'?'admin':'projects';menu();const target=clear($('#view'));target.append(el('div',{class:'loading',text:'Chargement de votre espace…'}));const fragment=document.createElement('div');try{const f={projects:renderProjects,applications:renderApplications,conversations:renderConversations,profile:renderProfile,enterprise:renderEnterprise,admin:renderAdmin,moderation:renderModeration,catalog:renderCatalog,support:renderSupport,notifications:renderNotifications,'personal-data':renderPersonalData}[appState.view];await f(fragment);if(epoch===renderEpoch)target.replaceChildren(...fragment.childNodes)}catch(e){if(epoch===renderEpoch){clear(target);viewError(target,e)}}}
+function menu(){const r=appState.user.role;const items=r==='requester'?[['projects','Mes projets','projects'],['conversations','Messages','messages']]:r==='professional'?[['professional-home','Vue d’ensemble','settings'],['projects','Trouver des projets','projects'],['applications','Mes candidatures','check'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','settings']]:[['admin','Vue d’ensemble','settings'],['moderation','Modération','projects'],['catalog','Métiers du bâtiment','settings']];items.push(['support','Assistance','messages'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']);const n=clear($('#tabs'));for(const[key,t,i]of items)n.append(el('button',{class:'navlink '+(appState.view===key?'active':''),type:'button','aria-current':appState.view===key?'page':'false',onClick:()=>go(key)},icon(i),t))}
+async function render(){++chatEpoch;const epoch=++renderEpoch;clearInterval(chatTimer);chatTimer=null;const u=appState.user;$('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#logout').hidden=!u;if(!u)return;$('#actor-role').textContent={requester:'ESPACE PARTICULIER',professional:'ESPACE PROFESSIONNEL',admin:'ADMINISTRATION'}[u.role];$('#actor-title').textContent='Bonjour, '+u.name;if(!appState.view)appState.view=u.role==='admin'?'admin':'projects';menu();const target=clear($('#view'));target.append(el('div',{class:'loading',text:'Chargement de votre espace…'}));const fragment=document.createElement('div');try{const f={'professional-home':renderProfessionalHome,projects:renderProjects,applications:renderApplications,conversations:renderConversations,profile:renderProfile,enterprise:renderEnterprise,admin:renderAdmin,moderation:renderModeration,catalog:renderCatalog,support:renderSupport,notifications:renderNotifications,'personal-data':renderPersonalData}[appState.view];await f(fragment);if(epoch===renderEpoch)target.replaceChildren(...fragment.childNodes)}catch(e){if(epoch===renderEpoch){clear(target);viewError(target,e)}}}
 function tradeNames(p){return (p.trades||(p.trades_json?JSON.parse(p.trades_json):[p.trade])).map(x=>trades[x]||x).join(' · ')}
 function amountField(label,name,value){return el('label',{},el('span',{text:label}),el('input',{type:'number',name,min:0,max:2147483647,step:1,inputmode:'numeric',value:value??''}))}
 const amountValue=value=>value==null||value===''?null:Number(value);
@@ -75,6 +75,52 @@ function matchExplanation(p){
   return el('p',{class:'match-reason small',text:who+' : '+p.match.trades.map(t=>trades[t]||t).join(' · ')+' ; commune couverte : '+p.match.town+'.'});
 }
 const timingNames={flexible:'Date flexible',month:'Dans le mois',quarter:'Dans les trois mois',urgent:'Dès que possible'};
+async function renderProfessionalHome(n){
+ if(appState.user.role!=='professional')throw Error('Cette vue est réservée à l’espace professionnel.');
+ const epoch=renderEpoch;
+ n.append(heading('Votre activité, en un regard.','Des informations de votre compte et des projets auxquels vos profils ont accès.'));
+ const grid=el('div',{class:'overview-grid'});n.append(grid);
+ function section(title,view,draw){
+  const box=panel(title),content=el('div');box.append(content,button({projects:'Voir les projets',applications:'Voir mes candidatures',conversations:'Ouvrir mes conversations',profile:'Voir mon profil',notifications:'Voir les notifications'}[view],()=>go(view),'link'));grid.append(box);
+  return {content,draw};
+ }
+ const missions=section('Missions ouvertes accessibles','projects',(data,node)=>{
+  const items=data.items.filter(p=>p.status==='open');node.append(el('strong',{class:'overview-count',text:items.length}));
+  if(data.search_scope&&data.search_scope!=='ready')node.append(el('p',{class:'hint',text:'Complétez votre profil ou attendez son examen pour consulter les missions autorisées.'}));
+  for(const project of items.slice(0,3))node.append(el('div',{class:'item'},el('h4',{text:project.title}),el('p',{class:'small muted',text:project.town+' · '+tradeNames(project)}),button('Consulter ce projet',()=>projectDetail(project))));
+  if(!items.length)node.append(el('p',{class:'hint',text:'Aucune mission ouverte accessible actuellement. Vos métiers, communes et profils actifs déterminent les résultats.'}));
+ });
+ const applications=section('Vos candidatures','applications',(data,node)=>{
+  const active=data.items.filter(a=>a.project_status!=='closed');
+  node.append(el('dl',{class:'overview-totals'},el('dt',{text:'En attente · projet non clôturé'}),el('dd',{text:active.filter(a=>a.status==='pending').length}),el('dt',{text:'Sélectionnées · projet non clôturé'}),el('dd',{text:active.filter(a=>a.status==='accepted').length})));
+  for(const a of data.items.slice(0,3))node.append(el('div',{class:'item'},el('h4',{text:a.title}),badge(a.status),a.project_status==='closed'?el('span',{class:'chip',text:'Projet clôturé'}):null));
+ });
+ const messages=section('Conversations accessibles','conversations',(data,node)=>{
+  const available=data.items.filter(a=>!!a.subscription_active&&(!a.linked_profile_id||!!a.linked_active));
+  node.append(el('strong',{class:'overview-count',text:available.length}),el('p',{class:'hint',text:'Après sélection et contrôle des droits de test. Ce compteur ne représente pas des messages non lus.'}));
+  const locked=data.items.length-available.length;
+  if(locked)node.append(el('p',{class:'status-note',text:locked+' échange(s) nécessitent une activation de test ou un profil lié actif.'}));
+ });
+ const profile=section('Profil et accès de test','profile',(data,node)=>{
+  const p=data.profile;
+  node.append(el('p',{class:'status-note',text:!p?'Profil à compléter':p.approved?'Profil autorisé pour les tests':'Profil en attente d’examen'}));
+  if(p)node.append(el('p',{class:'hint',text:p.subscription_active?'Accès messagerie de test actif, sous réserve de sélection et d’un profil actif.':'Accès messagerie de test inactif. Retrouvez les explications dans vos candidatures.'}));
+  node.append(el('p',{class:'small muted',text:'Aucune certification professionnelle ni souscription payante réelle.'}));
+ });
+ const notices=section('Notifications non lues','notifications',(data,node)=>{
+  node.append(el('strong',{class:'overview-count',text:data.unread}));
+  for(const notice of data.items.filter(x=>!x.read_at).slice(0,3))node.append(el('p',{class:'small',text:notice.message}));
+ });
+ async function load(target,path){
+  try{
+   const data=await api(path);if(epoch!==renderEpoch)return false;clear(target.content);target.draw(data,target.content);return {ok:true};
+  }catch(e){
+   if(e.stale||e.status===401||epoch!==renderEpoch)return false;
+   clear(target.content);target.content.append(el('p',{class:'status-note',text:'Information indisponible. Les autres rubriques restent utilisables.'}),button('Réessayer cette rubrique',()=>action(()=>load(target,path))));return false;
+  }
+ }
+ await Promise.all([[missions,'/projects'],[applications,'/my-applications'],[messages,'/conversations'],[profile,'/my-profile'],[notices,'/notifications']].map(([target,path])=>load(target,path)));
+}
 async function renderProjects(n){
   const req=appState.user.role==='requester',epoch=renderEpoch,owner=appState.user.id;
   n.append(heading(req?'Vos projets, en bonne voie.':'Le prochain projet est ici.',req?'Retrouvez vos demandes et choisissez avec qui échanger.':'Seules les missions autorisées pour vos profils et vos communes sont affichées.',req?'+ Décrire mon projet':null,()=>startWizard()));
@@ -129,7 +175,7 @@ async function renderProjects(n){
   if(Object.values(saved).some(Boolean))await load();else draw(items);
 }
 const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-async function projectDetail(p){if(acting)return;const epoch=++renderEpoch,actor=appState.user;await action(async()=>{const d=await api('/v4/projects/'+p.id);if(epoch!==renderEpoch||actor!==appState.user)return false;const n=el('div'),req=actor.role==='requester';n.append(button('← Mes projets',render,'link'),heading(d.title,d.town+' · '+tradeNames(d)),badge(d.status),el('section',{class:'panel'},el('h3',{text:'Le projet en quelques mots'}),el('p',{text:d.description}),el('p',{class:'small muted',text:'Début souhaité : '+({flexible:'flexible',month:'dans le mois',quarter:'dans les trois mois',urgent:'dès que possible'}[d.timing]||'flexible')})));n.append(el('p',{class:'hint',text:'Budget indicatif : '+budgetText(d)+'. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.'}));if(!req&&p.match)n.append(matchExplanation(p));if(d.photos.length)n.append(el('div',{class:'photos'},...d.photos.map(id=>el('a',{href:'/api/v4/photos/'+id,target:'_blank',rel:'noopener'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de test du projet',width:160,height:120})))));
+async function projectDetail(p){if(acting)return;const epoch=++renderEpoch,actor=appState.user,sourceView=appState.view;await action(async()=>{const d=await api('/v4/projects/'+p.id);if(epoch!==renderEpoch||actor!==appState.user)return false;const n=el('div'),req=actor.role==='requester';n.append(button(sourceView==='professional-home'?'← Vue d’ensemble':actor.role==='professional'?'← Trouver des projets':'← Mes projets',()=>go(sourceView),'link'),heading(d.title,d.town+' · '+tradeNames(d)),badge(d.status),el('section',{class:'panel'},el('h3',{text:'Le projet en quelques mots'}),el('p',{text:d.description}),el('p',{class:'small muted',text:'Début souhaité : '+({flexible:'flexible',month:'dans le mois',quarter:'dans les trois mois',urgent:'dès que possible'}[d.timing]||'flexible')})));n.append(el('p',{class:'hint',text:'Budget indicatif : '+budgetText(d)+'. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.'}));if(!req&&p.match)n.append(matchExplanation(p));if(d.photos.length)n.append(el('div',{class:'photos'},...d.photos.map(id=>el('a',{href:'/api/v4/photos/'+id,target:'_blank',rel:'noopener'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de test du projet',width:160,height:120})))));
 if(req){const apps=(await api('/projects/'+p.id+'/applications')).items;const box=panel('Les professionnels intéressés','Comparez les profils déclarés avant de choisir. Une candidature ne constitue pas un devis. Dans cette préproduction, le chat nécessite une sélection et des droits de test actifs.');if(!apps.length)box.append(empty('Pas encore de candidature','Votre demande reste disponible pour les professionnels éligibles.'));renderCandidateCards(box,apps,d.id);n.append(box);if(d.status!=='closed')n.append(button('Clôturer le projet',()=>ask('Clôturer votre projet ?','Les candidatures s’arrêtent et la conversation devient inaccessible dans ce laboratoire.',()=>api('/projects/'+d.id+'/close',{method:'POST'}))));if(!apps.length&&d.status==='open')n.append(button('Modifier la demande',()=>editProject(d)))}else if(d.own_application){n.append(el('section',{class:'status-note'},badge(d.own_application.status),el('p',{text:'Votre candidature est déjà enregistrée pour ce projet. Retrouvez son suivi dans Mes candidatures.'}),button('Voir ma candidature',()=>go('applications'))))}else if(d.status==='open')n.append(button('Proposer ma candidature',async()=>{const r=await action(()=>api('/projects/'+p.id+(p.matching_individual_profile===false&&p.matching_linked_profile_id?'/apply-linked/'+p.matching_linked_profile_id:'/apply'),{method:'POST'}),'Votre candidature est enregistrée.');if(r){UCPAnalytics.track('application_submitted');go('applications')}},'primary'));else n.append(el('p',{class:'status-note',text:'Les candidatures sont fermées pour ce projet.'}));n.append(button('Signaler un problème',()=>report('project',p.id),'link'));if(epoch!==renderEpoch||actor!==appState.user)return false;$('#view').replaceChildren(...n.childNodes);UCPAnalytics.track('project_viewed');return true})}
 
 function showcaseContent(data){
@@ -254,10 +300,10 @@ async function renderApplications(n){
  const count=fn=>items.filter(fn).length;
  n.append(el('div',{class:'stat-grid'},...[
   ['En attente',count(a=>a.status==='pending'&&a.project_status!=='closed')],
-  ['Sélectionnées · projet actif',count(a=>a.status==='accepted'&&a.project_status!=='closed')],
+  ['Sélectionnées · projet non clôturé',count(a=>a.status==='accepted'&&a.project_status!=='closed')],
   ['Projets clôturés',count(a=>a.project_status==='closed')]
  ].map(([text,value])=>el('div',{class:'stat'},el('strong',{text:value}),text))));
- const filter=field('Afficher les candidatures','application_status','select',{required:false,options:{all:'Toutes',pending:'En attente',accepted:'Sélectionnées · projet actif',rejected:'Non retenues',withdrawn:'Retirées',closed:'Projets clôturés'}});
+ const filter=field('Afficher les candidatures','application_status','select',{required:false,options:{all:'Toutes',pending:'En attente',accepted:'Sélectionnées · projet non clôturé',rejected:'Non retenues',withdrawn:'Retirées',closed:'Projets clôturés'}});
  const list=el('div',{'aria-live':'polite'});n.append(filter,list);
  const explanations={not_selected:'La messagerie s’ouvre après sélection et selon les droits de test actifs.',closed:'Projet clôturé : les échanges sont fermés.',unavailable:'L’accès aux échanges est actuellement suspendu. Consultez votre profil ou contactez l’assistance.',linked_inactive:'Le profil lié est inactif. Consultez Mon entreprise.',test_access_required:'Candidature sélectionnée. L’accès messagerie de test doit être activé par l’administrateur.',available:'Vous pouvez échanger avec le demandeur.'};
  function draw(){
