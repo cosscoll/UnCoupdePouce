@@ -1,6 +1,6 @@
 # Un Coup de Pouce — reprise 4.1 / préproduction
 
-Le code 4.0.2 est conservé. SQLite reste le mode local ; une configuration PostgreSQL/Vercel protégée est ajoutée. **Aucune URL applicative déployée à ce stade.** Voir [PREPRODUCTION.md](docs/PREPRODUCTION.md) et [audit de reprise](docs/REPRISE_2026-10-27.md).
+Le code 4.0.2 est conservé. SQLite reste le mode local ; une préproduction privée PostgreSQL/Vercel est disponible sur https://ucp-preproduction.vercel.app. Données fictives et accès autorisé uniquement, aucun paiement réel. Voir [PREPRODUCTION.md](docs/PREPRODUCTION.md) et [audit de reprise](docs/REPRISE_2026-10-27.md).
 
 ## Historique 4.0.2
 
