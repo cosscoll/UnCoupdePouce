@@ -24,6 +24,7 @@ async function boot(overrides={},configure=null){
  };
  if(configure)configure(w);
  w.eval(fs.readFileSync(path.join(root,'analytics.js'),'utf8'));
+ w.eval(fs.readFileSync(path.join(root,'guided-help.js'),'utf8'));
  new (require('node:vm').Script)(fs.readFileSync(path.join(root,'app.js'),'utf8')).runInContext(dom.getInternalVMContext());
  await tick();return {dom,w,calls,close:()=>w.close()};
 }
@@ -910,4 +911,96 @@ test('restricted candidate details are explained in cards and in the comparison'
 test('a withheld legacy presentation displays the unavailable state without exposing an error body',async()=>{
  const x=await boot({'/api/projects/10/applications/31/showcase':{status:404,data:{detail:'Présentation indisponible'}}});
  try{await x.w.openCandidateShowcase(10,{id:31,professional_name:'Profil professionnel'});assert.match(x.w.document.querySelector('#dialog-content').textContent,/présentation n’est plus disponible/);assert.equal(x.w.document.querySelector('#dialog').open,true)}finally{x.close()}
+});
+
+function helpButton(x,label){const b=[...x.w.document.querySelectorAll('.guided-helper button')].find(b=>b.textContent===label);assert.ok(b,label);return b}
+async function helpSend(x,text){input(x.w,'.guided-helper textarea',text);submit(x.w,'.guided-helper form');await tick()}
+async function prepareHelpProposal(x){
+ x.w.openGuidedHelp();helpButton(x,'Préparer mon annonce').click();await helpSend(x,'Remplacer un évier et réparer une fuite dans la cuisine.');
+ helpButton(x,'Plomberie').click();helpButton(x,'Confirmer les métiers').click();await helpSend(x,'Toulouse');helpButton(x,'Dans le mois').click();
+}
+
+test('requester chatbot prepares a proposal without writing or publishing before confirmation',async()=>{
+ const x=await boot();try{
+  const before=x.calls.length;assert.equal(x.w.document.querySelector('#guided-help-open').hidden,false);await prepareHelpProposal(x);
+  assert.match(x.w.document.querySelector('.helper-proposal').textContent,/Remplacer un évier/);assert.equal(x.calls.length,before);
+  helpButton(x,'Utiliser cette proposition').click();await tick();assert.equal(x.w.document.querySelector('#dialog').open,false);
+  assert.match(x.w.document.querySelector('#view').textContent,/De quoi avez-vous besoin/);assert.equal(x.w.document.querySelector('#view [name=title]').value,'Remplacer un évier et réparer une fuite dans la cuisine');
+  assert.ok(!x.calls.some(c=>c.method==='POST'));assert.ok(!x.calls.some(c=>c.url.endsWith('/publish')));
+ }finally{x.close()}
+});
+
+test('chatbot refuses contact details and treats markup as literal conversation text',async()=>{
+ const x=await boot();try{
+  x.w.openGuidedHelp();await helpSend(x,'Appelez au ０６ １２ ３４ ５６ ７８');assert.match(x.w.document.querySelector('.guided-helper [role=status]').textContent,/Retirez les coordonnées/);assert.doesNotMatch(x.w.document.querySelector('.helper-log').textContent,/０６/);
+  await helpSend(x,'<img src=x onerror=oops()>');assert.equal(x.w.document.querySelector('.guided-helper img'),null);assert.match(x.w.document.querySelector('.helper-log').textContent,/<img src=x/);
+ }finally{x.close()}
+});
+
+test('trades require an explicit choice and unknown cannot be mixed with a precise trade',async()=>{
+ const x=await boot();try{
+  x.w.openGuidedHelp();helpButton(x,'Préparer mon annonce').click();await helpSend(x,'Remplacer un évier dans ma cuisine.');helpButton(x,'Confirmer les métiers').click();assert.match(x.w.document.querySelector('.guided-helper [role=status]').textContent,/Choisissez au moins un métier/);
+  helpButton(x,'Plomberie').click();helpButton(x,'Je ne sais pas').click();assert.equal(helpButton(x,'Plomberie').getAttribute('aria-pressed'),'false');assert.equal(helpButton(x,'Je ne sais pas').getAttribute('aria-pressed'),'true');
+  helpButton(x,'Plomberie').click();assert.equal(helpButton(x,'Je ne sais pas').getAttribute('aria-pressed'),'false');
+ }finally{x.close()}
+});
+
+test('professional chatbot gives role-specific guidance and only navigates on explicit action',async()=>{
+ const x=await boot({'/api/session':savedProSession,'/api/my-applications':{items:[]}});try{
+  x.w.openGuidedHelp();assert.ok(![...x.w.document.querySelectorAll('.guided-helper button')].some(b=>b.textContent==='Préparer mon annonce'));
+  const before=x.calls.length;helpButton(x,'Pourquoi le chat est bloqué ?').click();assert.match(x.w.document.querySelector('.helper-log').textContent,/je ne peux pas débloquer/);assert.equal(x.calls.length,before);
+  helpButton(x,'Voir mes candidatures').click();await tick();assert.equal(x.w.document.querySelector('#dialog').open,false);assert.ok(x.calls.some(c=>c.url==='/api/my-applications'));
+ }finally{x.close()}
+});
+
+test('chatbot conversation is reset on logout and never stored in browser persistence',async()=>{
+ const x=await boot({'POST /api/logout':{ok:true}});try{
+  x.w.openGuidedHelp();await helpSend(x,'Une question privée de recette');x.w.document.querySelector('#logout').click();await tick();
+  assert.equal(x.w.document.querySelector('#guided-help-open').hidden,true);assert.equal(x.w.document.querySelector('.guided-helper'),null);assert.equal(x.w.localStorage.length,0);assert.equal(x.w.sessionStorage.length,0);
+  x.w.openGuidedHelp();assert.equal(x.w.document.querySelector('.guided-helper'),null);
+ }finally{x.close()}
+});
+
+test('a failed save keeps the existing wizard and the chatbot proposal available',async()=>{
+ const x=await boot({'POST /api/v4/drafts':{status:503,data:{detail:'Enregistrement indisponible'}}});try{
+  x.w.startWizard();input(x.w,'#view [name=title]','Mon brouillon initial');input(x.w,'#view [name=description]','La description initiale de mes travaux fictifs.');
+  await prepareHelpProposal(x);helpButton(x,'Utiliser cette proposition').click();await tick();await tick();
+  assert.equal(x.w.document.querySelector('#view [name=title]').value,'Mon brouillon initial');assert.equal(x.w.document.querySelector('#dialog').open,true);assert.match(x.w.document.querySelector('.helper-proposal').textContent,/Remplacer un évier/);assert.ok(!x.calls.some(c=>c.url.endsWith('/publish')));
+ }finally{x.close()}
+});
+
+test('closing the chatbot while its previous draft saves cancels the later replacement',async()=>{
+ let release;const pending=new Promise(r=>{release=r});const x=await boot({'POST /api/v4/drafts':()=>pending});try{
+  x.w.startWizard();input(x.w,'#view [name=title]','Mon brouillon initial');input(x.w,'#view [name=description]','La description initiale de mes travaux fictifs.');
+  await prepareHelpProposal(x);helpButton(x,'Utiliser cette proposition').click();await tick();x.w.document.querySelector('#dialog').close();release({id:601,version:1});await tick();await tick();
+  assert.equal(x.w.document.querySelector('#view [name=title]').value,'Mon brouillon initial');assert.equal(x.w.document.querySelector('#dialog').open,false);
+ }finally{x.close()}
+});
+
+test('chatbot history stays bounded and a restart discards the previous conversation',async()=>{
+ const x=await boot();try{x.w.openGuidedHelp();for(let i=0;i<30;i++)await helpSend(x,'Question fictive numéro '+i);assert.ok(x.w.document.querySelectorAll('.helper-message').length<=24);helpButton(x,'Nouvelle conversation').click();assert.equal(x.w.document.querySelectorAll('.helper-message').length,1)}finally{x.close()}
+});
+
+test('chatbot saves an existing draft before transferring a fresh proposal without publishing',async()=>{
+ const x=await boot({'POST /api/v4/drafts':{id:801,version:1}});try{
+  x.w.startWizard();input(x.w,'#view [name=title]','Mon brouillon initial');input(x.w,'#view [name=description]','La description initiale de mes travaux fictifs.');
+  await prepareHelpProposal(x);helpButton(x,'Utiliser cette proposition').click();helpButton(x,'Utiliser cette proposition').click();await tick();await tick();
+  const writes=x.calls.filter(c=>c.method==='POST');assert.equal(writes.length,1);assert.equal(writes[0].body.title,'Mon brouillon initial');assert.equal(writes[0].body.description,'La description initiale de mes travaux fictifs.');assert.match(x.w.document.querySelector('#view [name=title]').value,/Remplacer un évier/);
+ }finally{x.close()}
+});
+
+test('a delayed chatbot transfer cannot replace the page after logout',async()=>{
+ let release;const pending=new Promise(r=>{release=r});const x=await boot({'POST /api/v4/drafts':()=>pending,'POST /api/logout':{ok:true}});try{
+  x.w.startWizard();input(x.w,'#view [name=title]','Mon brouillon initial');input(x.w,'#view [name=description]','La description initiale de mes travaux fictifs.');
+  await prepareHelpProposal(x);helpButton(x,'Utiliser cette proposition').click();await tick();
+  x.w.eval('appState.user=null;appState.csrf=null;stopDraft();render()');release({id:802,version:1});await tick();await tick();assert.equal(x.w.document.querySelector('#dashboard').hidden,true);assert.equal(x.w.document.querySelector('.guided-helper'),null);assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/Remplacer un évier/);
+ }finally{x.close()}
+});
+
+test('chatbot appends new messages without replacing earlier log nodes',async()=>{
+ const x=await boot();try{x.w.openGuidedHelp();const first=x.w.document.querySelector('.helper-message');await helpSend(x,'Comment fonctionne le budget ?');assert.equal(x.w.document.querySelector('.helper-message'),first);assert.match(x.w.document.querySelector('.helper-log').textContent,/ne vaut pas devis/)}finally{x.close()}
+});
+
+test('unavailable chatbot module leaves the core application usable',async()=>{
+ const x=await boot({},w=>Object.defineProperty(w,'UCPGuidedHelp',{configurable:true,get:()=>undefined,set:()=>{}}));try{assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.match(x.w.document.querySelector('#view').textContent,/Vos projets/);x.w.openGuidedHelp();assert.match(x.w.document.querySelector('#alert').textContent,/assistant n’a pas pu être chargé/)}finally{x.close()}
 });
