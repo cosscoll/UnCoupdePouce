@@ -837,3 +837,53 @@ test('a delayed confirmation cannot close or steal focus from a newer dialog',as
   assert.equal(x.w.document.querySelector('#dialog').open,true);assert.equal(x.w.document.querySelector('#dialog-title').textContent,'Nouveau dialogue');assert.equal(x.w.document.activeElement,field);
  }finally{x.close()}
 });
+
+const favoriteProject={id:28,title:'Mission fictive à retenir',description:'Description fictive',town:'Toulouse',trade:'plomberie',trades:['plomberie'],status:'open',timing:'flexible',is_favorite:false,match:{profile:'individual',trades:['plomberie'],town:'Toulouse'}};
+
+test('favorite saves are single-flight and a lost response can be retried without applying',async()=>{
+ let attempts=0;const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[favoriteProject],search_scope:'ready'},'PUT /api/project-favorites/28':()=>{if(++attempts===1)throw Error('Réponse perdue');return {project_id:28,is_favorite:true}}});
+ try{
+  const b=x.w.document.querySelector('.favorite-toggle');assert.equal(b.getAttribute('aria-pressed'),'false');
+  b.click();b.click();await tick();assert.equal(attempts,1);assert.equal(b.disabled,false);assert.equal(b.getAttribute('aria-pressed'),'false');
+  b.click();await tick();assert.equal(attempts,2);assert.equal(b.getAttribute('aria-pressed'),'true');assert.match(b.textContent,/Retirer/);assert.ok(!x.calls.some(c=>c.url.includes('/apply')));
+ }finally{x.close()}
+});
+
+test('favorites list never displays or opens unavailable project content and removes it idempotently',async()=>{
+ let stored=[{project_id:28,available:false,project:null}];const x=await boot({'/api/session':savedProSession,'/api/project-favorites':()=>({items:stored,limit:50}),'DELETE /api/project-favorites/28':()=>{stored=[];return {project_id:28,is_favorite:false}}});
+ try{
+  await x.w.go('favorites');assert.match(x.w.document.querySelector('#view').textContent,/Projet indisponible/);assert.ok(![...x.w.document.querySelectorAll('#view button')].some(b=>b.textContent==='Voir le projet →'));
+  x.w.document.querySelector('.favorite-toggle').click();await tick();assert.match(x.w.document.querySelector('#view').textContent,/Aucun favori/);assert.match(x.w.document.querySelector('.count').textContent,/0 \/ 50/);assert.equal(x.calls.filter(c=>c.method==='DELETE').length,1);
+ }finally{x.close()}
+});
+
+test('favorites available project uses the current authorized detail and returns to favorites',async()=>{
+ const x=await boot({'/api/session':savedProSession,'/api/project-favorites':{items:[{project_id:28,available:true,project:{...favoriteProject,is_favorite:true}}],limit:50},'/api/v4/projects/28':{...favoriteProject,photos:[]}});
+ try{
+  await x.w.go('favorites');assert.equal(x.w.document.title,'Mes favoris · Un Coup de Pouce');savedButton(x.w,'Voir le projet →','#view').click();await tick();assert.ok(x.calls.some(c=>c.url==='/api/v4/projects/28'));assert.ok(savedButton(x.w,'← Mes favoris','#view'));
+ }finally{x.close()}
+});
+
+test('failed favorite removal preserves its card and allows a retry',async()=>{
+ const x=await boot({'/api/session':savedProSession,'/api/project-favorites':{items:[{project_id:28,available:true,project:{...favoriteProject,is_favorite:true}}],limit:50},'DELETE /api/project-favorites/28':{status:503,data:{detail:'Service indisponible'}}});
+ try{await x.w.go('favorites');x.w.document.querySelector('.favorite-toggle').click();await tick();assert.match(x.w.document.querySelector('.project-list').textContent,/Mission fictive/);assert.equal(x.w.document.querySelector('.favorite-toggle').disabled,false);assert.match(x.w.document.querySelector('#alert').textContent,/indisponible/)}finally{x.close()}
+});
+
+test('late favorite listing cannot replace a newer page or introduce HTML',async()=>{
+ let release;const pending=new Promise(r=>{release=r});const x=await boot({'/api/session':savedProSession,'/api/project-favorites':()=>pending,'/api/notifications':{items:[],unread:0,next_before_id:null}});
+ try{const old=x.w.go('favorites');await tick();await x.w.go('notifications');release({items:[{project_id:28,available:true,project:{...favoriteProject,title:'<img src=x onerror=oops()>'}}],limit:50});await old;assert.equal(x.w.document.querySelector('#view img'),null);assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/onerror/);assert.match(x.w.document.title,/Notifications/)}finally{x.close()}
+});
+
+test('a late favorite save cannot change the page or account visited afterwards',async()=>{
+ let release;const pending=new Promise(r=>{release=r});const x=await boot({'/api/session':savedProSession,'/api/projects':{items:[favoriteProject],search_scope:'ready'},'PUT /api/project-favorites/28':()=>pending,'/api/notifications':{items:[],unread:0,next_before_id:null}});
+ try{x.w.document.querySelector('.favorite-toggle').click();await tick();await x.w.go('notifications');release({project_id:28,is_favorite:true});await tick();assert.equal(x.w.document.querySelector('.favorite-toggle'),null);assert.match(x.w.document.title,/Notifications/)}finally{x.close()}
+});
+
+test('requesters have no professional favorite controls or favorite requests',async()=>{
+ const x=await boot();try{assert.equal(x.w.document.querySelector('.favorite-toggle'),null);assert.ok(![...x.w.document.querySelectorAll('#tabs button')].some(b=>b.textContent==='Mes favoris'));assert.ok(!x.calls.some(c=>c.url.includes('project-favorites')))}finally{x.close()}
+});
+
+test('favorite titles are rendered as literal text and never as active markup',async()=>{
+ const title='<img src=x onerror=oops()>';const x=await boot({'/api/session':savedProSession,'/api/project-favorites':{items:[{project_id:28,available:true,project:{...favoriteProject,title,is_favorite:true}}],limit:50}});
+ try{await x.w.go('favorites');assert.equal(x.w.document.querySelector('.project-list img'),null);assert.equal(x.w.document.querySelector('.project-list h3').textContent,title);assert.equal(x.w.document.querySelector('.favorite-toggle').getAttribute('aria-label'),'Retirer des favoris · '+title)}finally{x.close()}
+});
