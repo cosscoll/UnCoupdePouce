@@ -14,6 +14,7 @@ Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en rela
 - [Budget facultatif des travaux](application/docs/BUDGET.md)
 - [Brouillons et sauvegarde automatique](application/docs/BROUILLONS.md)
 - [Réévaluation des exigences critiques du 2 novembre](docs/REVALIDATION_P0_2026-11-02.md)
+- [Navigation et accessibilité : preuves et recette restante](docs/RECETTE_NAVIGATION_2026-11-02.md)
 - [Confidentialité des photos en modération](application/docs/MODERATION_PHOTOS.md)
 - [Suivi des candidatures et accès aux échanges](application/docs/SUIVI_CANDIDATURES.md)
 - [Assistance générale privée](application/docs/ASSISTANCE.md)
@@ -57,7 +58,7 @@ Sous Windows, utilisez `application/DEMARRER.bat`. Ces commandes lancent le dév
 ## Vérifications de référence
 
 - Application : 198 tests Python réussis sur GitHub Actions le 02/11/2026 (SQLite et PostgreSQL 17).
-- Interface de l'application : 73 tests DOM et 3 tests de service worker réussis.
+- Interface de l'application : 83 tests DOM et 3 tests de service worker réussis (86 au total).
 - Vitrine : contrôles statiques et tests des scénarios de brief réussis.
 - Parcours HTTPS réel publication → candidature → sélection → messagerie et refus inter-comptes réussis sur la préproduction.
 - Vitrine ouverte dans un navigateur réel ; rendu mobile sur appareils, installation/réouverture PWA et restauration PostgreSQL distante restent à vérifier.

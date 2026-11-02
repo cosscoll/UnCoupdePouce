@@ -1,0 +1,22 @@
+{
+  "date": "2026-11-02",
+  "result": "PASS",
+  "application_commit": "76644b62436e1e172cc41ef0c4f63996c2e567aa",
+  "deployment_id": "dpl_D5gKfwuVat45JRPERnUhmGhz1wWR",
+  "scope": "HTTPS HTML attributes and exact delivered asset hashes; no application login or browser rendering",
+  "html_attributes": "PASS",
+  "asset_sha256": {
+    "app.js": "f2a05fe0ded6f53189d5280bb6c22e1e6c06545ad465b7b338e5978eaa9501e6",
+    "style.css": "49a7a0b13b6b625f2adc63900327e84263330f68f004cb035c5e2d39675c177f"
+  },
+  "visual_acceptance": false,
+  "real_device_acceptance": false,
+  "ci": {
+    "run_id": 41413700156,
+    "url": "https://github.com/cosscoll/UnCoupdePouce/actions/runs/41413700156",
+    "head_sha": "cdac3a23cc0416a53b34c1ef297b3ffe766815f6",
+    "result": "success",
+    "python_passed": 198,
+    "dom_and_worker_passed": 86
+  }
+}

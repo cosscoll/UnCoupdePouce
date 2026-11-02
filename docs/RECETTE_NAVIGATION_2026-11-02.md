@@ -29,3 +29,22 @@ les couleurs et de tous les états de l'application.
 
 Voir [le contrat détaillé](../application/docs/NAVIGATION_ACCESSIBILITE.md) et
 [la preuve de couleurs](qa/navigation-couleurs-2026-11-02.json).
+
+## Livraison vérifiée
+
+La [PR nº 44](https://github.com/cosscoll/UnCoupdePouce/pull/44) est fusionnée au commit
+`76644b62436e1e172cc41ef0c4f63996c2e567aa`. La
+[CI de la dernière révision](https://github.com/cosscoll/UnCoupdePouce/actions/runs/41413700156)
+réussit : **198 tests Python et 86 tests DOM/worker** (83 DOM et 3 worker),
+dont dix nouveaux scénarios d'interface. Une confirmation lente conserve désormais
+le dialogue ouvert entre-temps et ne lui reprend pas le focus.
+
+Le déploiement applicatif `dpl_D5gKfwuVat45JRPERnUhmGhz1wWR` est `READY`.
+Un contrôle HTTPS indépendant, sans connexion à un compte applicatif, retrouve
+les attributs attendus du menu et des fichiers `app.js` et `style.css` strictement
+identiques aux sources fusionnées (comparaison des octets et SHA-256).
+Voir [la preuve de livraison](qa/navigation-livraison-2026-11-02.json).
+
+Ces preuves ne ferment pas la recette visuelle F88/F91 : le rendu sur petits écrans,
+le zoom 200 %, le clavier natif, le lecteur d'écran et les appareils réels restent
+non validés. Les 39 exigences encore à réévaluer dans la matrice restent ouvertes.
