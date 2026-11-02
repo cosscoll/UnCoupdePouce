@@ -1,0 +1,33 @@
+{
+  "date": "2026-11-02",
+  "result": "PASS",
+  "https_groups": 3,
+  "unicode_email_phone_url_rejected": true,
+  "safe_prose_preserved": true,
+  "rejected_edit_preserves_project": true,
+  "draft_publication_rejected": true,
+  "draft_removed": true,
+  "closed_fictional_project_id": 16,
+  "visual_acceptance": false,
+  "application_commit": "37fc720bfea352293b56dbe295a091a33fe4ee1e",
+  "deployment_id": "dpl_681bovVmqEbukvCMd7QLJti1uYu7",
+  "regression_before": {
+    "commit": "4f3524313db7c2d826f9a0f77ee70eaffa5add48",
+    "failed": 5,
+    "passed": 4
+  },
+  "dedicated_tests_after": 11,
+  "ci": {
+    "run_id": 41417924830,
+    "head_sha": "86a1bd6adadd5fcd0f6d44bb97e160d1d8426b9d",
+    "result": "success",
+    "python_passed": 224,
+    "dom_and_worker_passed": 94
+  },
+  "requirements": {
+    "total": 92,
+    "still_to_reevaluate": 38,
+    "F39": "partial",
+    "F42": "partial"
+  }
+}
