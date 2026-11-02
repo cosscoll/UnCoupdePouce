@@ -42,9 +42,10 @@ testé sur PostgreSQL dans `tests/test_postgres.py`.
   obfuscations ne sont pas couverts exhaustivement.
 - Les anciens noms, profils et présentations ne font pas l'objet ici d'une migration
   ou d'un audit exhaustif de leur contenu. Les photos ne font pas l'objet d'OCR.
-- L'unicité serveur d'une candidature par projet/compte reste en place ; aucune
-  limitation nouvelle du nombre de candidatures par minute ou par jour n'est livrée.
-- Les règles de sanctions, recours et limitation de masse restent à définir et tester.
+- L'unicité serveur d'une candidature par projet/compte reste en place. Le lot suivant
+  ajoute une [limitation technique de cadence](LIMITATION_CANDIDATURES.md), distincte
+  du filtre de coordonnées et d'un éventuel forfait commercial.
+- Les règles de sanctions, recours et lutte contre les abus multi-comptes restent à définir et tester.
 
 Ce correctif renforce la confidentialité de la préproduction fictive. Il ne constitue
 pas un audit de sécurité externe ni une acceptation complète de F39 ou F42.
