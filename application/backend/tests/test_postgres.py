@@ -299,6 +299,17 @@ def test_postgres_application_rate_is_shared_and_atomic(pg,parallel):
     (exercise_parallel_rate if parallel else exercise_shared_rate)(pg,pro,requester)
 
 
+def test_postgres_legacy_public_names_and_headers_are_filtered(pg):
+    from test_legacy_public_profiles import exercise_legacy_headers
+    pro,pid=client_for(pg,'legacy-public-pro@ucp.test','professional')
+    requester,rid=client_for(pg,'legacy-public-owner@ucp.test','requester')
+    assert pro.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
+    with pg.connect() as db:db.execute('UPDATE profiles SET approved=1 WHERE user_id=?',(pid,))
+    result=requester.post('/api/projects',json={'title':'Projet fictif','description':'Travaux fictifs de plomberie à étudier.','trade':'plomberie','town':'Toulouse'})
+    assert result.status_code==201,result.text
+    exercise_legacy_headers(pg,requester,pro,result.json()['id'],pid,rid)
+
+
 def test_postgres_initial_draft_retries_preserve_owner_and_version_boundaries(pg):
     from test_draft_autosave import exercise_draft_creation_recovery
     owner,_=client_for(pg,'draft-retry-owner@ucp.test','requester')

@@ -896,3 +896,18 @@ test('an application rate refusal preserves the project and waits for an explici
   await tick();assert.equal(attempts,1);savedButton(x.w,'Proposer ma candidature','#view').click();await tick();assert.equal(attempts,2);assert.ok(x.calls.some(c=>c.url==='/api/my-applications'));
  }finally{x.close()}
 });
+
+test('restricted candidate details are explained in cards and in the comparison',async()=>{
+ const x=await boot();try{
+  const holder=x.w.document.createElement('section');x.w.document.querySelector('#view').replaceChildren(holder);
+  x.w.renderCandidateCards(holder,[{id:1,professional_name:'Profil professionnel',status:'pending',trades:[],service_zones:[],public_details_restricted:true},{id:2,professional_name:'Atelier fictif',status:'pending',trades:['plomberie'],service_zones:['Toulouse']}]);
+  assert.match(holder.textContent,/Certaines informations ont été masquées/);assert.match(holder.textContent,/Non affichés/);assert.match(holder.textContent,/Non affichées/);
+  for(const check of holder.querySelectorAll('input[type=checkbox]')){check.checked=true;check.dispatchEvent(new x.w.Event('change'))}
+  savedButton(x.w,'Comparer les profils sélectionnés','#view').click();await tick();assert.match(x.w.document.querySelector('#dialog-content').textContent,/Certaines informations ont été masquées/);assert.match(x.w.document.querySelector('#dialog-content').textContent,/Atelier fictif/);
+ }finally{x.close()}
+});
+
+test('a withheld legacy presentation displays the unavailable state without exposing an error body',async()=>{
+ const x=await boot({'/api/projects/10/applications/31/showcase':{status:404,data:{detail:'Présentation indisponible'}}});
+ try{await x.w.openCandidateShowcase(10,{id:31,professional_name:'Profil professionnel'});assert.match(x.w.document.querySelector('#dialog-content').textContent,/présentation n’est plus disponible/);assert.equal(x.w.document.querySelector('#dialog').open,true)}finally{x.close()}
+});

@@ -40,8 +40,9 @@ testé sur PostgreSQL dans `tests/test_postgres.py`.
 - Aucun filtre textuel ne garantit de reconnaître toutes les coordonnées : numéros
   étrangers, transcription en toutes lettres, réseaux sociaux, images ou autres
   obfuscations ne sont pas couverts exhaustivement.
-- Les anciens noms, profils et présentations ne font pas l'objet ici d'une migration
-  ou d'un audit exhaustif de leur contenu. Les photos ne font pas l'objet d'OCR.
+- Le lot suivant ajoute un [filtrage en lecture des anciens profils](PROFILS_PUBLICS_HISTORIQUES.md).
+  Il ne constitue pas une migration ou un audit exhaustif des contenus. Les photos
+  ne font pas l’objet d’OCR.
 - L'unicité serveur d'une candidature par projet/compte reste en place. Le lot suivant
   ajoute une [limitation technique de cadence](LIMITATION_CANDIDATURES.md), distincte
   du filtre de coordonnées et d'un éventuel forfait commercial.
