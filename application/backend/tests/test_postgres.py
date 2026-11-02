@@ -271,3 +271,13 @@ def test_postgres_initial_draft_retries_preserve_owner_and_version_boundaries(pg
     owner,_=client_for(pg,'draft-retry-owner@ucp.test','requester')
     other,_=client_for(pg,'draft-retry-other@ucp.test','requester')
     exercise_draft_creation_recovery(pg,owner,other)
+
+
+def test_postgres_moderation_photos_require_the_reviewed_open_project_case(pg):
+    from test_moderation_photos import exercise_case_scoped_photos
+    admin=TestClient(pg.app)
+    assert admin.post('/api/admin/bootstrap',json={'secret':'test-bootstrap-only-0123456789','email':'admin@ucp.test','password':'Fictif-Long-Test!9326'}).status_code==200
+    admin.headers['x-ucp-csrf']=admin.post('/api/login',json={'email':'admin@ucp.test','password':'Fictif-Long-Test!9326'}).json()['csrf']
+    owner,_=client_for(pg,'photo-owner@ucp.test','requester')
+    other,_=client_for(pg,'photo-other@ucp.test','requester')
+    exercise_case_scoped_photos(pg,owner,admin,other)

@@ -1,0 +1,133 @@
+{
+  "date": "2026-11-02",
+  "source_base": "cea012817c788d7bf2e59d03b00c4ed25a38bcc8",
+  "requirements": [
+    {
+      "id": "F01",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_lab_api.py",
+      "test": "test_registration_blocks_real_email_domains"
+    },
+    {
+      "id": "F07",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_v4.py",
+      "test": "test_suspension_revokes_sessions_and_blocks_counterparty_chat"
+    },
+    {
+      "id": "F11",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_v4.py",
+      "test": "test_photo_privacy_metadata_and_export"
+    },
+    {
+      "id": "F13",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_lab_api.py",
+      "test": "test_session_logout_and_private_request"
+    },
+    {
+      "id": "F15",
+      "conclusion": "Contrôles API réévalués",
+      "test_file": "application/backend/tests/test_candidate_comparison.py",
+      "test": "test_candidate_comparison_uses_each_actual_profile_and_no_contact_or_billing_data"
+    },
+    {
+      "id": "F17",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_lab_api.py",
+      "test": "test_unique_application_and_owner_accept"
+    },
+    {
+      "id": "F21",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_v4.py",
+      "test": "test_catalog_live_add_disable_and_unknown_classification"
+    },
+    {
+      "id": "F22",
+      "conclusion": "Correspondance API réévaluée",
+      "test_file": "application/backend/tests/test_lab_api.py",
+      "test": "test_secondary_trades_are_eligible_only_inside_declared_zones"
+    },
+    {
+      "id": "F23",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_project_search.py",
+      "test": "test_search_never_returns_hidden_suspended_or_unapproved_projects"
+    },
+    {
+      "id": "F31",
+      "conclusion": "Contrôles API réévalués",
+      "test_file": "application/backend/tests/test_access_audit.py",
+      "test": "test_moderated_conversation_is_absent_from_lists_and_photos"
+    },
+    {
+      "id": "F38",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_lab_api.py",
+      "test": "test_unique_application_and_owner_accept"
+    },
+    {
+      "id": "F40",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_lab_api.py",
+      "test": "test_chat_requires_accept_and_subscription"
+    },
+    {
+      "id": "F44",
+      "conclusion": "Partiel renforcé et réévalué",
+      "test_file": "application/backend/tests/test_moderation_photos.py",
+      "test": "test_failed_photo_audit_returns_no_image_and_rolls_back_the_case_decision"
+    },
+    {
+      "id": "F45",
+      "conclusion": "Contrôles API réévalués",
+      "test_file": "application/backend/tests/test_access_audit.py",
+      "test": "test_revocation_committed_while_message_waits_for_write_lock"
+    },
+    {
+      "id": "F46",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_v4.py",
+      "test": "test_message_retries_are_scoped_atomic_and_recheck_permissions"
+    },
+    {
+      "id": "F47",
+      "conclusion": "Partiel renforcé et réévalué",
+      "test_file": "application/backend/tests/test_moderation_photos.py",
+      "test": "test_admin_photo_access_is_bound_to_the_reviewed_project_and_open_case"
+    },
+    {
+      "id": "F48",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_application_tracking.py",
+      "test": "test_application_tracking_explains_access_and_preserves_actual_status"
+    },
+    {
+      "id": "F57",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_access_audit.py",
+      "test": "test_revoked_session_cannot_write_after_dependency_authentication"
+    },
+    {
+      "id": "F66",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_lab_api.py",
+      "test": "test_chat_requires_accept_and_subscription"
+    },
+    {
+      "id": "F73",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_lab_api.py",
+      "test": "test_admin_approval_does_not_mean_verified_siren"
+    },
+    {
+      "id": "F74",
+      "conclusion": "Partiel réévalué",
+      "test_file": "application/backend/tests/test_candidate_comparison.py",
+      "test": "test_candidate_comparison_uses_each_actual_profile_and_no_contact_or_billing_data"
+    }
+  ],
+  "fully_accepted_claimed": false
+}

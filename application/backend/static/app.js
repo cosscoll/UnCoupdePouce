@@ -563,6 +563,7 @@ function reviewReport(report){
       const detail=el('div',{},el('p',{class:'case-text',text:data.report.reason}),el('p',{class:'hint',text:'Chaque consultation est tracée. Ne recopiez aucune donnée privée dans la réponse au déclarant.'}));
       const ctx=data.context;
       if(ctx.project)detail.append(el('h4',{text:ctx.project.title}),el('p',{class:'case-text',text:ctx.project.description}),el('p',{text:ctx.project.town}));
+      if(ctx.project?.photos?.length)detail.append(el('p',{class:'hint',text:'Chaque consultation de photo est privée, liée à ce dossier et journalisée.'}),el('div',{class:'row'},...ctx.project.photos.map((id,index)=>el('a',{href:'/api/v4/photos/'+id+'?report_id='+report.id,target:'_blank',rel:'noopener',class:'outline',text:'Consulter la photo privée '+(index+1)}))));
       for(const m of ctx.messages)detail.append(el('article',{class:'item'},el('h4',{text:m.sender_name+' · message #'+m.id}),el('p',{class:'case-text',text:m.body}),el('time',{class:'small muted',text:new Date(m.created_at).toLocaleString('fr-FR')})));
       if(!ctx.project&&!ctx.messages.length)detail.append(el('p',{text:'Le contenu n’est plus disponible ou aucun message ne figure dans cette période.'}));
       if(ctx.next_before_id)detail.append(button('Consulter les messages plus anciens',()=>action(()=>load(ctx.next_before_id))));
