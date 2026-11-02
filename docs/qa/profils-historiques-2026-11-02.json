@@ -1,0 +1,35 @@
+{
+  "date": "2026-11-02",
+  "result": "PASS",
+  "https_check_groups": 2,
+  "fictional_project_id": 17,
+  "fictional_application_id": 15,
+  "owner_private_records_unchanged": true,
+  "unauthenticated_and_wrong_role_refused": true,
+  "app_js_sha256": "66ef5f2cd3f80b5ee46b9b881c9ac091b68172920f938c5c97194ff3656abaae",
+  "remote_legacy_injection": false,
+  "legacy_redaction_proof": "SQLite/PostgreSQL automated integration tests",
+  "visual_acceptance": false,
+  "application_commit": "c4a848f8e0563f3330022d3b586589df9dda6c74",
+  "deployment_id": "dpl_HK1HjoYAika7wN7d6NLAGYtBTFKt",
+  "regression_before": {
+    "commit": "04a1f21c4106e98d8e160c0e8d36bad1a8b7be33",
+    "initial_cases_failed": 9
+  },
+  "dedicated_sqlite_cases_after": 10,
+  "targeted_api_cases_passed": 22,
+  "ci": {
+    "run_id": 41425945268,
+    "head_sha": "1d59f181a5ec08210b1a76b039b6358137297717",
+    "result": "success",
+    "python_passed": 249,
+    "dom_and_worker_passed": 97
+  },
+  "requirements": {
+    "total": 92,
+    "still_to_reevaluate": 38,
+    "F15": "partial",
+    "F35": "partial",
+    "F39": "partial"
+  }
+}

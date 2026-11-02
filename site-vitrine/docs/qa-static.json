@@ -2,18 +2,6 @@
   "status": "PASS",
   "pages": [
     {
-      "page": "avancement.html",
-      "checks": 29,
-      "h1": 1,
-      "lang": "fr"
-    },
-    {
-      "page": "404.html",
-      "checks": 66,
-      "h1": 1,
-      "lang": "fr"
-    },
-    {
       "page": "index.html",
       "checks": 103,
       "h1": 1,
@@ -22,6 +10,18 @@
     {
       "page": "projet.html",
       "checks": 75,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "avancement.html",
+      "checks": 29,
+      "h1": 1,
+      "lang": "fr"
+    },
+    {
+      "page": "404.html",
+      "checks": 66,
       "h1": 1,
       "lang": "fr"
     },
@@ -82,14 +82,9 @@
   ],
   "assets": [
     {
-      "file": "avancement.html",
-      "bytes": 7358,
-      "gzip_bytes": 3040
-    },
-    {
-      "file": "404.html",
-      "bytes": 4502,
-      "gzip_bytes": 1675
+      "file": "_headers",
+      "bytes": 680,
+      "gzip_bytes": 467
     },
     {
       "file": "index.html",
@@ -102,14 +97,14 @@
       "gzip_bytes": 4081
     },
     {
-      "file": "informations.html",
-      "bytes": 7775,
-      "gzip_bytes": 2922
+      "file": "avancement.html",
+      "bytes": 7682,
+      "gzip_bytes": 3123
     },
     {
-      "file": "_headers",
-      "bytes": 680,
-      "gzip_bytes": 467
+      "file": "404.html",
+      "bytes": 4502,
+      "gzip_bytes": 1675
     },
     {
       "file": "robots.txt",
@@ -117,9 +112,24 @@
       "gzip_bytes": 46
     },
     {
-      "file": "en/index.html",
-      "bytes": 11024,
-      "gzip_bytes": 3894
+      "file": "informations.html",
+      "bytes": 7775,
+      "gzip_bytes": 2922
+    },
+    {
+      "file": "assets/app.js",
+      "bytes": 8631,
+      "gzip_bytes": 2382
+    },
+    {
+      "file": "assets/brief.js",
+      "bytes": 2930,
+      "gzip_bytes": 1358
+    },
+    {
+      "file": "assets/logo.svg",
+      "bytes": 159256,
+      "gzip_bytes": 28162
     },
     {
       "file": "assets/house.svg",
@@ -137,29 +147,14 @@
       "gzip_bytes": 4883
     },
     {
-      "file": "assets/app.js",
-      "bytes": 8631,
-      "gzip_bytes": 2382
-    },
-    {
-      "file": "assets/brief.js",
-      "bytes": 2930,
-      "gzip_bytes": 1358
-    },
-    {
       "file": "assets/social.svg",
       "bytes": 35915,
       "gzip_bytes": 7514
     },
     {
-      "file": "assets/logo.svg",
-      "bytes": 159256,
-      "gzip_bytes": 28162
-    },
-    {
-      "file": "assets/fonts/montserrat-400.woff2",
-      "bytes": 61868,
-      "gzip_bytes": 61906
+      "file": "en/index.html",
+      "bytes": 11024,
+      "gzip_bytes": 3894
     },
     {
       "file": "assets/fonts/montserrat-700.woff2",
@@ -172,14 +167,19 @@
       "gzip_bytes": 1964
     },
     {
+      "file": "assets/fonts/montserrat-600.woff2",
+      "bytes": 62784,
+      "gzip_bytes": 62822
+    },
+    {
       "file": "assets/fonts/anton.woff2",
       "bytes": 47088,
       "gzip_bytes": 47121
     },
     {
-      "file": "assets/fonts/montserrat-600.woff2",
-      "bytes": 62784,
-      "gzip_bytes": 62822
+      "file": "assets/fonts/montserrat-400.woff2",
+      "bytes": 61868,
+      "gzip_bytes": 61906
     },
     {
       "file": "assets/fonts/anton-OFL.txt",
