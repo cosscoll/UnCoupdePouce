@@ -326,11 +326,12 @@ async function editShowcase(linked){
  showDialog('Présentation · '+data.scope.name,form);
 }
 function candidateFacts(a){
-  const terms=[['Métiers déclarés',(a.trades||[a.trade]).map(t=>trades[t]||t).join(' · ')],
-    ['Communes d’intervention',(a.service_zones||[a.town]).join(' · ')],
+  const terms=[['Métiers déclarés',(a.trades||[a.trade]).map(t=>trades[t]||t).join(' · ')||'Non affichés'],
+    ['Communes d’intervention',(a.service_zones||[a.town]).join(' · ')||'Non affichées'],
     ['Statut du profil',a.verification_status==='test_authorized'?'Autorisé pour les tests · aucune certification réelle':a.verification_status==='test_unavailable'?'Profil indisponible pour la sélection':'Statut non renseigné'],
     ['Candidature',labels[a.status]||a.status],
     ['Reçue le',a.submitted_at?new Date(a.submitted_at).toLocaleString('fr-FR'):'Date non renseignée']];
+  if(a.public_details_restricted)terms.push(['Informations du profil','Certaines informations ont été masquées par précaution. Cela ne constitue pas une vérification professionnelle.']);
   return el('dl',{class:'candidate-facts'},...terms.flatMap(([t,v])=>[el('dt',{text:t}),el('dd',{text:v})]));
 }
 function renderCandidateCards(box,apps,projectId=null){

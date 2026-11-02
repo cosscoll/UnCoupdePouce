@@ -93,5 +93,12 @@ def install(m):
             data=view(stored(c,row['professional_id'],row['linked_profile_id']))
             # Scope changes cannot advertise a realization for an undeclared trade.
             works=[w for w in data['works'] if w['trade'] in meta['trades'] and m.active_trade(w['trade'],c)]
-            return {'profile_name':meta['name'],'intro':data['intro'],'works':works,'updated_at':data['updated_at'],
+            try:
+                public=Showcase(intro=data['intro'],works=works,version=data['version']).model_dump()
+                public['intro']=m.precontact_safe(public['intro']) if public['intro'].strip() else ''
+                for work in public['works']:
+                    for field in ('title','description','trade'):work[field]=m.precontact_safe(work[field])
+            except (ValueError,TypeError):error(404,'Présentation indisponible')
+            name,_=m.public_profile_text(meta['name'],'Profil professionnel')
+            return {'profile_name':name,'intro':public['intro'],'works':public['works'],'updated_at':data['updated_at'],
                     'declaration':'Informations déclarées, non vérifiées. Aucune certification ni avis client.'}

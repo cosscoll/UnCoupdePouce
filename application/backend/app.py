@@ -176,6 +176,31 @@ def precontact_safe(value: str) -> str:
     return normal
 
 
+def public_profile_text(value,fallback):
+    """Read-time guard for legacy public text; never modifies the stored record."""
+    try:return precontact_safe(value),False
+    except (ValueError,TypeError):return fallback,True
+
+
+def restrict_public_fields(item,fields):
+    restricted=False
+    for field,fallback in fields.items():
+        value=item[field]
+        if value is None:continue  # Optional linked-profile alias.
+        if isinstance(value,list):
+            cleaned=[]
+            for entry in value:
+                safe,blocked=public_profile_text(entry,None)
+                restricted|=blocked
+                if safe is not None:cleaned.append(safe)
+            item[field]=cleaned
+        else:
+            item[field],blocked=public_profile_text(value,fallback)
+            restricted|=blocked
+    if restricted:item['public_details_restricted']=True
+    return item
+
+
 def siren_checksum_ok(value: str) -> bool:
     """Only validate the checksum. This is not an official registration lookup."""
     if not re.fullmatch(r'\d{9}', value):
@@ -904,7 +929,7 @@ def my_applications(user=Depends(require('professional'))):
         WHERE applications.professional_id=? ORDER BY applications.id DESC''',(user['id'],)).fetchall()
         items=[]
         for row in rows:
-            item=dict(row)
+            item=restrict_public_fields(dict(row),{'title':'Projet','town':'Commune non affichée','trade':'Métier non affiché'})
             state='not_selected'
             if row['project_status']=='closed':state='closed'
             elif row['status']=='accepted':
@@ -942,10 +967,12 @@ def get_applications(project_id:int,user=Depends(require('requester'))):
             zones=json.loads(row['linked_zones'] or '[]') if linked else json.loads(row['service_areas'] or '[]') or [row['town']]
             authorized=bool(row['approved'] and not row['suspended'] and (not linked or row['linked_active']))
             # Public candidate fields only: no email, SIREN, session or billing data.
-            items.append({k:row[k] for k in ('id','status','professional_name','trade','town','linked_artisan_alias')} |
+            item=({k:row[k] for k in ('id','status','professional_name','trade','town','linked_artisan_alias')} |
                          {'trades':list(dict.fromkeys(scope)),'service_zones':zones,'submitted_at':row['created_at'],
                           'verification_status':'test_authorized' if authorized else 'test_unavailable',
                           'eligible_for_selection':authorized and row['status']=='pending' and pr['status']=='open' and not pr['hidden']})
+            items.append(restrict_public_fields(item,{'professional_name':'Profil professionnel','trade':'Métier non affiché',
+                'town':'Commune non affichée','linked_artisan_alias':'Profil lié','trades':None,'service_zones':None}))
     return {'items':items}
 
 @app.post('/api/applications/{application_id}/accept')
@@ -996,7 +1023,7 @@ def conversations(user=Depends(get_user)):
             try:check_conversation(c,item['application_id'],user['id'],allow_locked=True)
             except HTTPException as exc:
                 if exc.status_code not in (403,404):raise
-            else:visible.append(dict(item))
+            else:visible.append(restrict_public_fields(dict(item),{'title':'Projet','peer':'Compte participant'}))
     return {'items':visible}
 
 def check_conversation(c,aid,uid,allow_locked=False):
