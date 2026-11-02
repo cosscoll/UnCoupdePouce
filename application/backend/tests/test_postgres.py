@@ -266,6 +266,18 @@ def test_postgres_saved_searches_are_private_exportable_and_deletable(pg):
     exercise_private_saved_searches(pg,owner,other)
 
 
+def test_postgres_project_favorites_obey_privacy_and_closure(pg):
+    from test_project_favorites import exercise_favorites
+    owner,pid=client_for(pg,'favorite-owner@ucp.test','professional')
+    other,_=client_for(pg,'favorite-other@ucp.test','professional')
+    requester,_=client_for(pg,'favorite-requester@ucp.test','requester')
+    assert owner.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
+    with pg.connect() as db:db.execute('UPDATE profiles SET approved=1 WHERE user_id=?',(pid,))
+    result=requester.post('/api/projects',json={'title':'Favori fictif','description':'Travaux de plomberie pour une recette fictive.','trade':'plomberie','town':'Toulouse'})
+    assert result.status_code==201,result.text
+    exercise_favorites(pg,owner,other,requester,result.json()['id'])
+
+
 def test_postgres_initial_draft_retries_preserve_owner_and_version_boundaries(pg):
     from test_draft_autosave import exercise_draft_creation_recovery
     owner,_=client_for(pg,'draft-retry-owner@ucp.test','requester')

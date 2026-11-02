@@ -764,6 +764,46 @@ def close_project(project_id:int,user=Depends(require('requester'))):
         c.execute('COMMIT')
     return {'ok':True,'status':'closed','chat_access':False}
 
+def discover_projects(c,user):
+    """Authorized project discovery, reused by lists and private favorites."""
+    from project_search import decorate
+    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,
+    (SELECT payload FROM drafts WHERE project_id=p.id ORDER BY id LIMIT 1) AS draft_payload'''
+    discovery='not_applicable'
+    if user['role']=='requester':
+        rs=[decorate(r) for r in c.execute('SELECT '+columns+' FROM projects p WHERE p.requester_id=? ORDER BY p.id DESC',(user['id'],))]
+    elif user['role']=='professional':
+        p=c.execute('SELECT * FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
+        discovery='profile_required' if not p else 'pending_review' if not p['approved'] else 'ready'
+        # Authorization precedes all filters. No requester identity or outside counts.
+        possible=c.execute('SELECT '+columns+''' FROM projects p JOIN users u ON u.id=p.requester_id
+            WHERE p.status=? AND p.hidden=0 AND u.suspended=0 ORDER BY p.id DESC''',('open',)).fetchall() if p and p['approved'] else []
+        eligible={zone.casefold() for zone in json.loads(p['service_areas'] or '[]')} if p else set()
+        valid_trades={p['trade'],*json.loads(p['service_trades'] or '[]')} if p else set()
+        if p:eligible.add(p['town'].casefold())
+        members=c.execute('''SELECT a.id,a.alias,a.service_trades,a.service_areas FROM enterprise_artisans a
+            JOIN enterprise_accounts e ON e.id=a.enterprise_id WHERE e.owner_id=? AND a.is_active=1 ORDER BY a.id''',
+            (user['id'],)).fetchall() if p and p['approved'] else []
+        rs=[]
+        for pr in possible:
+            try:precontact_safe(' '.join(str(pr[key]) for key in ('title','description','town')))
+            except ValueError:continue
+            scope=project_trades(pr)
+            owner_match=bool(scope & valid_trades) and pr['town'].casefold() in eligible
+            linked=next((r for r in members if bool(scope & set(json.loads(r['service_trades']))) and
+                         pr['town'].casefold() in {t.casefold() for t in json.loads(r['service_areas'])}),None)
+            if owner_match or linked:
+                row=decorate(pr)
+                row['matching_linked_profile_id']=linked['id'] if linked else None
+                row['matching_individual_profile']=bool(owner_match)
+                row['match']={'profile':'individual' if owner_match else 'linked',
+                              'alias':None if owner_match else linked['alias'],
+                              'trades':sorted(scope & (valid_trades if owner_match else set(json.loads(linked['service_trades'])))),
+                              'town':pr['town']}
+                rs.append(row)
+    else:rs=[]
+    return rs,discovery
+
 @app.get('/api/projects')
 def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
              trade:Annotated[str,Query(max_length=61)]='',town:Annotated[str,Query(max_length=90)]='',
@@ -775,43 +815,12 @@ def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
              budget_from:Annotated[int|None,Query(ge=0,le=MAX_BUDGET)]=None,
              budget_to:Annotated[int|None,Query(ge=0,le=MAX_BUDGET)]=None):
     if budget_from is not None and budget_to is not None and budget_from>budget_to:error(422,'Le budget minimum ne peut pas dépasser le maximum')
-    from project_search import decorate, filter_projects
-    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,
-        (SELECT payload FROM drafts WHERE project_id=p.id ORDER BY id LIMIT 1) AS draft_payload'''
-    discovery='not_applicable'
+    from project_search import filter_projects
     with authenticated_db(user,write=False) as c:
-        if user['role']=='requester':
-            rs=[decorate(r) for r in c.execute('SELECT '+columns+' FROM projects p WHERE p.requester_id=? ORDER BY p.id DESC',(user['id'],))]
-        elif user['role']=='professional':
-            p=c.execute('SELECT * FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
-            discovery='profile_required' if not p else 'pending_review' if not p['approved'] else 'ready'
-            # Authorization precedes all filters. No requester identity or outside counts.
-            possible=c.execute('SELECT '+columns+''' FROM projects p JOIN users u ON u.id=p.requester_id
-                WHERE p.status=? AND p.hidden=0 AND u.suspended=0 ORDER BY p.id DESC''',('open',)).fetchall() if p and p['approved'] else []
-            eligible={zone.casefold() for zone in json.loads(p['service_areas'] or '[]')} if p else set()
-            valid_trades={p['trade'],*json.loads(p['service_trades'] or '[]')} if p else set()
-            if p:eligible.add(p['town'].casefold())
-            members=c.execute('''SELECT a.id,a.alias,a.service_trades,a.service_areas FROM enterprise_artisans a
-                JOIN enterprise_accounts e ON e.id=a.enterprise_id WHERE e.owner_id=? AND a.is_active=1 ORDER BY a.id''',
-                (user['id'],)).fetchall() if p and p['approved'] else []
-            rs=[]
-            for pr in possible:
-                try:precontact_safe(' '.join(str(pr[key]) for key in ('title','description','town')))
-                except ValueError:continue
-                scope=project_trades(pr)
-                owner_match=bool(scope & valid_trades) and pr['town'].casefold() in eligible
-                linked=next((r for r in members if bool(scope & set(json.loads(r['service_trades']))) and
-                             pr['town'].casefold() in {t.casefold() for t in json.loads(r['service_areas'])}),None)
-                if owner_match or linked:
-                    row=decorate(pr)
-                    row['matching_linked_profile_id']=linked['id'] if linked else None
-                    row['matching_individual_profile']=bool(owner_match)
-                    row['match']={'profile':'individual' if owner_match else 'linked',
-                                  'alias':None if owner_match else linked['alias'],
-                                  'trades':sorted(scope & (valid_trades if owner_match else set(json.loads(linked['service_trades'])))),
-                                  'town':pr['town']}
-                    rs.append(row)
-        else:rs=[]
+        rs,discovery=discover_projects(c,user)
+        if user['role']=='professional':
+            saved={r['project_id'] for r in c.execute('SELECT project_id FROM project_favorites WHERE owner_id=?',(user['id'],))}
+            for row in rs:row['is_favorite']=row['id'] in saved
         taxonomy=[dict(r) for r in c.execute('SELECT id,label,group_name,synonyms FROM taxonomy')]
         filtered=filter_projects(rs,taxonomy,q=q,trade=trade,town=town,category=category,timing=timing,status=status,
                                  published_within=published_within,sort=sort,budget_from=budget_from,budget_to=budget_to)
@@ -1049,13 +1058,14 @@ def account_export(user=Depends(get_user)):
         own_activity=[dict(r) for r in c.execute('SELECT action,target_type,target_id,created_at FROM audit WHERE actor_id=? ORDER BY id DESC',(user['id'],))]
         from saved_searches import serialize as serialize_search
         own_searches=[serialize_search(r) for r in c.execute('SELECT id,label,payload,created_at FROM saved_searches WHERE owner_id=? ORDER BY id DESC',(user['id'],))]
+        own_favorites=[dict(r) for r in c.execute('SELECT project_id,created_at FROM project_favorites WHERE owner_id=? ORDER BY id DESC',(user['id'],))]
         own_enterprise=c.execute('SELECT id,label,created_at FROM enterprise_accounts WHERE owner_id=?',(user['id'],)).fetchone()
         own_linked_artisans=([dict(r) for r in c.execute('SELECT id,alias,service_trades,service_areas,is_active,created_at FROM enterprise_artisans WHERE enterprise_id=?',(own_enterprise['id'],))]
                               if own_enterprise else [])
     return {'laboratory':True,'user':{'email':user['email'],'name':user['name'],'role':user['role']},
             'profile':dict(profile) if profile else None,'beta_interest':dict(interest) if interest else None,
             'own_projects':projects_owned,'own_applications':applications_owned,'own_messages':messages_owned,
-            'own_notifications':own_notices,'own_activity':own_activity,'own_saved_searches':own_searches,'own_enterprise':dict(own_enterprise) if own_enterprise else None,
+            'own_notifications':own_notices,'own_activity':own_activity,'own_saved_searches':own_searches,'own_project_favorites':own_favorites,'own_enterprise':dict(own_enterprise) if own_enterprise else None,
             'own_linked_artisans':own_linked_artisans,'own_drafts':own_drafts,'own_photos':own_photos,'own_reports':own_reports,'own_support':own_support,'own_showcases':own_showcases}
 
 @app.delete('/api/beta-interest')
@@ -1174,6 +1184,7 @@ from features_v4 import install
 from support_cases import install as install_support
 from professional_showcase import install as install_showcase
 from saved_searches import install as install_saved_searches
+from project_favorites import install as install_favorites
 if DATABASE_URL:
     from postgres import initialize_schema
     initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
@@ -1185,6 +1196,7 @@ with initialization:
     install_support(sys.modules[__name__])
     install_showcase(sys.modules[__name__])
     install_saved_searches(sys.modules[__name__])
+    install_favorites(sys.modules[__name__])
     # Optional, one-time fictional seed under the initialization lock.
     if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
         with connect() as c:
