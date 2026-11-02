@@ -1,0 +1,23 @@
+{
+  "date": "2026-11-02",
+  "result": "PASS",
+  "https_check_groups": 3,
+  "demo_favorite_project_id": 14,
+  "closed_test_project_id": 15,
+  "new_session_persistence": true,
+  "no_application_or_requester_notice": true,
+  "unavailable_content_hidden": true,
+  "owner_only_export": true,
+  "app_js_sha256": "fae3b2d28cd72a7d4f996f72c8cf0311395f4f5bb6fb3875433648ee36d9491d",
+  "visual_acceptance": false,
+  "real_device_acceptance": false,
+  "application_commit": "1c2d773520d3a33288f139ad28ae3361ad809e77",
+  "deployment_id": "dpl_Cws6JUJU6sUoyRHJhrh1SEoAkpiK",
+  "ci": {
+    "run_id": 41415631354,
+    "head_sha": "2e67728fc47af84bb423398a8a86d1c61239f2c0",
+    "result": "success",
+    "python_passed": 212,
+    "dom_and_worker_passed": 94
+  }
+}
