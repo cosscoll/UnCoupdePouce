@@ -753,3 +753,13 @@ test('removing a draft photo waits for autosave and keeps the photo mutation ver
   release({id:51,version:3});await tick();await tick();assert.equal(x.calls.filter(c=>c.method==='DELETE').length,1);input(x.w,'.wizard [name=budget_min]','0');clock.fire();await tick();assert.equal(x.calls.filter(c=>c.method==='PUT').at(-1).body.version,4);
  }finally{x.close()}
 });
+
+test('project report photos appear only after motivated review and are not fetched automatically',async()=>{
+ const x=await boot({'/api/session':{id:99,name:'Admin',role:'admin',csrf:'admin-token'},'/api/admin/metrics':{counts:{}},'/api/admin/queue':{items:[]},'/api/admin/audit':{items:[]},'POST /api/v4/admin/reports/6/review':{report:{reason:'Projet fictif signalé'},context:{project:{id:7,title:'Projet fictif',description:'Description fictive',town:'Toulouse',photos:[31,32]},messages:[],next_before_id:null}}});
+ try{
+  x.w.reviewReport({id:6,kind:'project',target_id:7});assert.equal(x.w.document.querySelector('#dialog a[href^="/api/v4/photos/"]'),null);
+  input(x.w,'#dialog [name=reason]','Examen motivé des seules photos du dossier.');submit(x.w,'#dialog form');await tick();
+  const links=[...x.w.document.querySelectorAll('#dialog a[href^="/api/v4/photos/"]')];assert.deepEqual(links.map(a=>a.getAttribute('href')),['/api/v4/photos/31?report_id=6','/api/v4/photos/32?report_id=6']);assert.ok(links.every(a=>a.target==='_blank'&&a.rel==='noopener'));
+  assert.equal(x.w.document.querySelector('#dialog img'),null);assert.ok(!x.calls.some(c=>c.url.startsWith('/api/v4/photos/')));assert.match(x.w.document.querySelector('#dialog').textContent,/journalisée/);
+ }finally{x.close()}
+});

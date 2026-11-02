@@ -194,12 +194,22 @@ def install(m):
             return {'id':cur.lastrowid,'version':r['version']+1}
 
     @app.get('/api/v4/photos/{id}')
-    def get_photo(id:int,user=Depends(m.get_user)):
-        with m.authenticated_db(user,write=False) as c:
+    def get_photo(id:int,report_id:int|None=Query(default=None,gt=0,le=9223372036854775807),user=Depends(m.get_user)):
+        # Admin reads must commit their case-bound audit before returning bytes.
+        with m.authenticated_db(user,write=user['role']=='admin') as c:
             r=c.execute('SELECT photos.body,drafts.owner_id,drafts.project_id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE photos.id=?',(id,)).fetchone()
             if not r:error(404,'Photo introuvable')
             # Conservative privacy default: images only after explicit selection, never in discovery.
-            if r['owner_id']!=user['id'] and user['role']!='admin':
+            if user['role']=='admin':
+                case=c.execute('''SELECT reports.id FROM reports JOIN admin_decisions d
+                    ON d.target_id=reports.id AND d.kind='review_report' AND d.actor_id=?
+                    WHERE reports.kind='project' AND reports.target_id=? AND reports.status='open' AND reports.id=?
+                    ORDER BY d.id DESC LIMIT 1''',(user['id'],r['project_id'],report_id)).fetchone()
+                if not case:error(404,'Photo introuvable')
+                c.execute('INSERT INTO admin_decisions(actor_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',
+                          (user['id'],'view_report_photo',case['id'],f"Photo privée #{id} du projet #{r['project_id']} consultée dans le dossier déjà motivé.",now()))
+                audit(c,user,'view_report_photo','photo',id)
+            elif r['owner_id']!=user['id']:
                 a=c.execute("SELECT id FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(r['project_id'],user['id'])).fetchone()
                 if not a:error(404,'Photo introuvable')
                 m.check_conversation(c,a['id'],user['id'])
@@ -263,7 +273,10 @@ def install(m):
             if report['kind']=='project':
                 if body.before_id is not None:error(422,'Pagination réservée aux conversations signalées')
                 row=c.execute('SELECT id,title,description,town,status,hidden FROM projects WHERE id=?',(report['target_id'],)).fetchone()
-                if row:context['project']=dict(row)
+                if row:
+                    context['project']=dict(row)
+                    context['project']['photos']=[r['id'] for r in c.execute('''SELECT photos.id FROM photos
+                        JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=? ORDER BY photos.id''',(report['target_id'],))]
             else:
                 if report['kind']=='message':
                     if body.before_id is not None:error(422,'Un seul message est consultable dans ce dossier')

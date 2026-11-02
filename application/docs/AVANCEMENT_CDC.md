@@ -1,7 +1,12 @@
-# Avancement vérifié du cahier des charges — 28 octobre 2026
+# Avancement vérifié du cahier des charges — 2 novembre 2026
 
 Les états ci-dessous concernent la **préproduction privée avec données fictives**.
 Ils ne valent ni ouverture commerciale ni validation des décisions D01–D13.
+
+Le 2 novembre, 21 exigences supplémentaires sont réévaluées avec leurs tests et
+limites explicites. La lecture administrative des photos exige désormais le dossier
+de projet ouvert et motivé du même administrateur ; chaque consultation est tracée
+avant restitution. Voir [réévaluation](../../docs/REVALIDATION_P0_2026-11-02.md).
 
 | Exigence | Développement de ce lot | Limite restante |
 |---|---|---|

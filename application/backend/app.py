@@ -821,7 +821,7 @@ def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
 def apply(project_id:int,user=Depends(require('professional'))):
     with authenticated_db(user,write=True) as c:
         p=c.execute('SELECT * FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
-        if not p or not p['approved']:error(403,'Profil professionnel non vérifié')
+        if not p or not p['approved']:error(403,'Profil professionnel non autorisé pour les tests')
         project=c.execute('SELECT * FROM projects WHERE id=?',(project_id,)).fetchone()
         if not project:error(404,'Projet inconnu')
         if c.execute('SELECT suspended FROM users WHERE id=?',(project['requester_id'],)).fetchone()[0]:error(403,'Projet indisponible')
@@ -941,7 +941,7 @@ def accept(application_id:int,user=Depends(require('requester'))):
         if item['status']!='pending' or item['project_status']!='open':error(409,'Candidature déjà traitée ou projet fermé')
         p=c.execute('SELECT approved FROM profiles WHERE user_id=?',(item['professional_id'],)).fetchone()
         if c.execute('SELECT suspended FROM users WHERE id=?',(item['professional_id'],)).fetchone()[0]:error(409,'Compte professionnel suspendu')
-        if not p or not p['approved']:error(409,'Prestataire non vérifié')
+        if not p or not p['approved']:error(409,'Profil professionnel non autorisé pour les tests')
         c.execute('UPDATE applications SET status=? WHERE id=?',('accepted',application_id))
         queue_notice(c,item['professional_id'],'application_accepted',application_id)
         if SINGLE_ACCEPT:
