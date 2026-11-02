@@ -129,5 +129,16 @@
       "test": "test_candidate_comparison_uses_each_actual_profile_and_no_contact_or_billing_data"
     }
   ],
-  "fully_accepted_claimed": false
+  "fully_accepted_claimed": false,
+  "validation": {
+    "ci_run": 41409762758,
+    "tested_commit": "8bfdef831fbd2a8578d2b27a96cd2a94e9be61df",
+    "python_passed": 198,
+    "dom_worker_passed": 76,
+    "targeted_api_passed": 24,
+    "https_checks": 4,
+    "https_result": "PASS",
+    "fictional_case_resolved": true,
+    "fictional_project_closed": true
+  }
 }

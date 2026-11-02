@@ -43,6 +43,28 @@ photos, signalements et droits du chat restent inclus dans les contrôles.
 Le nouveau test DOM vérifie la demande de motif avant apparition des liens, leur
 rattachement au dossier et l'absence de lecture automatique des photos.
 
+La [CI 41409762758](https://github.com/cosscoll/UnCoupdePouce/actions/runs/41409762758)
+réussit **198 tests Python et 76 tests DOM/worker**, avec PostgreSQL 17 et restauration
+isolée. Les 24 tests API ciblés de photos, modération et parcours existants réussissent
+également après correction. La [pull request 43](https://github.com/cosscoll/UnCoupdePouce/pull/43)
+est fusionnée au commit applicatif `01ad1c7`.
+
+## Recette HTTPS
+
+Quatre groupes de contrôles réussissent sur la préproduction : propriétaire autorisé
+mais rôle admin seul insuffisant ; examen motivé avec CSRF, dossier exact et trace
+de consultation ; refus après clôture du dossier avec accès propriétaire conservé ;
+liens contextualisés présents dans l'interface effectivement publiée.
+
+Un projet et une photo entièrement fictifs sont créés pour ces contrôles. Le dossier
+est résolu et le projet est clôturé en fin de recette. Aucun ancien projet ou dossier
+n'est modifié. Les identifiants privés restent hors du dépôt. Les interactions de
+navigateur et le rendu visuel ne sont pas déduits des requêtes API ou du code livré.
+
+Le commit applicatif `01ad1c7` est READY sur le projet privé `ucp-preproduction`.
+Les contrôles statiques et les 55 tests de la vitrine réussissent après sa mise à
+jour du 2 novembre.
+
 ## Conclusions qui restent partielles
 
 Les comptes nominatifs d'entreprise, les pièces jointes de chat, les liens temporaires,
