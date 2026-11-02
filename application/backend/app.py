@@ -2,7 +2,7 @@
 Fictional accounts only. No payments, commercial signup or external messaging.
 """
 from __future__ import annotations
-import os, sqlite3, hashlib, hmac, secrets, re, time, json
+import os, sqlite3, hashlib, hmac, secrets, re, time, json, unicodedata
 from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
@@ -163,10 +163,12 @@ _STREET_ADDRESS = re.compile(r"(?i)(?<!\w)\d{1,4}\s*(?:bis|ter)?\s+(?:rue|avenue
 
 def precontact_safe(value: str) -> str:
     # Lab-only protection in addition to existing role gating; intentionally fail closed.
-    normal = re.sub(r"[\u200b-\u200f\u2060\ufeff]", "", value).strip()
+    normal = ''.join(char for char in value if unicodedata.category(char) != 'Cf').strip()
     if not normal:
         raise ValueError('Ce champ doit contenir du texte, et non uniquement des espaces')
-    if any(rule.search(normal) for rule in (_EMAIL_CONTACT, _WEB_CONTACT, _PHONE_CONTACT, _STREET_ADDRESS)):
+    # Inspect compatibility forms and Unicode spacing without rewriting safe prose.
+    inspection = ' '.join(unicodedata.normalize('NFKC', normal).split())
+    if any(rule.search(inspection) for rule in (_EMAIL_CONTACT, _WEB_CONTACT, _PHONE_CONTACT, _STREET_ADDRESS)):
         raise ValueError("Avant la sélection, ne renseignez ni téléphone, ni email, ni URL, ni adresse postale précise")
     return normal
 

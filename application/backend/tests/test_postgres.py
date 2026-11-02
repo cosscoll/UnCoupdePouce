@@ -278,6 +278,17 @@ def test_postgres_project_favorites_obey_privacy_and_closure(pg):
     exercise_favorites(pg,owner,other,requester,result.json()['id'])
 
 
+def test_postgres_unicode_contacts_are_blocked_in_existing_project_discovery(pg):
+    from test_contact_normalization import exercise_legacy_contact_discovery
+    pro,pid=client_for(pg,'contact-pro@ucp.test','professional')
+    owner,_=client_for(pg,'contact-owner@ucp.test','requester')
+    assert pro.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
+    with pg.connect() as db:db.execute('UPDATE profiles SET approved=1 WHERE user_id=?',(pid,))
+    project=owner.post('/api/projects',json={'title':'Projet fictif','description':'Travaux fictifs de plomberie à étudier.','trade':'plomberie','town':'Toulouse'})
+    assert project.status_code==201,project.text
+    exercise_legacy_contact_discovery(pg,owner,pro,project.json()['id'])
+
+
 def test_postgres_initial_draft_retries_preserve_owner_and_version_boundaries(pg):
     from test_draft_autosave import exercise_draft_creation_recovery
     owner,_=client_for(pg,'draft-retry-owner@ucp.test','requester')
