@@ -1,0 +1,39 @@
+{
+  "date": "2026-11-02",
+  "result": "PASS",
+  "https_check_groups": 2,
+  "closed_fictional_project_id": 17,
+  "withdrawn_fictional_application_id": 15,
+  "duplicate_preserves_one_application_and_notice": true,
+  "nominal_journey_preserved": true,
+  "published_app_js_sha256": "fae3b2d28cd72a7d4f996f72c8cf0311395f4f5bb6fb3875433648ee36d9491d",
+  "remote_rate_exhaustion_tested": false,
+  "rate_rejection_and_concurrency_proof": "automated SQLite/PostgreSQL integration tests",
+  "visual_acceptance": false,
+  "application_commit": "5c7c0a30e826e9475dd37d8dc013ccd6d6236af8",
+  "deployment_id": "dpl_GnJt53DYL6KVXcc7zPTYpxuyZkmp",
+  "ci": {
+    "run_id": 41419774001,
+    "head_sha": "3ca424f627410ab8f9080ebc5fd687afe60c8165",
+    "result": "success",
+    "python_passed": 238,
+    "dom_and_worker_passed": 95
+  },
+  "defaults": {
+    "per_60_seconds": 10,
+    "per_3600_seconds": 50
+  },
+  "automated_rate_evidence": {
+    "dedicated_sqlite_cases": 12,
+    "postgres_scenarios": [
+      "shared_rolling_windows",
+      "parallel_last_slot"
+    ],
+    "dom_429_explicit_retry": true
+  },
+  "requirements": {
+    "total": 92,
+    "still_to_reevaluate": 38,
+    "F42": "partial"
+  }
+}
