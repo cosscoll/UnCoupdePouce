@@ -98,7 +98,7 @@ def install(m):
         if user['role']=='admin' or row['requester_id']==user['id']:return row
         if user['role']=='professional' and not row['hidden']:
             # Only authorized projects or accepted relationships reveal attachments.
-            allowed={x['id'] for x in m.projects(user)['items']}
+            allowed={x['id'] for x in m.discover_projects(c,user)[0]}
             selected=c.execute("SELECT id FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone()
             if id in allowed:return row
             if selected:
