@@ -887,3 +887,12 @@ test('favorite titles are rendered as literal text and never as active markup',a
  const title='<img src=x onerror=oops()>';const x=await boot({'/api/session':savedProSession,'/api/project-favorites':{items:[{project_id:28,available:true,project:{...favoriteProject,title,is_favorite:true}}],limit:50}});
  try{await x.w.go('favorites');assert.equal(x.w.document.querySelector('.project-list img'),null);assert.equal(x.w.document.querySelector('.project-list h3').textContent,title);assert.equal(x.w.document.querySelector('.favorite-toggle').getAttribute('aria-label'),'Retirer des favoris · '+title)}finally{x.close()}
 });
+
+test('an application rate refusal preserves the project and waits for an explicit retry',async()=>{
+ let attempts=0;const x=await boot({'/api/session':savedProSession,'/api/v4/projects/28':{...favoriteProject,photos:[]},'POST /api/projects/28/apply':()=>++attempts===1?{status:429,data:{detail:'Trop de candidatures rapprochées. Réessayez dans 60 s. Aucune nouvelle candidature n’a été enregistrée.'}}:{id:88},'/api/my-applications':{items:[]}});
+ try{
+  await x.w.projectDetail(favoriteProject);savedButton(x.w,'Proposer ma candidature','#view').click();await tick();
+  assert.equal(attempts,1);assert.match(x.w.document.querySelector('#alert').textContent,/60 s/);assert.match(x.w.document.querySelector('#view').textContent,/Mission fictive/);assert.ok(savedButton(x.w,'Proposer ma candidature','#view'));assert.ok(!x.calls.some(c=>c.url==='/api/my-applications'));
+  await tick();assert.equal(attempts,1);savedButton(x.w,'Proposer ma candidature','#view').click();await tick();assert.equal(attempts,2);assert.ok(x.calls.some(c=>c.url==='/api/my-applications'));
+ }finally{x.close()}
+});

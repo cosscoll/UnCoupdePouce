@@ -289,6 +289,16 @@ def test_postgres_unicode_contacts_are_blocked_in_existing_project_discovery(pg)
     exercise_legacy_contact_discovery(pg,owner,pro,project.json()['id'])
 
 
+@pytest.mark.parametrize('parallel',[False,True])
+def test_postgres_application_rate_is_shared_and_atomic(pg,parallel):
+    from test_application_rate import exercise_shared_rate,exercise_parallel_rate
+    pro,pid=client_for(pg,'rate-pro@ucp.test','professional')
+    requester,_=client_for(pg,'rate-requester@ucp.test','requester')
+    assert pro.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
+    with pg.connect() as db:db.execute('UPDATE profiles SET approved=1 WHERE user_id=?',(pid,))
+    (exercise_parallel_rate if parallel else exercise_shared_rate)(pg,pro,requester)
+
+
 def test_postgres_initial_draft_retries_preserve_owner_and_version_boundaries(pg):
     from test_draft_autosave import exercise_draft_creation_recovery
     owner,_=client_for(pg,'draft-retry-owner@ucp.test','requester')

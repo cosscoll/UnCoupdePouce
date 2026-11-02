@@ -35,6 +35,8 @@ def active_trade(value, connection=None):
         return bool(c.execute('SELECT 1 FROM taxonomy WHERE id=? AND active=1',(value,)).fetchone())
 SESSION_SECONDS = 12*3600
 SINGLE_ACCEPT = True  # Demo rule; founder to arbitrate multiple acceptance in real MVP.
+from application_rate import load_limits, enforce as enforce_application_rate
+APPLICATION_LIMITS = load_limits()
 
 app = FastAPI(title='UCP LAB — API locale non publique', docs_url=None, redoc_url=None, openapi_url=None)
 
@@ -122,6 +124,7 @@ def init_db():
           CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(recipient_id,id DESC) WHERE read_at IS NULL;
           CREATE INDEX IF NOT EXISTS idx_project_matching ON projects(trade,town,status);
           CREATE INDEX IF NOT EXISTS idx_applications_pid ON applications(project_id);
+          CREATE INDEX IF NOT EXISTS idx_applications_professional_created ON applications(professional_id,created_at);
           CREATE INDEX IF NOT EXISTS idx_messages_app ON messages(application_id);
         ''')
         cols=[r['name'] for r in c.execute('PRAGMA table_info(profiles)').fetchall()]
@@ -538,9 +541,11 @@ def apply_with_enterprise_profile(project_id:int,linked_id:int,user=Depends(requ
         trades=json.loads(linked['service_trades']);zones={z.casefold() for z in json.loads(linked['service_areas'])}
         if proj['hidden'] or proj['status']!='open' or not (project_trades(proj) & set(trades)) or proj['town'].casefold() not in zones:
             error(403,'Projet hors métier, hors zone ou clos')
+        created=now()
+        enforce_application_rate(c,user['id'],project_id,created,APPLICATION_LIMITS)
         try:
             cur=c.execute('''INSERT INTO applications(project_id,professional_id,linked_profile_id,created_at)
-                     VALUES(?,?,?,?)''',(project_id,user['id'],linked_id,now()))
+                     VALUES(?,?,?,?)''',(project_id,user['id'],linked_id,created))
         except sqlite3.IntegrityError as exc:
             c.execute('ROLLBACK')
             if exc.sqlite_errorcode != sqlite3.SQLITE_CONSTRAINT_UNIQUE:raise
@@ -845,8 +850,10 @@ def apply(project_id:int,user=Depends(require('professional'))):
         valid_trades={p['trade'],*json.loads(p['service_trades'] or '[]')}
         if project['hidden'] or project['status']!='open' or not (project_trades(project) & valid_trades) or project['town'].casefold() not in eligible:
             error(403,'Projet non éligible au métier, à la zone ou au statut')
+        created=now()
+        enforce_application_rate(c,user['id'],project_id,created,APPLICATION_LIMITS)
         try:
-            cur=c.execute('INSERT INTO applications(project_id,professional_id,created_at) VALUES(?,?,?)',(project_id,user['id'],now()))
+            cur=c.execute('INSERT INTO applications(project_id,professional_id,created_at) VALUES(?,?,?)',(project_id,user['id'],created))
         except sqlite3.IntegrityError as exc:
             c.execute('ROLLBACK')
             if exc.sqlite_errorcode != sqlite3.SQLITE_CONSTRAINT_UNIQUE:raise
