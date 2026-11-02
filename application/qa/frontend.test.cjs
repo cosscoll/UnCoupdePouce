@@ -12,7 +12,7 @@ async function boot(overrides={},configure=null){
  const w=dom.window,calls=[];
  w.structuredClone=structuredClone;w.AbortSignal.timeout=AbortSignal.timeout;
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};
- w.HTMLDialogElement.prototype.close=function(){this.open=false};
+ w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
  w.crypto.randomUUID=crypto.randomUUID;
  const defaults={'/api/catalog':{items:JSON.parse(fs.readFileSync(path.join(root,'../taxonomy.json'),'utf8'))},'/api/session':{id:1,name:'Camille',role:'requester',csrf:'test-token'},'/api/projects':{items:[]},'/api/saved-searches':{items:[],limit:10},'/api/v4/drafts':{items:[]},'/api/my-profile':{profile:null},'/api/v4/reports':{items:[],next_before_id:null},'/api/v4/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}},'/api/v4/admin/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}}};
  w.fetch=async(url,opts={})=>{
@@ -761,5 +761,71 @@ test('project report photos appear only after motivated review and are not fetch
   input(x.w,'#dialog [name=reason]','Examen motivé des seules photos du dossier.');submit(x.w,'#dialog form');await tick();
   const links=[...x.w.document.querySelectorAll('#dialog a[href^="/api/v4/photos/"]')];assert.deepEqual(links.map(a=>a.getAttribute('href')),['/api/v4/photos/31?report_id=6','/api/v4/photos/32?report_id=6']);assert.ok(links.every(a=>a.target==='_blank'&&a.rel==='noopener'));
   assert.equal(x.w.document.querySelector('#dialog img'),null);assert.ok(!x.calls.some(c=>c.url.startsWith('/api/v4/photos/')));assert.match(x.w.document.querySelector('#dialog').textContent,/journalisée/);
+ }finally{x.close()}
+});
+
+test('navigation menu exposes its state, closes after a successful choice and orients focus to the page',async()=>{
+ const x=await boot({'/api/notifications':{items:[],unread:0,next_before_id:null}});
+ try{
+  const toggle=x.w.document.querySelector('#navigation-toggle');assert.equal(toggle.getAttribute('aria-controls'),'tabs');assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(x.w.document.querySelector('#navigation-current').textContent,'Mes projets');
+  toggle.click();assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(x.w.document.querySelector('.sidebar').dataset.navigationOpen,'true');
+  [...x.w.document.querySelectorAll('#tabs button')].find(b=>b.textContent==='Notifications').click();await tick();
+  assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(x.w.document.querySelector('#navigation-current').textContent,'Notifications');assert.equal(x.w.document.activeElement,x.w.document.querySelector('#view h2'));assert.equal(x.w.document.activeElement.getAttribute('tabindex'),'-1');assert.equal(x.w.document.title,'Notifications · Un Coup de Pouce');assert.equal(x.w.document.querySelector('#view').hasAttribute('aria-live'),false);
+ }finally{x.close()}
+});
+
+test('Escape closes the expanded navigation and restores focus to its toggle without navigating',async()=>{
+ const x=await boot();try{
+  const toggle=x.w.document.querySelector('#navigation-toggle');toggle.click();const tab=x.w.document.querySelector('#tabs button');tab.focus();const count=x.calls.length;
+  tab.dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(x.w.document.activeElement,toggle);assert.equal(x.calls.length,count);
+ }finally{x.close()}
+});
+
+test('failed draft saving keeps the navigation open and does not discard the wizard or its text',async()=>{
+ const x=await boot({'POST /api/v4/drafts':()=>{throw Error('offline')}});try{
+  x.w.startWizard();input(x.w,'.wizard [name=title]','Texte à conserver');const toggle=x.w.document.querySelector('#navigation-toggle');toggle.click();[...x.w.document.querySelectorAll('#tabs button')].find(b=>b.textContent==='Messages').click();await tick();
+  assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(x.w.document.querySelector('.wizard [name=title]').value,'Texte à conserver');assert.match(x.w.document.querySelector('#alert').textContent,/Connexion interrompue/);assert.equal(x.w.document.title,'Décrire mon projet · Un Coup de Pouce');
+ }finally{x.close()}
+});
+
+test('a late navigation cannot steal focus after a newer page has loaded',async()=>{
+ let release;const pending=new Promise(resolve=>{release=resolve});
+ const x=await boot({'/api/v4/support':()=>pending,'/api/notifications':{items:[],unread:0,next_before_id:null}});try{
+  const old=x.w.go('support');await tick();await x.w.go('notifications');const filter=x.w.document.querySelector('[name=notification_filter]');filter.focus();release({items:[],categories:{other:'Autre demande'},next_before_id:null});await old;await tick();
+  assert.equal(x.w.document.activeElement,filter);assert.equal(x.w.document.title,'Notifications · Un Coup de Pouce');
+ }finally{x.close()}
+});
+
+test('dialog focus enters its first field, survives content replacement and returns to the opener',async()=>{
+ const x=await boot();try{
+  const opener=x.w.document.createElement('button');opener.textContent='Modifier';opener.addEventListener('click',()=>x.w.editProject({id:7,title:'Projet fictif',town:'Toulouse',description:'Description fictive assez longue.',trade:'plomberie'}));x.w.document.querySelector('#view').append(opener);opener.focus();opener.click();
+  assert.equal(x.w.document.activeElement,x.w.document.querySelector('#dialog [name=title]'));
+  x.w.showDialog('Résultat de consultation',x.w.document.createElement('p'));assert.equal(x.w.document.activeElement,x.w.document.querySelector('#dialog-title'));
+  x.w.document.querySelector('#dialog-close').click();assert.equal(x.w.document.activeElement,opener);
+ }finally{x.close()}
+});
+
+test('closing a dialog whose opener disappeared falls back to the current page heading',async()=>{
+ const x=await boot();try{
+  const opener=x.w.document.createElement('button');x.w.document.querySelector('#view').append(opener);opener.focus();x.w.showDialog('Dossier fictif',x.w.document.createElement('p'));opener.remove();x.w.document.querySelector('#dialog-close').click();assert.equal(x.w.document.activeElement,x.w.document.querySelector('#view h2'));
+ }finally{x.close()}
+});
+
+test('wizard changes orient focus to their heading and logout removes the workspace title',async()=>{
+ const x=await boot({'POST /api/v4/drafts':{id:51,version:1},'POST /api/logout':{ok:true}});try{
+  x.w.startWizard(resumedDraft);assert.equal(x.w.document.activeElement,x.w.document.querySelector('.wizard h2'));assert.equal(x.w.document.title,'Décrire mon projet · Un Coup de Pouce');x.w.document.querySelector('#logout').click();await tick();assert.equal(x.w.document.title,'Un Coup de Pouce · Votre espace travaux');assert.equal(x.w.document.querySelector('#dashboard').hidden,true);
+ }finally{x.close()}
+});
+
+test('a confirmed dialog action returns keyboard orientation to the refreshed page',async()=>{
+ const x=await boot();try{
+  x.w.ask('Confirmer cette action fictive ?','Le contenu de la page sera actualisé.',async()=>({ok:true}));[...x.w.document.querySelectorAll('#dialog button')].find(b=>b.textContent==='Confirmer').click();await tick();await tick();assert.equal(x.w.document.querySelector('#dialog').open,false);assert.equal(x.w.document.activeElement,x.w.document.querySelector('#view h2'));
+ }finally{x.close()}
+});
+
+test('successful sign-in orients focus inside the new workspace and clears the password',async()=>{
+ const x=await boot({'/api/session':{status:401,data:{detail:'Connexion requise'}},'POST /api/login':{user_id:2,name:'Pro fictif',role:'professional',csrf:'new-session'},'/api/projects':{items:[],search_scope:'ready'}});try{
+  input(x.w,'#login-form [name=email]','fictif@ucp.test');input(x.w,'#login-form [name=password]','Fictional-password!2026');submit(x.w,'#login-form');await tick();await tick();
+  assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.equal(x.w.document.activeElement,x.w.document.querySelector('#view h2'));assert.equal(x.w.document.querySelector('#login-form [name=password]').value,'');assert.equal(x.w.document.title,'Trouver des projets · Un Coup de Pouce');
  }finally{x.close()}
 });

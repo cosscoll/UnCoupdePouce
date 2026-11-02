@@ -1,0 +1,77 @@
+{
+  "date": "2026-11-02",
+  "scope": "Calcul de huit paires de couleurs déclarées dans le CSS ; aucun rendu navigateur ni conformité globale revendiqués.",
+  "css_sha256": "49a7a0b13b6b625f2adc63900327e84263330f68f004cb035c5e2d39675c177f",
+  "pairs": [
+    {
+      "label": "Texte principal sur blanc",
+      "foreground": "#20223b",
+      "background": "#ffffff",
+      "ratio": 15.517,
+      "minimum": 4.5,
+      "pass": true
+    },
+    {
+      "label": "Texte secondaire sur blanc",
+      "foreground": "#626477",
+      "background": "#ffffff",
+      "ratio": 5.819,
+      "minimum": 4.5,
+      "pass": true
+    },
+    {
+      "label": "Texte secondaire sur beige",
+      "foreground": "#626477",
+      "background": "#f5f0ea",
+      "ratio": 5.136,
+      "minimum": 4.5,
+      "pass": true
+    },
+    {
+      "label": "Texte secondaire sur fond doux",
+      "foreground": "#626477",
+      "background": "#f4f5fb",
+      "ratio": 5.349,
+      "minimum": 4.5,
+      "pass": true
+    },
+    {
+      "label": "Texte du bouton principal",
+      "foreground": "#242033",
+      "background": "#ff791d",
+      "ratio": 6.021,
+      "minimum": 4.5,
+      "pass": true
+    },
+    {
+      "label": "Texte blanc sur violet",
+      "foreground": "#ffffff",
+      "background": "#505dc1",
+      "ratio": 5.711,
+      "minimum": 4.5,
+      "pass": true
+    },
+    {
+      "label": "Bordure des champs sur blanc",
+      "foreground": "#85879b",
+      "background": "#ffffff",
+      "ratio": 3.538,
+      "minimum": 3,
+      "pass": true
+    },
+    {
+      "label": "Indicateur de focus sur blanc",
+      "foreground": "#505dc1",
+      "background": "#ffffff",
+      "ratio": 5.711,
+      "minimum": 3,
+      "pass": true
+    }
+  ],
+  "visual_browser": {
+    "result": "BLOCKED",
+    "error": "net::ERR_INVALID_AUTH_CREDENTIALS",
+    "screenshots_accepted": 0
+  },
+  "real_device_acceptance": false
+}
