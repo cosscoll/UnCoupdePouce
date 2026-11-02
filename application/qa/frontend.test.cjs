@@ -829,3 +829,11 @@ test('successful sign-in orients focus inside the new workspace and clears the p
   assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.equal(x.w.document.activeElement,x.w.document.querySelector('#view h2'));assert.equal(x.w.document.querySelector('#login-form [name=password]').value,'');assert.equal(x.w.document.title,'Trouver des projets · Un Coup de Pouce');
  }finally{x.close()}
 });
+
+test('a delayed confirmation cannot close or steal focus from a newer dialog',async()=>{
+ let finish;const pending=new Promise(resolve=>{finish=resolve});const x=await boot();try{
+  x.w.ask('Ancienne confirmation','Action fictive en cours.',()=>pending);[...x.w.document.querySelectorAll('#dialog button')].find(b=>b.textContent==='Confirmer').click();await tick();x.w.document.querySelector('#dialog').close();
+  const field=x.w.document.createElement('input');field.setAttribute('aria-label','Nouvelle saisie');x.w.showDialog('Nouveau dialogue',field);assert.equal(x.w.document.activeElement,field);finish({ok:true});await tick();await tick();
+  assert.equal(x.w.document.querySelector('#dialog').open,true);assert.equal(x.w.document.querySelector('#dialog-title').textContent,'Nouveau dialogue');assert.equal(x.w.document.activeElement,field);
+ }finally{x.close()}
+});
