@@ -768,6 +768,7 @@ async function renderPersonalData(target){
   const data=await api('/account/export');
   const form=el('form',{},field('Votre nom affiché','name','text',{value:data.user.name,minlength:2,maxlength:100}),el('button',{type:'submit',text:'Enregistrer mon nom',class:'outline'}));form.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/account',{method:'PUT',body:formValue(form)}),'Nom enregistré.');if(r){appState.user.name=r.name;render()}});box.append(form);
   box.append(el('p',{text:`Compte : ${data.user.name} · ${data.user.email} · rôle ${data.user.role}`}));
+  if(data.user.login_alias)box.append(el('p',{text:'Identifiant de connexion : '+data.user.login_alias}));
   box.append(el('p',{text:`Projets personnels : ${data.own_projects.length} · Candidatures : ${data.own_applications.length} · Messages écrits : ${data.own_messages.length}`}));
   const sessions=await api('/account/sessions');
   box.append(el('p',{class:'quiet',text:`Sessions actives dans ce laboratoire : ${sessions.active_sessions}`}));
@@ -801,7 +802,7 @@ function selectEntrySpace(role,focus=false){
  $('#auth-title').textContent=pro?'Votre espace professionnel.':'Votre espace particulier.';
  $('#auth-space').textContent=pro?'Votre activité, vos candidatures et vos messages.':'Vos demandes, vos brouillons et vos échanges.';
  $('#register-form [name=role]').value=role;
- $('#login-form [name=email]').placeholder=pro?'atelier@ucp.test':'camille@ucp.test';
+ $('#login-form [name=email]').placeholder='Votre identifiant ou email de test';
  if(!appState.user)document.body.dataset.space=role;
  if(focus)$('#auth-title').focus();
 }

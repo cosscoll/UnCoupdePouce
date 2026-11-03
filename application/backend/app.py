@@ -83,6 +83,8 @@ def init_db():
           CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
             role TEXT NOT NULL CHECK(role IN ('requester','professional','admin')),
             pw_salt TEXT NOT NULL, pw_hash TEXT NOT NULL, created_at TEXT NOT NULL);
+          CREATE TABLE IF NOT EXISTS login_aliases(alias TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE);
           CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             csrf_hash TEXT NOT NULL, expires INTEGER NOT NULL);
           CREATE TABLE IF NOT EXISTS auth_failures(email TEXT PRIMARY KEY,
@@ -254,7 +256,7 @@ def get_user(request:Request):
     t = request.cookies.get('ucp_lab_sid','')
     if not t: error(401,'Connexion requise')
     with connect() as c:
-        user=c.execute('''SELECT users.id,users.name,users.email,users.role,users.suspended,sessions.csrf_hash,sessions.expires,sessions.token_hash AS session_token_hash
+        user=c.execute('''SELECT users.id,users.name,users.email,users.role,users.suspended,(SELECT alias FROM login_aliases WHERE user_id=users.id) AS login_alias,sessions.csrf_hash,sessions.expires,sessions.token_hash AS session_token_hash
                FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash=?''',(hash_token(t),)).fetchone()
     if user and user['suspended']: error(403,'Compte suspendu')
     if not user or user['expires'] <= int(time.time()): error(401,'Session expirée')
@@ -619,13 +621,15 @@ def register(body:Register):
 
 @app.post('/api/login')
 def login(body:Login,response:Response):
-    email=body.email.strip().lower()
+    identifier=body.email.strip().lower()
     stamp=int(time.time())
     with connect() as c:
+        user=c.execute('SELECT users.* FROM users LEFT JOIN login_aliases ON login_aliases.user_id=users.id WHERE users.email=? OR login_aliases.alias=?',(identifier,identifier)).fetchone()
+        # Alias and email share the same throttle bucket.
+        email=user['email'] if user else identifier
         attempts=c.execute('SELECT attempts,last_attempt,locked_until FROM auth_failures WHERE email=?',(email,)).fetchone()
         if attempts and attempts['locked_until']>stamp:
             error(429,'Trop de tentatives de démonstration. Réessayez plus tard.')
-        user=c.execute('SELECT * FROM users WHERE email=?',(email,)).fetchone()
         # Same KDF for known and unknown accounts: avoids trivial email enumeration.
         digest=pw(body.password,user['pw_salt'] if user else '00'*16)
         if not user or user['suspended'] or not hmac.compare_digest(digest,user['pw_hash']):
@@ -1112,7 +1116,7 @@ def account_export(user=Depends(get_user)):
         own_enterprise=c.execute('SELECT id,label,created_at FROM enterprise_accounts WHERE owner_id=?',(user['id'],)).fetchone()
         own_linked_artisans=([dict(r) for r in c.execute('SELECT id,alias,service_trades,service_areas,is_active,created_at FROM enterprise_artisans WHERE enterprise_id=?',(own_enterprise['id'],))]
                               if own_enterprise else [])
-    return {'laboratory':True,'user':{'email':user['email'],'name':user['name'],'role':user['role']},
+    return {'laboratory':True,'user':{'email':user['email'],'name':user['name'],'role':user['role'],'login_alias':user['login_alias']},
             'profile':dict(profile) if profile else None,'beta_interest':dict(interest) if interest else None,
             'own_projects':projects_owned,'own_applications':applications_owned,'own_messages':messages_owned,
             'own_notifications':own_notices,'own_activity':own_activity,'own_saved_searches':own_searches,'own_project_favorites':own_favorites,'own_enterprise':dict(own_enterprise) if own_enterprise else None,
@@ -1237,6 +1241,7 @@ from support_cases import install as install_support
 from professional_showcase import install as install_showcase
 from saved_searches import install as install_saved_searches
 from project_favorites import install as install_favorites
+from demo_access import install as install_demo_access
 if DATABASE_URL:
     from postgres import initialize_schema
     initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
@@ -1249,6 +1254,7 @@ with initialization:
     install_showcase(sys.modules[__name__])
     install_saved_searches(sys.modules[__name__])
     install_favorites(sys.modules[__name__])
+    install_demo_access(sys.modules[__name__])
     # Optional, one-time fictional seed under the initialization lock.
     if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
         with connect() as c:

@@ -343,3 +343,22 @@ def test_postgres_moderation_photos_require_the_reviewed_open_project_case(pg):
     owner,_=client_for(pg,'photo-owner@ucp.test','requester')
     other,_=client_for(pg,'photo-other@ucp.test','requester')
     exercise_case_scoped_photos(pg,owner,admin,other)
+
+
+def demo_access_setup(pg):
+    from test_demo_access import make_demo_setup
+    admin = TestClient(pg.app)
+    password = 'Fictif-Long-Test!9326'
+    assert admin.post('/api/admin/bootstrap', json={'secret':'test-bootstrap-only-0123456789','email':'admin@ucp.test','password':password}).status_code == 200
+    r = admin.post('/api/login', json={'email':'admin@ucp.test','password':password})
+    return make_demo_setup(pg, admin, r.json()['csrf'])
+
+
+def test_postgres_demo_aliases_preserve_roles_and_revoke_old_access(pg):
+    from test_demo_access import exercise_alias_access
+    exercise_alias_access(demo_access_setup(pg))
+
+
+def test_postgres_demo_aliases_share_throttle_with_email(pg):
+    from test_demo_access import exercise_alias_throttle
+    exercise_alias_throttle(demo_access_setup(pg))

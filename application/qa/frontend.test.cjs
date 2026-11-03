@@ -1093,3 +1093,16 @@ test('one failed dashboard section leaves other personal information usable and 
   assert.equal(d.querySelector('.requester-overview img'),null);
  }finally{x.close()}
 });
+
+test('login accepts a short account identifier and sends it to the server without an email restriction',async()=>{
+ const x=await boot({'/api/session':{status:401,data:{detail:'Connexion requise'}},'POST /api/login':{user_id:7,name:'Compte fictif',role:'requester',csrf:'alias-csrf'}});
+ try{
+  const f=x.w.document.querySelector('#login-form');
+  assert.equal(f.elements.email.type,'text');
+  input(x.w,'#login-form [name=email]','preview.part');input(x.w,'#login-form [name=password]','Demo-1234');
+  assert.equal(f.checkValidity(),true);submit(x.w,'#login-form');await tick();
+  const login=x.calls.find(c=>c.method==='POST'&&c.url==='/api/login');
+  assert.equal(login.body.email,'preview.part');assert.equal(x.w.document.querySelector('#actor-role').textContent,'ESPACE PARTICULIER');
+  assert.equal(f.elements.password.value,'');
+ }finally{x.close()}
+});
