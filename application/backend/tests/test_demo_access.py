@@ -61,6 +61,7 @@ def exercise_alias_throttle(v):
     for i in range(4):
         identifier = 'preview.part' if i % 2 else 'camille@ucp.test'
         assert c.post('/api/login', json={'email': identifier, 'password': 'Wrong-demo-password'}).status_code == 401
+    assert c.post('/api/login', json={'email': 'preview.part', 'password': 'Wrong-demo-password'}).status_code == 429
     for identifier in ['preview.part', 'camille@ucp.test']:
         assert c.post('/api/login', json={'email': identifier, 'password': NEW}).status_code == 429
 
