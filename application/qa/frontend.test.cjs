@@ -1106,3 +1106,55 @@ test('login accepts a short account identifier and sends it to the server withou
   assert.equal(f.elements.password.value,'');
  }finally{x.close()}
 });
+
+const intakeProject={id:41,title:'Chantier fictif en réception',description:'Description fictive suffisamment précise du chantier.',town:'Toulouse',trade:'plomberie',trades:['plomberie'],status:'open',photos:[],applications_paused:0,intake_version:4};
+
+test('owner explicitly confirms intake pause and sends the loaded revision without closing the project',async()=>{
+ const x=await boot({'/api/v4/projects/41':intakeProject,'/api/projects/41/applications':{items:[]},'POST /api/projects/41/application-intake':{paused:true,version:5}});
+ try{
+  await x.w.projectDetail({id:41});savedButton(x.w,'Mettre les candidatures en pause','#view').click();
+  assert.match(x.w.document.querySelector('#dialog').textContent,/candidatures reçues restent conservées/);
+  assert.equal(x.calls.some(c=>c.method==='POST'),false);
+  x.w.document.querySelector('#dialog-close').click();assert.equal(x.calls.some(c=>c.method==='POST'),false);
+  savedButton(x.w,'Mettre les candidatures en pause','#view').click();savedButton(x.w,'Confirmer','#dialog').click();await tick();
+  const sent=x.calls.filter(c=>c.method==='POST');assert.equal(sent.length,1);
+  assert.equal(sent[0].url,'/api/projects/41/application-intake');assert.deepEqual(sent[0].body,{paused:true,version:4});
+  assert.equal(sent[0].headers['x-ucp-csrf'],'test-token');
+ }finally{x.close()}
+});
+
+test('paused project offers explicit reopening and shows its current reception state',async()=>{
+ const x=await boot({'/api/v4/projects/41':{...intakeProject,applications_paused:1,intake_version:7},'/api/projects/41/applications':{items:[]},'POST /api/projects/41/application-intake':{paused:false,version:8}});
+ try{
+  await x.w.projectDetail({id:41});assert.match(x.w.document.querySelector('#view').textContent,/Candidatures en pause/);
+  assert.match(x.w.document.querySelector('#view').textContent,/Vous pouvez les rouvrir/);
+  savedButton(x.w,'Rouvrir les candidatures','#view').click();assert.match(x.w.document.querySelector('#dialog').textContent,/conserve son état/);
+  savedButton(x.w,'Confirmer','#dialog').click();await tick();
+  assert.deepEqual(x.calls.find(c=>c.method==='POST').body,{paused:false,version:7});
+ }finally{x.close()}
+});
+
+test('professional tracking explains a pause and still permits withdrawal of a pending application',async()=>{
+ const x=await boot({'/api/session':savedProSession,'/api/my-applications':{items:[{id:33,title:'Chantier en pause',trade:'plomberie',town:'Toulouse',status:'pending',project_status:'open',project_paused:1,conversation_state:'not_selected'}]}});
+ try{
+  await x.w.go('applications');assert.match(x.w.document.querySelector('#view').textContent,/Votre candidature est conservée/);
+  assert.ok(savedButton(x.w,'Retirer ma candidature','#view'));
+  assert.equal([...x.w.document.querySelectorAll('#view button')].some(b=>b.textContent==='Ouvrir mes messages'),false);
+ }finally{x.close()}
+});
+
+test('stale intake confirmation keeps the dialog and server error instead of inventing a successful transition',async()=>{
+ const x=await boot({'/api/v4/projects/41':intakeProject,'/api/projects/41/applications':{items:[]},'POST /api/projects/41/application-intake':{status:409,data:{detail:'La réception a changé dans une autre fenêtre. Actualisez le projet.'}}});
+ try{
+  await x.w.projectDetail({id:41});savedButton(x.w,'Mettre les candidatures en pause','#view').click();savedButton(x.w,'Confirmer','#dialog').click();await tick();
+  assert.equal(x.w.document.querySelector('#dialog').open,true);assert.match(x.w.document.querySelector('#alert').textContent,/autre fenêtre/);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,1);assert.ok(savedButton(x.w,'Mettre les candidatures en pause','#view'));
+ }finally{x.close()}
+});
+
+test('selected or closed projects never offer intake pause or reopening',async()=>{
+ for(const status of ['selected','closed']){
+  const x=await boot({'/api/v4/projects/41':{...intakeProject,status,applications_paused:1},'/api/projects/41/applications':{items:[]}});
+  try{await x.w.projectDetail({id:41});assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/Rouvrir les candidatures|Mettre les candidatures en pause|Candidatures en pause/)}finally{x.close()}
+ }
+});

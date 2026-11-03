@@ -230,7 +230,7 @@ def install(m):
         with m.authenticated_db(user,write=False) as c:
             r=visible_project(c,id,user)
             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
-            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max')};row['trades']=list(m.project_trades(r))
+            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version')};row['trades']=list(m.project_trades(r))
             draft=c.execute('SELECT payload FROM drafts WHERE project_id=?',(id,)).fetchone()
             row['timing']=json.loads(draft['payload']).get('timing','flexible') if draft else 'flexible'
             row['photos']=photos if user['role'] in ('requester','admin') or c.execute("SELECT 1 FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone() else []

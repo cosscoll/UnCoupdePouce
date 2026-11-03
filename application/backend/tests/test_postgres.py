@@ -362,3 +362,36 @@ def test_postgres_demo_aliases_preserve_roles_and_revoke_old_access(pg):
 def test_postgres_demo_aliases_share_throttle_with_email(pg):
     from test_demo_access import exercise_alias_throttle
     exercise_alias_throttle(demo_access_setup(pg))
+
+
+def project_intake_setup(pg):
+    admin = TestClient(pg.app)
+    password = 'Fictif-Long-Test!9326'
+    assert admin.post('/api/admin/bootstrap',json={'secret':'test-bootstrap-only-0123456789','email':'admin@ucp.test','password':password}).status_code==200
+    admin.headers['x-ucp-csrf']=admin.post('/api/login',json={'email':'admin@ucp.test','password':password}).json()['csrf']
+    owner,_=client_for(pg,'intake-owner@ucp.test','requester')
+    candidate,cid=client_for(pg,'intake-candidate@ucp.test','professional')
+    fresh,fid=client_for(pg,'intake-fresh@ucp.test','professional')
+    for client,uid,siren in [(candidate,cid,'123456782'),(fresh,fid,'123456790')]:
+        assert client.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':siren}).status_code==200
+        assert admin.post(f'/api/admin/professionals/{uid}/approve').status_code==200
+    pid=owner.post('/api/projects',json={'title':'Chantier fictif en réception','description':'Une demande fictive de plomberie pour la réception des candidatures.','town':'Toulouse','trade':'plomberie'}).json()['id']
+    aid=candidate.post(f'/api/projects/{pid}/apply').json()['id']
+    return owner,candidate,fresh,pid,aid
+
+
+def test_postgres_application_intake_lifecycle_and_visibility(pg):
+    from test_project_intake import exercise_intake
+    exercise_intake(pg,*project_intake_setup(pg))
+
+
+def test_postgres_concurrent_application_intake_transition(pg):
+    from test_project_intake import exercise_parallel_intake
+    owner,candidate,_,pid,_=project_intake_setup(pg)
+    exercise_parallel_intake(pg,owner,candidate,pid)
+
+
+def test_postgres_pause_race_with_new_application(pg):
+    from test_project_intake import exercise_apply_pause_race
+    owner,_,fresh,pid,_=project_intake_setup(pg)
+    exercise_apply_pause_race(pg,owner,fresh,pid)
