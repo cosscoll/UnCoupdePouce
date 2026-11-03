@@ -673,7 +673,7 @@ async function renderEnterprise(target){
   }
   const pr=data.pricing;
   overview.append(el('p',{text:data.enterprise.label}),
-    el('div',{class:'line'},el('span',{class:'chip violet',text:pr.active_artisans+' profil(s) artisan actif(s) facturé(s)'}),
+    el('div',{class:'line'},el('span',{class:'chip violet',text:pr.active_artisans+' profil(s) actif(s) dans la simulation'}),
       el('span',{class:'chip',text:pr.monthly_ht+' € HT/mois — SIMULATION'})),
     el('p',{class:'quiet',text:'Calcul simulé : 20 € HT/mois de base + 15 € HT/mois par profil artisan actif, gestionnaire compris seulement s’il possède son propre profil actif. Aucun prorata ni prélèvement Stripe ; validation juridique et recette requises.'}));
   overview.append(el('p',{class:'quiet',text:pr.linked_artisans_active+' profils liés actifs · Gestionnaire artisan : '+(pr.manager_counted_as_artisan?'OUI (siège actif fictif)':'NON (gestion administrative seule)')}));
@@ -689,14 +689,16 @@ async function renderEnterprise(target){
     el('button',{type:'submit',class:'primary',text:'Ajouter un profil de test'}));
   f.addEventListener('submit',async e=>{e.preventDefault();const v=formValue(f);const body={alias:v.alias,trades:v.trades.split(',').map(x=>x.trim()).filter(Boolean),zones:v.zones.split(',').map(x=>x.trim()).filter(Boolean)};const result=await action(()=>api('/enterprise/artisans',{method:'POST',body}),'Profil artisan fictif ajouté.');if(result)await render()});
   formBox.append(f);target.append(formBox);
-  const profiles=panel('Artisans liés à l’entreprise','Désactiver un profil bloque immédiatement ses futures candidatures et le chat de ses candidatures acceptées.');
+  const profiles=panel('Artisans liés à l’entreprise','Désactiver un profil retire ses candidatures en attente et bloque le chat de ses candidatures sélectionnées. Les participants concernés sont informés dans leurs notifications internes.');
   if(!data.members.length)profiles.append(el('p',{class:'empty',text:'Aucun profil artisan lié à ce compte de test.'}));
   for(const x of data.members){
     const line=el('div',{class:'item'},el('h4',{text:x.alias}),el('p',{text:x.trades.map(x=>trades[x]||x).join(' · ')+' — '+x.zones.join(', ')}),
       el('span',{class:'chip',text:x.is_active?'Actif — facturation fictive':'Inactif — non comptabilisé'}));
-    line.append(button(x.is_active?'Désactiver ce profil':'Réactiver ce profil',async()=>{
-      const result=await action(()=>api(`/enterprise/artisans/${x.id}/set-active`,{method:'POST',body:{active:!x.is_active}}),'Statut du profil fictif actualisé.');if(result)await render();
-    }));profiles.append(line);
+    line.append(button(x.is_active?'Désactiver ce profil':'Réactiver ce profil',()=>ask(
+      x.is_active?'Désactiver ce profil lié ?':'Réactiver ce profil lié ?',
+      x.is_active?'Les candidatures en attente de « '+x.alias+' » seront retirées. Les sélections restent dans le suivi, mais leurs messages deviennent inaccessibles tant que ce profil est inactif. Les participants concernés recevront une notification interne. Aucun prélèvement réel.':'Les candidatures retirées ne seront pas rétablies. Le chat sera de nouveau contrôlé selon toutes les autorisations ; la réactivation ne garantit pas son ouverture. Les participants concernés recevront une notification interne. Aucun prélèvement réel.',
+      ()=>api(`/enterprise/artisans/${x.id}/set-active`,{method:'POST',body:{active:!x.is_active}})
+    )));profiles.append(line);
   }
   target.append(profiles);
 }

@@ -138,6 +138,7 @@ def init_db():
         application_cols=[r['name'] for r in c.execute('PRAGMA table_info(applications)').fetchall()]
         if 'linked_profile_id' not in application_cols:
             c.execute('ALTER TABLE applications ADD COLUMN linked_profile_id INTEGER REFERENCES enterprise_artisans(id)')
+        c.execute('CREATE INDEX IF NOT EXISTS idx_applications_linked_status ON applications(linked_profile_id,status)')
         # Existing v3.5 lab databases are migrated in place; no deletion or production migration.
         enterprise_cols=[r['name'] for r in c.execute('PRAGMA table_info(enterprise_accounts)').fetchall()]
         if 'manager_artisan_active' not in enterprise_cols:
@@ -236,6 +237,10 @@ NOTIFICATION_TYPES = {
     'test_access_activated': 'Votre accès de test aux conversations a été activé. Les autres conditions d’accès restent applicables. Aucun paiement ni abonnement réel.',
     'account_suspended': 'Votre compte a été suspendu et ses sessions révoquées. Cet événement reste dans votre historique après réactivation.',
     'account_restored': 'La suspension de votre compte a été levée. Reconnectez-vous ; les autorisations professionnelles et les autres conditions d’accès restent applicables.',
+    'linked_profile_paused': 'Un profil lié a été désactivé : ses candidatures en attente sont retirées et ses échanges sélectionnés sont bloqués.',
+    'linked_profile_resumed': 'Un profil lié a été réactivé. Les candidatures retirées ne sont pas rétablies ; les autres conditions du chat restent applicables.',
+    'linked_conversation_paused': 'Le profil professionnel lié à votre échange a été désactivé. La sélection reste dans le suivi, mais la messagerie est bloquée.',
+    'linked_conversation_changed': 'Le profil lié à votre échange a été réactivé. La disponibilité du chat dépend encore des autres autorisations et de l’état du projet.',
 }
 
 def queue_notice(connection, recipient_id, event_type, entity_id):
@@ -467,9 +472,12 @@ def create_enterprise(body:EnterpriseAccountCreate,user=Depends(require('profess
         try:
             cur=c.execute('INSERT INTO enterprise_accounts(owner_id,label,created_at) VALUES(?,?,?)',
                           (user['id'],body.label,now()))
+            c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
+                      (user['id'],'create_lab_enterprise','enterprise',cur.lastrowid,now()))
             c.execute('COMMIT')
-        except sqlite3.IntegrityError:
+        except sqlite3.IntegrityError as exc:
             c.execute('ROLLBACK')
+            if exc.sqlite_errorcode != sqlite3.SQLITE_CONSTRAINT_UNIQUE:raise
             error(409,'Un compte Entreprise de test existe déjà pour ce gestionnaire')
     return {'id':cur.lastrowid,'label':body.label,'simulation':True}
 
@@ -538,9 +546,15 @@ def set_linked_artisan_active(linked_id:int,body:dict,user=Depends(require('prof
         if not row:error(404,'Profil lié introuvable')
         if row['owner_id']!=user['id']:error(403,'Un autre compte Entreprise possède ce profil')
         if bool(row['is_active'])==body['active']:error(409,'Ce profil est déjà dans cet état')
+        pending=c.execute("SELECT a.id,p.requester_id FROM applications a JOIN projects p ON p.id=a.project_id WHERE a.linked_profile_id=? AND a.status='pending'",(linked_id,)).fetchall() if not body['active'] else []
+        selected=c.execute("SELECT a.id,p.requester_id FROM applications a JOIN projects p ON p.id=a.project_id WHERE a.linked_profile_id=? AND a.status='accepted' AND p.status!='closed'",(linked_id,)).fetchall()
         c.execute('UPDATE enterprise_artisans SET is_active=? WHERE id=?',(int(body['active']),linked_id))
         if not body['active']:
             c.execute("UPDATE applications SET status='withdrawn' WHERE linked_profile_id=? AND status='pending'",(linked_id,))
+            for application in pending:queue_notice(c,application['requester_id'],'application_withdrawn',application['id'])
+        queue_notice(c,user['id'],'linked_profile_resumed' if body['active'] else 'linked_profile_paused',linked_id)
+        for application in selected:
+            queue_notice(c,application['requester_id'],'linked_conversation_changed' if body['active'] else 'linked_conversation_paused',application['id'])
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                   (user['id'],'toggle_linked_lab_artisan','linked_artisan',linked_id,now()))
         c.execute('COMMIT')

@@ -310,6 +310,24 @@ def test_postgres_legacy_public_names_and_headers_are_filtered(pg):
     exercise_legacy_headers(pg,requester,pro,result.json()['id'],pid,rid)
 
 
+@pytest.mark.parametrize('parallel',[False,True])
+def test_postgres_enterprise_profile_effects_and_notifications_are_consistent(pg,parallel):
+    from test_enterprise_effects import exercise_enterprise_effects,exercise_parallel_pause
+    owner,oid=client_for(pg,'enterprise-effects-owner@ucp.test','professional')
+    requester,_=client_for(pg,'enterprise-effects-requester@ucp.test','requester')
+    other,_=client_for(pg,'enterprise-effects-other@ucp.test','requester')
+    assert owner.post('/api/profile',json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code==200
+    with pg.connect() as c:c.execute('UPDATE profiles SET approved=1 WHERE user_id=?',(oid,))
+    if parallel:
+        assert owner.post('/api/enterprise',json={'label':'Entreprise fictive concurrente'}).status_code==201
+        lid=owner.post('/api/enterprise/artisans',json={'alias':'Equipe fictive','trades':['plomberie'],'zones':['Toulouse']}).json()['id']
+        result=requester.post('/api/projects',json={'title':'Projet fictif','description':'Travaux fictifs de plomberie à étudier.','trade':'plomberie','town':'Toulouse'})
+        assert result.status_code==201
+        aid=owner.post(f'/api/projects/{result.json()["id"]}/apply-linked/{lid}').json()['id']
+        exercise_parallel_pause(pg,owner,requester,lid,aid)
+    else:exercise_enterprise_effects(pg,owner,requester,other,lambda aid:requester.post(f'/api/applications/{aid}/accept'))
+
+
 def test_postgres_initial_draft_retries_preserve_owner_and_version_boundaries(pg):
     from test_draft_autosave import exercise_draft_creation_recovery
     owner,_=client_for(pg,'draft-retry-owner@ucp.test','requester')
