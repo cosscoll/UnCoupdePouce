@@ -1,0 +1,32 @@
+{
+  "date": "2026-11-03",
+  "pr": 53,
+  "application_commit": "25e75e7f9e3395a3e3f356e8219f8fc4e96f3a78",
+  "ci": {
+    "head": "58bbaea21c9a7d09042a35eb318a74b77d3b0930",
+    "run_id": 41650251165,
+    "python": 270,
+    "dom_logic_worker": 121,
+    "result": "success",
+    "main_run_id": 41650864109,
+    "main_result": "success"
+  },
+  "deployment": {
+    "id": "dpl_8yfsTcdNFdqzdpdM5G9R2MCmJNov",
+    "state": "READY",
+    "alias": "ucp-preproduction.vercel.app"
+  },
+  "https": {
+    "date": "2026-11-03",
+    "result": "PASS",
+    "configured_accounts": 2,
+    "requested_aliases_and_distinct_passwords_work": true,
+    "old_password_rejected": true,
+    "swapped_passwords_rejected": true,
+    "previous_sessions_revoked": true,
+    "roles_and_existing_account_data_preserved": true,
+    "user_passwords_committed_to_git": false,
+    "private_gate_unchanged": true
+  },
+  "authenticated_visual_acceptance": false
+}
