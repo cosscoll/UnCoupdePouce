@@ -472,13 +472,13 @@ def create_enterprise(body:EnterpriseAccountCreate,user=Depends(require('profess
         try:
             cur=c.execute('INSERT INTO enterprise_accounts(owner_id,label,created_at) VALUES(?,?,?)',
                           (user['id'],body.label,now()))
-            c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
-                      (user['id'],'create_lab_enterprise','enterprise',cur.lastrowid,now()))
-            c.execute('COMMIT')
         except sqlite3.IntegrityError as exc:
             c.execute('ROLLBACK')
             if exc.sqlite_errorcode != sqlite3.SQLITE_CONSTRAINT_UNIQUE:raise
             error(409,'Un compte Entreprise de test existe déjà pour ce gestionnaire')
+        c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
+                  (user['id'],'create_lab_enterprise','enterprise',cur.lastrowid,now()))
+        c.execute('COMMIT')
     return {'id':cur.lastrowid,'label':body.label,'simulation':True}
 
 @app.get('/api/enterprise')

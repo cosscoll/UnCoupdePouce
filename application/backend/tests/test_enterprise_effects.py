@@ -60,6 +60,17 @@ def test_enterprise_creation_is_rolled_back_if_audit_cannot_be_written(setup):
     assert v['pro'].get('/api/enterprise').json()['enterprise'] is None
 
 
+def test_audit_unique_failure_is_not_reported_as_existing_enterprise(setup):
+    v=setup;approve(v);approve(v,who='intruder');call=v['call']
+    assert call(v['pro'],v['pcsrf'],'post','/api/enterprise',json={'label':'Entreprise fictive initiale'}).status_code==201
+    with v['mod'].connect() as c:c.execute("CREATE UNIQUE INDEX forced_enterprise_audit_uniqueness ON audit(action) WHERE action='create_lab_enterprise'")
+    with TestClient(v['mod'].app,raise_server_exceptions=False) as client:
+        client.cookies.update(v['intruder'].cookies)
+        result=call(client,v['icsrf'],'post','/api/enterprise',json={'label':'Autre entreprise fictive'})
+        assert result.status_code==500
+    assert v['intruder'].get('/api/enterprise').json()['enterprise'] is None
+
+
 @pytest.mark.parametrize('failure',['audit','notification'])
 @pytest.mark.parametrize('active',[False,True])
 def test_profile_transition_and_withdrawals_roll_back_with_failed_notice_or_audit(setup,failure,active):
