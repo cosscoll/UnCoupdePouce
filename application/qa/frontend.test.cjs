@@ -1158,3 +1158,19 @@ test('selected or closed projects never offer intake pause or reopening',async()
   try{await x.w.projectDetail({id:41});assert.doesNotMatch(x.w.document.querySelector('#view').textContent,/Rouvrir les candidatures|Mettre les candidatures en pause|Candidatures en pause/)}finally{x.close()}
  }
 });
+
+test('floating assistant entry is visible and opens the same assistant as the header',async()=>{
+ const x=await boot();
+ try{
+  const launcher=x.w.document.querySelector('#chatbot-launcher');
+  assert.ok(launcher,'floating assistant launcher exists');
+  assert.equal(launcher.hidden,false,'visible to signed-in requester');
+  assert.equal(launcher.getAttribute('aria-haspopup'),'dialog');
+  launcher.click();await tick();
+  assert.equal(x.w.document.querySelector('#dialog').open,true);
+  assert.match(x.w.document.querySelector('#dialog-content').textContent,/assistant|aide|annonce|métier/i);
+  x.w.document.querySelector('#dialog').close();
+  await x.w.go('projects');await tick();
+  assert.equal(launcher.hidden,false,'entry remains visible while navigating');
+ }finally{x.close()}
+});
