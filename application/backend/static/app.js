@@ -77,7 +77,7 @@ function menu(){
  const n=clear($('#tabs'));for(const[key,t,i]of items)n.append(el('button',{class:'navlink '+(appState.view===key?'active':''),type:'button','aria-current':appState.view===key?'page':'false',onClick:()=>go(key)},icon(i),t));
 }
 async function render(){
- guidedHelp?.sync();$('#guided-help-open').hidden=!appState.user||!['requester','professional'].includes(appState.user.role);
+ guidedHelp?.sync();const hasAssistant=!!appState.user&&['requester','professional'].includes(appState.user.role);$('#guided-help-open').hidden=!hasAssistant;$('#chatbot-launcher').hidden=!hasAssistant;
  ++chatEpoch;const epoch=++renderEpoch;clearInterval(chatTimer);chatTimer=null;const u=appState.user;
  $('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#logout').hidden=!u;
  document.body.dataset.space=u?.role||entrySpace;
@@ -849,5 +849,6 @@ const guidedHelp=(window.UCPAssistantAI||window.UCPGuidedHelp)?.create({
 })||null;
 function openGuidedHelp(){if(guidedHelp)guidedHelp.open();else msg('L’assistant n’a pas pu être chargé. Rechargez la page pour réessayer.','error')}
 $('#guided-help-open').addEventListener('click',openGuidedHelp);
+$('#chatbot-launcher').addEventListener('click',openGuidedHelp);
 window.addEventListener('beforeunload',e=>{if(draftUnsaved()){e.preventDefault();e.returnValue=''}});
 (async()=>{try{await loadCatalog();try{const me=await api('/session');appState.user=me;appState.csrf=me.csrf}catch{}await render()}catch(e){msg('Le serveur ne répond pas. Démarrez UCP puis rechargez cette page.','error')}})();
