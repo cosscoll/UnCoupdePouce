@@ -7,8 +7,8 @@ const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
 const root=path.join(__dirname,'../backend/static');
 const tick=()=>new Promise(r=>setTimeout(r,12));
-async function boot(overrides={},configure=null){
- const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url:'http://localhost:8765',runScripts:'outside-only'});
+async function boot(overrides={},configure=null,url='http://localhost:8765/#projects'){
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'index.html'),'utf8'),{url,runScripts:'outside-only'});
  const w=dom.window,calls=[];
  w.structuredClone=structuredClone;w.AbortSignal.timeout=AbortSignal.timeout;
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};
@@ -1019,5 +1019,77 @@ test('linked profile deactivation explains withdrawals and blocked messages befo
 test('linked profile reactivation states that withdrawals and chat permissions are not restored implicitly',async()=>{
  const x=await boot({'/api/session':savedProSession,'/api/enterprise':{...enterpriseEffectsData,members:[{...enterpriseEffectsData.members[0],is_active:0}]}});try{
   await x.w.go('enterprise');savedButton(x.w,'Réactiver ce profil','#view').click();await tick();assert.match(x.w.document.querySelector('#dialog-content').textContent,/candidatures retirées ne seront pas rétablies/);assert.match(x.w.document.querySelector('#dialog-content').textContent,/ne garantit pas son ouverture/);assert.ok(!x.calls.some(c=>c.url.endsWith('/set-active')));
+ }finally{x.close()}
+});
+
+test('professional entry changes onboarding and registration choice without changing any permissions',async()=>{
+ const x=await boot({'/api/session':{status:401,data:{detail:'Connexion requise'}}},null,'http://localhost:8765/professionnel');
+ try{
+  const d=x.w.document;
+  assert.equal(d.querySelector('#space-professional').getAttribute('aria-pressed'),'true');
+  assert.match(d.querySelector('#auth-title').textContent,/professionnel/);
+  assert.equal(d.querySelector('#register-form [name=role]').value,'professional');
+  input(x.w,'#login-form [name=email]','saisie@ucp.test');
+  d.querySelector('#space-requester').click();
+  assert.equal(d.querySelector('#register-form [name=role]').value,'requester');
+  assert.equal(d.querySelector('#login-form [name=email]').value,'saisie@ucp.test');
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+  assert.equal(d.querySelector('#dashboard').hidden,true);
+ }finally{x.close()}
+});
+
+test('requester starts on a personal dashboard with own active projects, drafts and real actions',async()=>{
+ const x=await boot({'/api/projects':{items:[{id:31,title:'Mon chantier',status:'open',town:'Toulouse'},{id:32,title:'Ancien chantier',status:'closed',town:'Toulouse'}]},'/api/v4/drafts':{items:[{id:41,title:'Brouillon personnel',version:1,trades:[],photos:[]}]},'/api/conversations':{items:[]},'/api/notifications?unread_only=true':{unread:2,items:[{message:'Une candidature reçue'}]}},null,'http://localhost:8765/particulier');
+ try{
+  const d=x.w.document,panels=[...d.querySelectorAll('.requester-overview>.panel')];
+  assert.equal(d.title,'Mon accueil · Un Coup de Pouce');
+  assert.equal(panels.length,4);assert.equal(panels[0].querySelector('.overview-count').textContent,'1');
+  assert.match(panels[1].textContent,/Brouillon personnel/);assert.doesNotMatch(panels[0].textContent,/Ancien chantier/);
+  assert.equal(d.querySelector('body').dataset.space,'requester');
+  assert.doesNotMatch(d.querySelector('#tabs').textContent,/Mes candidatures|Mon entreprise|Trouver des projets/);
+  [...d.querySelectorAll('#view button')].find(b=>b.textContent==='Créer un projet').click();
+  assert.ok(d.querySelector('.wizard'));assert.match(d.title,/Décrire mon projet/);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+ }finally{x.close()}
+});
+
+test('a saved draft can be resumed from the personal home without publishing it',async()=>{
+ const draft={id:41,title:'Cuisine à rénover',description:'Remplacer les anciens équipements de cuisine.',town:'Toulouse',version:3,trades:['plomberie'],photos:[],timing:'month'};
+ const x=await boot({'/api/v4/drafts':{items:[draft]},'/api/conversations':{items:[]},'/api/notifications?unread_only=true':{unread:0,items:[]}},null,'http://localhost:8765/particulier');
+ try{
+  [...x.w.document.querySelectorAll('#view button')].find(b=>b.textContent==='Reprendre ce brouillon').click();
+  assert.equal(x.w.document.querySelector('.wizard [name=title]').value,draft.title);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+ }finally{x.close()}
+});
+
+test('a professional starts on the activity dashboard and can open real project search',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Atelier',role:'professional',csrf:'pro-token'},'/api/projects':{items:[],search_scope:'ready'},'/api/my-applications':{items:[]},'/api/conversations':{items:[]},'/api/notifications?unread_only=true':{unread:0,items:[]}},null,'http://localhost:8765/professionnel');
+ try{
+  const d=x.w.document;assert.equal(d.title,'Vue d’ensemble · Un Coup de Pouce');
+  assert.equal(d.body.dataset.space,'professional');assert.ok(d.querySelector('.overview-grid'));
+  assert.doesNotMatch(d.querySelector('#tabs').textContent,/Mon accueil|Mes projets/);
+  [...d.querySelectorAll('#tabs button')].find(b=>b.textContent==='Trouver des projets').click();await tick();
+  assert.ok(d.querySelector('.project-search'));assert.equal(x.w.location.hash,'#projects');
+  assert.equal(d.querySelector('[aria-current=page]').textContent,'Trouver des projets');
+ }finally{x.close()}
+});
+
+test('a professional URL and forbidden view cannot turn a requester session into a professional',async()=>{
+ const x=await boot({'/api/conversations':{items:[]},'/api/notifications?unread_only=true':{unread:0,items:[]}},null,'http://localhost:8765/professionnel#enterprise');
+ try{
+  const d=x.w.document;assert.equal(d.body.dataset.space,'requester');assert.equal(d.title,'Mon accueil · Un Coup de Pouce');
+  assert.equal(d.querySelector('#actor-role').textContent,'ESPACE PARTICULIER');
+  assert.equal(x.calls.some(c=>c.url==='/api/enterprise'||c.url==='/api/my-applications'),false);
+ }finally{x.close()}
+});
+
+test('one failed dashboard section leaves other personal information usable and renders text safely',async()=>{
+ const x=await boot({'/api/projects':{status:503,data:{detail:'Indisponible'}},'/api/v4/drafts':{items:[{id:41,title:'<img src=x onerror=unsafe()>',trades:[]}]},'/api/conversations':{items:[]},'/api/notifications?unread_only=true':{unread:0,items:[]}},null,'http://localhost:8765/particulier');
+ try{
+  const d=x.w.document;assert.equal(d.querySelectorAll('.requester-overview>.panel').length,4);
+  assert.match(d.querySelector('.requester-overview').textContent,/momentanément indisponible/);
+  assert.ok([...d.querySelectorAll('#view button')].some(b=>b.textContent==='Reprendre ce brouillon'));
+  assert.equal(d.querySelector('.requester-overview img'),null);
  }finally{x.close()}
 });

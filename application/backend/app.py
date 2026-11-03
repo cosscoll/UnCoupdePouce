@@ -1219,6 +1219,8 @@ def delete_own_account(user=Depends(get_user)):
     return {'ok':True}
 
 @app.get('/')
+@app.get('/particulier')
+@app.get('/professionnel')
 def root():return FileResponse(ROOT/'static'/'index.html')
 
 @app.get('/manifest.webmanifest')

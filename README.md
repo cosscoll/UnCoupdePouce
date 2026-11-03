@@ -2,6 +2,23 @@
 
 Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en relation entre particuliers ayant un projet de travaux et professionnels du BTP.
 
+## Ouvrir l’application — deux espaces
+
+**[Entrée principale : choisir Particulier ou Professionnel](https://cosscoll.github.io/UnCoupdePouce/)**
+
+| Espace | Accès direct | Parcours |
+|---|---|---|
+| Particulier | [Ouvrir mon espace](https://ucp-preproduction.vercel.app/particulier) | Accueil personnel, brouillons, publication, candidatures reçues, messages |
+| Professionnel | [Ouvrir mon espace](https://ucp-preproduction.vercel.app/professionnel) | Tableau d’activité, recherche de chantiers, candidatures, profil et messages |
+
+L’application est en **préproduction privée**, avec accès autorisé puis connexion
+au compte. Le choix d’entrée ne change jamais le rôle du compte connecté.
+GitHub Pages héberge le point d’entrée et la présentation ; les données et actions
+sont traitées dans l’application Vercel. La branche de livraison est **`main`**,
+le code applicatif se trouve dans **[`application/`](application/)**.
+La [vitrine](https://cosscoll.github.io/UnCoupdePouce/site-vitrine/dist/index.html)
+reste une présentation séparée.
+
 ## Suivi du projet
 
 - [Vitrine publique vérifiée](https://cosscoll.github.io/UnCoupdePouce/site-vitrine/dist/index.html)
@@ -36,7 +53,7 @@ Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en rela
 - [Audit de reprise du 27 octobre](application/docs/REPRISE_2026-10-27.md)
 - [Sources de la vitrine](site-vitrine/dist/index.html)
 - [Tableau d'avancement : fait / reste à faire / blocages](site-vitrine/dist/avancement.html)
-- [Page d'accueil compatible GitHub Pages](index.html) — l'hébergement GitHub Pages doit être activé et vérifié séparément.
+- [Accueil GitHub Pages : accès aux deux espaces](index.html).
 
 ## Contenu
 

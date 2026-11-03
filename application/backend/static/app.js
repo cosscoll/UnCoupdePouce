@@ -56,13 +56,73 @@ async function action(fn,success){
  catch(e){if(!e.stale)msg(e.message,'error');return null}
  finally{acting=false;$('#main').removeAttribute('aria-busy');if(currentDraft)queueDraftAutosave(currentDraft)}
 }
-async function go(v){if(currentDraft){const saved=await action(saveDraft,'Brouillon enregistré avant de changer de page.');if(!saved)return;stopDraft()}setNavigationOpen(false);appState.view=v;const token=renderEpoch+1;await render();if(token===renderEpoch)focusPageHeading()}
+async function go(v){if(currentDraft){const saved=await action(saveDraft,'Brouillon enregistré avant de changer de page.');if(!saved)return;stopDraft()}setNavigationOpen(false);appState.view=v;history.replaceState(null,'','#'+v);const token=renderEpoch+1;await render();if(token===renderEpoch)focusPageHeading()}
 function focusPageHeading(){const target=$('#view h2')||$('#view h3')||$('#main');target.setAttribute('tabindex','-1');target.focus()}
 function setNavigationOpen(open){const toggle=$('#navigation-toggle');$('.sidebar').dataset.navigationOpen=String(open);toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',(open?'Masquer':'Afficher')+' la navigation de mon espace')}
 function showDialog(title,content){++dialogEpoch;const dialog=$('#dialog'),wasOpen=dialog.open;if(!wasOpen)dialogReturnFocus=document.activeElement;const n=clear($('#dialog-content')),heading=el('h3',{id:'dialog-title',tabindex:'-1',text:title});n.append(heading,content);dialog.setAttribute('aria-labelledby','dialog-title');dialog.showModal();(wasOpen?heading:n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')||$('#dialog-close')).focus()}
 function ask(title,desc,fn){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const dialogToken=dialogEpoch;const r=await action(fn);if(r){if(dialogToken===dialogEpoch&&$('#dialog').open)$('#dialog').close();const token=renderEpoch+1;await render();if(token===renderEpoch&&!$('#dialog').open)focusPageHeading()}},'primary'));showDialog(title,body)}
-function menu(){const r=appState.user.role;const items=r==='requester'?[['projects','Mes projets','projects'],['conversations','Messages','messages']]:r==='professional'?[['professional-home','Vue d’ensemble','settings'],['projects','Trouver des projets','projects'],['favorites','Mes favoris','check'],['applications','Mes candidatures','check'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','settings']]:[['admin','Vue d’ensemble','settings'],['moderation','Modération','projects'],['catalog','Métiers du bâtiment','settings']];items.push(['support','Assistance','messages'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']);setNavigationOpen(false);const current=items.find(([key])=>key===appState.view)?.[1]||'Mon espace';$('#navigation-current').textContent=current;document.title=current+' · Un Coup de Pouce';const n=clear($('#tabs'));for(const[key,t,i]of items)n.append(el('button',{class:'navlink '+(appState.view===key?'active':''),type:'button','aria-current':appState.view===key?'page':'false',onClick:()=>go(key)},icon(i),t))}
-async function render(){guidedHelp?.sync();$('#guided-help-open').hidden=!appState.user||!['requester','professional'].includes(appState.user.role);++chatEpoch;const epoch=++renderEpoch;clearInterval(chatTimer);chatTimer=null;const u=appState.user;$('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#logout').hidden=!u;if(!u){document.title='Un Coup de Pouce · Votre espace travaux';return}$('#actor-role').textContent={requester:'ESPACE PARTICULIER',professional:'ESPACE PROFESSIONNEL',admin:'ADMINISTRATION'}[u.role];$('#actor-title').textContent='Bonjour, '+u.name;if(!appState.view)appState.view=u.role==='admin'?'admin':'projects';menu();const target=clear($('#view'));target.append(el('div',{class:'loading',text:'Chargement de votre espace…'}));const fragment=document.createElement('div');try{const f={'professional-home':renderProfessionalHome,projects:renderProjects,favorites:renderFavorites,applications:renderApplications,conversations:renderConversations,profile:renderProfile,enterprise:renderEnterprise,admin:renderAdmin,moderation:renderModeration,catalog:renderCatalog,support:renderSupport,notifications:renderNotifications,'personal-data':renderPersonalData}[appState.view];await f(fragment);if(epoch===renderEpoch)target.replaceChildren(...fragment.childNodes)}catch(e){if(epoch===renderEpoch){clear(target);viewError(target,e)}}}
+function roleNavigation(role){
+ const items=role==='requester'?[['requester-home','Mon accueil','settings'],['projects','Mes projets','projects'],['conversations','Messages','messages']]:role==='professional'?[['professional-home','Vue d’ensemble','settings'],['projects','Trouver des projets','projects'],['favorites','Mes favoris','check'],['applications','Mes candidatures','check'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','settings']]:[['admin','Vue d’ensemble','settings'],['moderation','Modération','projects'],['catalog','Métiers du bâtiment','settings']];
+ return [...items,['support','Assistance','messages'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']];
+}
+function initialView(role){
+ const requested=location.hash.slice(1);
+ return roleNavigation(role).some(([key])=>key===requested)?requested:role==='requester'?'requester-home':role==='professional'?'professional-home':'admin';
+}
+function menu(){
+ const items=roleNavigation(appState.user.role);setNavigationOpen(false);
+ const current=items.find(([key])=>key===appState.view)?.[1]||'Mon espace';
+ $('#navigation-current').textContent=current;document.title=current+' · Un Coup de Pouce';
+ const n=clear($('#tabs'));for(const[key,t,i]of items)n.append(el('button',{class:'navlink '+(appState.view===key?'active':''),type:'button','aria-current':appState.view===key?'page':'false',onClick:()=>go(key)},icon(i),t));
+}
+async function render(){
+ guidedHelp?.sync();$('#guided-help-open').hidden=!appState.user||!['requester','professional'].includes(appState.user.role);
+ ++chatEpoch;const epoch=++renderEpoch;clearInterval(chatTimer);chatTimer=null;const u=appState.user;
+ $('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#logout').hidden=!u;
+ document.body.dataset.space=u?.role||entrySpace;
+ if(!u){document.title='Un Coup de Pouce · Votre espace travaux';return}
+ $('#actor-role').textContent={requester:'ESPACE PARTICULIER',professional:'ESPACE PROFESSIONNEL',admin:'ADMINISTRATION'}[u.role];
+ $('#actor-title').textContent='Bonjour, '+u.name;
+ if(!appState.view)appState.view=initialView(u.role);menu();
+ const target=clear($('#view'));target.append(el('div',{class:'loading',text:'Chargement de votre espace…'}));const fragment=document.createElement('div');
+ try{
+  const f={'requester-home':renderRequesterHome,'professional-home':renderProfessionalHome,projects:renderProjects,favorites:renderFavorites,applications:renderApplications,conversations:renderConversations,profile:renderProfile,enterprise:renderEnterprise,admin:renderAdmin,moderation:renderModeration,catalog:renderCatalog,support:renderSupport,notifications:renderNotifications,'personal-data':renderPersonalData}[appState.view];
+  await f(fragment);if(epoch===renderEpoch)target.replaceChildren(...fragment.childNodes);
+ }catch(e){if(epoch===renderEpoch){clear(target);viewError(target,e)}}
+}
+async function renderRequesterHome(n){
+ if(appState.user.role!=='requester')throw Error('Cet accueil est réservé à l’espace particulier.');
+ const epoch=renderEpoch;
+ n.append(heading('Votre projet, du début à la rencontre.','Préparez votre demande, retrouvez les candidatures et avancez avec le professionnel que vous choisissez.','Créer un projet',()=>startWizard()));
+ n.append(el('div',{class:'home-actions'},button('Être aidé pour mon annonce',openGuidedHelp),button('Voir tous mes projets',()=>go('projects')),button('Ouvrir mes messages',()=>go('conversations'))));
+ const grid=el('div',{class:'overview-grid requester-overview'});n.append(grid);
+ const sections=[
+  {title:'Mes projets en cours',path:'/projects',view:'projects',cta:'Gérer mes projets',draw(data,node){
+   const active=data.items.filter(p=>p.status!=='closed');node.append(el('strong',{class:'overview-count',text:active.length}),el('p',{class:'hint',text:'Projets publiés ou avec un professionnel sélectionné.'}));
+   for(const p of active.slice(0,3))node.append(el('div',{class:'item'},el('h4',{text:p.title}),badge(p.status),el('p',{class:'small muted',text:p.town}),button('Suivre ce projet',()=>projectDetail(p))));
+   if(!active.length)node.append(el('p',{text:'Votre prochain projet commence par une description de vos travaux.'}));
+  }},
+  {title:'Mes brouillons',path:'/v4/drafts',view:'projects',cta:'Voir mes brouillons',draw(data,node){
+   node.append(el('strong',{class:'overview-count',text:data.items.length}),el('p',{class:'hint',text:'Demandes enregistrées, pas encore publiées.'}));
+   for(const d of data.items.slice(0,3))node.append(el('div',{class:'item'},el('h4',{text:d.title||'Nouveau projet'}),button('Reprendre ce brouillon',()=>{appState.view='projects';menu();startWizard(d)})));
+   if(!data.items.length)node.append(el('p',{text:'Vous pouvez enregistrer une demande et la reprendre plus tard.'}));
+  }},
+  {title:'Mes échanges',path:'/conversations',view:'conversations',cta:'Voir mes échanges',draw(data,node){
+   node.append(el('strong',{class:'overview-count',text:data.items.length}),el('p',{class:'hint',text:'Conversations liées à vos sélections. Leur accès dépend des droits en cours ; ce nombre ne compte pas les messages non lus.'}));
+   for(const c of data.items.slice(0,3))node.append(el('div',{class:'item'},el('h4',{text:c.title}),el('p',{class:'small muted',text:c.peer})));
+  }},
+  {title:'Mes notifications',path:'/notifications?unread_only=true',view:'notifications',cta:'Voir mes notifications',draw(data,node){
+   node.append(el('strong',{class:'overview-count',text:data.unread}),el('p',{class:'hint',text:'Notifications internes non lues.'}));
+   for(const item of data.items.slice(0,3))node.append(el('p',{text:item.message}));
+  }}
+ ];
+ await Promise.all(sections.map(async section=>{
+  const box=panel(section.title),content=el('div');box.append(content,button(section.cta,()=>go(section.view),'link'));grid.append(box);
+  try{const data=await api(section.path);if(epoch!==renderEpoch)return;section.draw(data,content)}
+  catch(e){if(epoch===renderEpoch&&!e.stale)content.append(el('p',{class:'hint',text:'Cette rubrique est momentanément indisponible.'}),button('Réessayer',render,'link'))}
+ }));
+}
+
 function tradeNames(p){return (p.trades||(p.trades_json?JSON.parse(p.trades_json):[p.trade])).map(x=>trades[x]||x).join(' · ')}
 function amountField(label,name,value){return el('label',{},el('span',{text:label}),el('input',{type:'number',name,min:0,max:2147483647,step:1,inputmode:'numeric',value:value??''}))}
 const amountValue=value=>value==null||value===''?null:Number(value);
@@ -728,11 +788,32 @@ async function renderPersonalData(target){
   target.append(box);
 }
 async function loadCatalog(){catalog=(await api('/catalog')).items;for(const t of catalog)trades[t.id]=t.label}
+let entrySpace='requester';
+function selectEntrySpace(role,focus=false){
+ if(!['requester','professional'].includes(role))return;
+ entrySpace=role;const pro=role==='professional';
+ $('#space-requester').setAttribute('aria-pressed',String(!pro));$('#space-professional').setAttribute('aria-pressed',String(pro));
+ $('#welcome-eyebrow').textContent=pro?'ESPACE PROFESSIONNEL':'ESPACE PARTICULIER';
+ clear($('#welcome-title')).append(pro?'Les bons chantiers.':'Les bons pros.',el('br'),pro?'Pour votre ': 'Pour vos ',el('span',{text:pro?'savoir-faire.':'projets de travaux.'}));
+ $('#welcome-description').textContent=pro?'Trouvez les projets accessibles dans vos métiers et vos communes. Proposez votre candidature et suivez vos échanges.':'Décrivez vos travaux, comparez les candidatures et choisissez avec qui échanger.';
+ const steps=pro?['Présentez vos métiers et vos communes','Trouvez des projets adaptés','Suivez vos candidatures et vos échanges']:['Décrivez votre besoin','Comparez les candidatures reçues','Choisissez et échangez avec le professionnel'];
+ clear($('#welcome-steps')).append(...steps.map((text,i)=>el('p',{},el('b',{text:'0'+(i+1)}),text)));
+ $('#auth-title').textContent=pro?'Votre espace professionnel.':'Votre espace particulier.';
+ $('#auth-space').textContent=pro?'Votre activité, vos candidatures et vos messages.':'Vos demandes, vos brouillons et vos échanges.';
+ $('#register-form [name=role]').value=role;
+ $('#login-form [name=email]').placeholder=pro?'atelier@ucp.test':'camille@ucp.test';
+ if(!appState.user)document.body.dataset.space=role;
+ if(focus)$('#auth-title').focus();
+}
+$('#space-requester').addEventListener('click',()=>selectEntrySpace('requester'));
+$('#space-professional').addEventListener('click',()=>selectEntrySpace('professional'));
+$('#register-form [name=role]').addEventListener('change',e=>selectEntrySpace(e.target.value));
+selectEntrySpace(location.pathname==='/professionnel'?'professional':'requester');
 function authTab(register){$('#tab-login').classList.toggle('selected',!register);$('#tab-register').classList.toggle('selected',register);$('#login-form').hidden=register;$('#register-form').hidden=!register;msg('')}
 $('#tab-login').addEventListener('click',()=>authTab(false));$('#tab-register').addEventListener('click',()=>authTab(true));
 $('#login-form').addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/login',{method:'POST',body:formValue(e.currentTarget)}));if(r){$('#login-form [name=password]').value='';appState.user={id:r.user_id,name:r.name,role:r.role};appState.projectFilters=null;appState.csrf=r.csrf;appState.view=null;const token=renderEpoch+1;await render();if(token===renderEpoch)focusPageHeading()}});
 $('#register-form').addEventListener('submit',async e=>{e.preventDefault();const d=formValue(e.currentTarget);const r=await action(()=>api('/register',{method:'POST',body:d}));if(r){$('#register-form [name=password]').value='';UCPAnalytics.track('account_created',{role:d.role});authTab(false);$('#login-form [name=email]').value=d.email;$('#login-form [name=password]').focus();msg('Votre compte de test est créé. Connectez-vous pour commencer.','success')}});
-$('#logout').addEventListener('click',async()=>{const r=await action(()=>api('/logout',{method:'POST'}));if(r){$('#login-form').reset();$('#register-form').reset();$('#dialog').close();clear($('#dialog-content'));clear($('#view'));appState.user=null;appState.csrf=null;appState.view=null;appState.projectFilters=null;stopDraft();UCPAnalytics.reset();render()}});
+$('#logout').addEventListener('click',async()=>{const r=await action(()=>api('/logout',{method:'POST'}));if(r){$('#login-form').reset();$('#register-form').reset();selectEntrySpace(entrySpace);$('#dialog').close();clear($('#dialog-content'));clear($('#view'));appState.user=null;appState.csrf=null;appState.view=null;appState.projectFilters=null;stopDraft();UCPAnalytics.reset();render()}});
 $('#navigation-toggle').addEventListener('click',()=>setNavigationOpen($('#navigation-toggle').getAttribute('aria-expanded')!=='true'));
 $('.sidebar').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#navigation-toggle').getAttribute('aria-expanded')==='true'){e.preventDefault();setNavigationOpen(false);$('#navigation-toggle').focus()}});
 $('#dialog').addEventListener('close',()=>{if($('#dialog').open)return;const previous=dialogReturnFocus;dialogReturnFocus=null;if(previous?.isConnected&&!previous.disabled&&!previous.closest('[hidden],dialog:not([open])'))previous.focus();else focusPageHeading()});

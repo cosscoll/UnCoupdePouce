@@ -9,31 +9,31 @@
     },
     {
       "page": "projet.html",
-      "checks": 75,
+      "checks": 72,
       "h1": 1,
       "lang": "fr"
     },
     {
       "page": "informations.html",
-      "checks": 66,
+      "checks": 63,
       "h1": 1,
       "lang": "fr"
     },
     {
       "page": "index.html",
-      "checks": 103,
+      "checks": 100,
       "h1": 1,
       "lang": "fr"
     },
     {
       "page": "404.html",
-      "checks": 66,
+      "checks": 63,
       "h1": 1,
       "lang": "fr"
     },
     {
       "page": "en/index.html",
-      "checks": 72,
+      "checks": 69,
       "h1": 1,
       "lang": "en"
     }
@@ -83,23 +83,23 @@
   "assets": [
     {
       "file": "avancement.html",
-      "bytes": 8548,
-      "gzip_bytes": 3425
+      "bytes": 8628,
+      "gzip_bytes": 3443
     },
     {
       "file": "projet.html",
-      "bytes": 10840,
-      "gzip_bytes": 4081
+      "bytes": 10870,
+      "gzip_bytes": 4098
     },
     {
       "file": "informations.html",
-      "bytes": 7775,
-      "gzip_bytes": 2922
+      "bytes": 7805,
+      "gzip_bytes": 2946
     },
     {
       "file": "index.html",
-      "bytes": 19815,
-      "gzip_bytes": 6279
+      "bytes": 19845,
+      "gzip_bytes": 6303
     },
     {
       "file": "_headers",
@@ -113,13 +113,13 @@
     },
     {
       "file": "404.html",
-      "bytes": 4502,
-      "gzip_bytes": 1675
+      "bytes": 4532,
+      "gzip_bytes": 1697
     },
     {
       "file": "en/index.html",
-      "bytes": 11024,
-      "gzip_bytes": 3894
+      "bytes": 11047,
+      "gzip_bytes": 3911
     },
     {
       "file": "assets/logo.svg",
