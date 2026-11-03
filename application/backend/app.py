@@ -137,6 +137,8 @@ def init_db():
         project_cols=[r['name'] for r in c.execute('PRAGMA table_info(projects)').fetchall()]
         for column in ('budget_min','budget_max'):
             if column not in project_cols:c.execute(f'ALTER TABLE projects ADD COLUMN {column} INTEGER CHECK ({column}>=0)')
+        if 'applications_paused' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN applications_paused INTEGER NOT NULL DEFAULT 0 CHECK (applications_paused IN (0,1))')
+        if 'intake_version' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN intake_version INTEGER NOT NULL DEFAULT 0 CHECK (intake_version>=0)')
         application_cols=[r['name'] for r in c.execute('PRAGMA table_info(applications)').fetchall()]
         if 'linked_profile_id' not in application_cols:
             c.execute('ALTER TABLE applications ADD COLUMN linked_profile_id INTEGER REFERENCES enterprise_artisans(id)')
@@ -230,6 +232,8 @@ NOTIFICATION_TYPES = {
     'application_rejected': 'Une de vos candidatures de test a été refusée.',
     'application_withdrawn': 'Une candidature sur votre projet a été retirée.',
     'project_closed': 'Un projet auquel vous avez candidaté a été clôturé.',
+    'project_intake_paused': 'Le demandeur a mis les nouvelles candidatures en pause. Votre candidature est conservée ; les échanges restent soumis aux droits en cours.',
+    'project_intake_resumed': 'Le demandeur reçoit de nouveau des candidatures. Votre candidature conserve son état ; les échanges restent soumis aux droits en cours.',
     'new_message': 'Un nouveau message fictif vous attend dans une conversation.',
     'support_resolved': 'Une réponse à votre demande d’assistance est disponible dans Assistance.',
     'report_resolved': 'Une réponse à votre signalement est disponible dans Assistance.',
@@ -580,7 +584,7 @@ def apply_with_enterprise_profile(project_id:int,linked_id:int,user=Depends(requ
         except ValueError:
             error(403,'Ancien projet fictif bloqué : données de contact directes')
         trades=json.loads(linked['service_trades']);zones={z.casefold() for z in json.loads(linked['service_areas'])}
-        if proj['hidden'] or proj['status']!='open' or not (project_trades(proj) & set(trades)) or proj['town'].casefold() not in zones:
+        if proj['hidden'] or proj['applications_paused'] or proj['status']!='open' or not (project_trades(proj) & set(trades)) or proj['town'].casefold() not in zones:
             error(403,'Projet hors métier, hors zone ou clos')
         created=now()
         enforce_application_rate(c,user['id'],project_id,created,APPLICATION_LIMITS)
@@ -806,7 +810,7 @@ def close_project(project_id:int,user=Depends(require('requester'))):
         if project['status']=='closed':error(409,'Projet déjà clôturé')
         targets=c.execute("SELECT professional_id FROM applications WHERE project_id=? AND status IN ('pending','accepted')",
                           (project_id,)).fetchall()
-        c.execute("UPDATE projects SET status='closed' WHERE id=?",(project_id,))
+        c.execute("UPDATE projects SET status='closed',applications_paused=0,intake_version=intake_version+1 WHERE id=?",(project_id,))
         c.execute("UPDATE applications SET status='rejected' WHERE project_id=? AND status='pending'",(project_id,))
         for target in targets:queue_notice(c,target['professional_id'],'project_closed',project_id)
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
@@ -817,7 +821,7 @@ def close_project(project_id:int,user=Depends(require('requester'))):
 def discover_projects(c,user):
     """Authorized project discovery, reused by lists and private favorites."""
     from project_search import decorate
-    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,
+    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,p.applications_paused,p.intake_version,
     (SELECT payload FROM drafts WHERE project_id=p.id ORDER BY id LIMIT 1) AS draft_payload'''
     discovery='not_applicable'
     if user['role']=='requester':
@@ -827,7 +831,7 @@ def discover_projects(c,user):
         discovery='profile_required' if not p else 'pending_review' if not p['approved'] else 'ready'
         # Authorization precedes all filters. No requester identity or outside counts.
         possible=c.execute('SELECT '+columns+''' FROM projects p JOIN users u ON u.id=p.requester_id
-            WHERE p.status=? AND p.hidden=0 AND u.suspended=0 ORDER BY p.id DESC''',('open',)).fetchall() if p and p['approved'] else []
+            WHERE p.status=? AND p.hidden=0 AND p.applications_paused=0 AND u.suspended=0 ORDER BY p.id DESC''',('open',)).fetchall() if p and p['approved'] else []
         eligible={zone.casefold() for zone in json.loads(p['service_areas'] or '[]')} if p else set()
         valid_trades={p['trade'],*json.loads(p['service_trades'] or '[]')} if p else set()
         if p:eligible.add(p['town'].casefold())
@@ -891,7 +895,7 @@ def apply(project_id:int,user=Depends(require('professional'))):
         eligible={zone.casefold() for zone in json.loads(p['service_areas'] or '[]')}
         eligible.add(p['town'].casefold())
         valid_trades={p['trade'],*json.loads(p['service_trades'] or '[]')}
-        if project['hidden'] or project['status']!='open' or not (project_trades(project) & valid_trades) or project['town'].casefold() not in eligible:
+        if project['hidden'] or project['applications_paused'] or project['status']!='open' or not (project_trades(project) & valid_trades) or project['town'].casefold() not in eligible:
             error(403,'Projet non éligible au métier, à la zone ou au statut')
         created=now()
         enforce_application_rate(c,user['id'],project_id,created,APPLICATION_LIMITS)
@@ -941,7 +945,7 @@ def reject_application(application_id:int,user=Depends(require('requester'))):
 def my_applications(user=Depends(require('professional'))):
     with authenticated_db(user,write=False) as c:
         rows=c.execute('''SELECT applications.id,applications.status,applications.created_at AS submitted_at,
-        projects.title,projects.trade,projects.town,projects.status AS project_status,
+        projects.title,projects.trade,projects.town,projects.status AS project_status,projects.applications_paused AS project_paused,
         linked.alias AS linked_artisan_alias FROM applications JOIN projects ON projects.id=applications.project_id
         LEFT JOIN enterprise_artisans linked ON linked.id=applications.linked_profile_id
         WHERE applications.professional_id=? ORDER BY applications.id DESC''',(user['id'],)).fetchall()
@@ -1010,7 +1014,7 @@ def accept(application_id:int,user=Depends(require('requester'))):
         if SINGLE_ACCEPT:
             pending=c.execute("SELECT id,professional_id FROM applications WHERE project_id=? AND id!=? AND status='pending'",
                               (item['project_id'],application_id)).fetchall()
-            c.execute('UPDATE projects SET status=? WHERE id=?',('selected',item['project_id']))
+            c.execute('UPDATE projects SET status=?,applications_paused=0,intake_version=intake_version+1 WHERE id=?',('selected',item['project_id']))
             c.execute('UPDATE applications SET status=? WHERE project_id=? AND id!=? AND status=?',('rejected',item['project_id'],application_id,'pending'))
             for other in pending:queue_notice(c,other['professional_id'],'application_rejected',other['id'])
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
@@ -1097,7 +1101,7 @@ def send_message(aid:int,body:Message,request:Request,user=Depends(get_user)):
 def account_export(user=Depends(get_user)):
     # Limited lab export: only the authenticated participant's records, never another user's messages.
     with authenticated_db(user,write=False) as c:
-        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max FROM projects WHERE requester_id=?',(user['id'],))]
+        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,applications_paused,intake_version FROM projects WHERE requester_id=?',(user['id'],))]
         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
         import base64
         own_photos=[{'id':r['id'],'draft_id':r['draft_id'],'jpeg_base64':base64.b64encode(r['body']).decode()} for r in c.execute('SELECT photos.id,draft_id,body FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.owner_id=?',(user['id'],))]
@@ -1242,6 +1246,7 @@ from professional_showcase import install as install_showcase
 from saved_searches import install as install_saved_searches
 from project_favorites import install as install_favorites
 from demo_access import install as install_demo_access
+from project_intake import install as install_project_intake
 if DATABASE_URL:
     from postgres import initialize_schema
     initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
@@ -1255,6 +1260,7 @@ with initialization:
     install_saved_searches(sys.modules[__name__])
     install_favorites(sys.modules[__name__])
     install_demo_access(sys.modules[__name__])
+    install_project_intake(sys.modules[__name__])
     # Optional, one-time fictional seed under the initialization lock.
     if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
         with connect() as c:

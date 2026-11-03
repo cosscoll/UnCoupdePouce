@@ -87,3 +87,14 @@ ces demandeurs, sans promettre une ouverture du chat. Les retraits restent acqui
 Ces alertes génériques partagent la transaction du changement d'état et de l'audit ;
 les refus et répétitions sans changement ne créent aucune alerte. Elles n'ajoutent
 ni email, ni push, ni tâche récurrente. Voir [effets et limites](ENTREPRISE_EFFETS.md).
+
+
+## Pause et réouverture des candidatures — 3 novembre
+
+`project_intake_paused` et `project_intake_resumed` ciblent les professionnels dont
+la candidature est en attente ou sélectionnée, une seule fois par compte pour
+chaque transition. `entity_id` désigne le projet. Les messages internes expliquent
+que la candidature garde son état et que les échanges restent soumis aux droits
+en cours. Le changement, les notices et le journal partagent une transaction ;
+un doublon ou une révision périmée ne produit aucune notice. Voir
+[PAUSE_CANDIDATURES.md](PAUSE_CANDIDATURES.md).
