@@ -1,0 +1,37 @@
+{
+  "date": "2026-11-03",
+  "result": "PASS",
+  "https_check_groups": 2,
+  "button_and_script_order": true,
+  "asset_sha256": {
+    "guided-help.js": "b757a176dc7304573becb082a006f2dae5963ed5285974c926913cae5fa5492b",
+    "app.js": "9f9f7999a7c0555f864261a18f1a0443785b5af4ec67745786272afad2847282",
+    "style.css": "f6fba1706258927bcf6143673099918641740621b3187817480820131e7b2bff"
+  },
+  "proposal_accepted_as_unpublished_draft": true,
+  "no_project_published": true,
+  "fictional_test_draft_removed": true,
+  "draft_id": 15,
+  "browser_interaction": false,
+  "visual_acceptance": false,
+  "external_ai_provider": false,
+  "application_commit": "85224070b3fdd281e028844631ec4671bb0060c7",
+  "deployment_id": "dpl_7RW1U5hxRC98gqgfm3jiFZAznWZ6",
+  "ci": {
+    "date": "2026-11-02",
+    "run_id": 41429540457,
+    "head_sha": "f9073a68c3a9c0b3534c0e6d0550c34258078f39",
+    "result": "success",
+    "python_passed": 249,
+    "dom_logic_worker_passed": 112,
+    "dom_passed": 106,
+    "assistant_logic_passed": 3,
+    "worker_passed": 3
+  },
+  "requirements": {
+    "historical_total": 92,
+    "still_to_reevaluate": 37,
+    "F20": "partial"
+  },
+  "assistant_mode": "deterministic guided dialogue; no external language model"
+}
