@@ -1,51 +1,39 @@
-# UCP — chatbot conversationnel IA (lot du 3 novembre 2026)
+# UCP — assistant IA gratuit directement dans le navigateur (03/11/2026)
 
-## Portée du lot
+## Choix technique
 
-Le chatbot guidé `guided-help.js` de 2026-11-02 est conservé comme solution de repli technique si le module IA ne charge pas ; le module `assistant-ai.js` prend désormais la priorité lorsqu’il est présent. Il s’agit d'un **vrai modèle de langage**, pas d'un arbre de réponses. L’inférence se fait sur le serveur via **OpenAI Responses API** (`POST /v1/responses`), avec prompt français, contexte conversationnel et sortie JSON validée. Aucun texte fictif n’est envoyé au fournisseur avant l'action explicite de l'utilisateur.
+Le projet UCP **n'utilise plus l'API OpenAI payante** : le backend d'inférence, ses routes `/api/assistant/chat` et `/api/assistant/status` et les instructions de configuration d'une clé facturée ont été supprimés. Aucun abonnement, clé API, token fournisseur ou service de paiement n'est nécessaire pour le chatbot.
 
-### Parcours reliés
+Le moteur est [WebLLM](https://github.com/mlc-ai/web-llm) exécuté dans un **Web Worker** du navigateur, avec le modèle open source [Qwen2.5-0.5B-Instruct](https://huggingface.co/mlc-ai/Qwen2.5-0.5B-Instruct-q4f16_1-MLC), quantifié en 4 bits. L'ensemble des calculs s'exécute **sur le GPU du visiteur** via WebGPU ; les messages et réponses ne sont pas envoyés à une API de génération. Le modèle et son moteur sont téléchargés depuis les hébergements publics (Hugging Face/MLC/CDN jsDelivr) lors de la première utilisation, puis mis en cache par le navigateur, dans la mesure de ses capacités.
 
-- Particulier : dialogue libre, clarification, suggestion d’une annonce structurée (titre, description, commune, métiers, délai), affichage de la proposition, clic `Utiliser dans mon annonce`. L’application enregistre d’abord un éventuel brouillon en cours, ouvre le formulaire normal et ne publie rien.
-- Professionnel : dialogue libre, proposition de filtres (mots-clés, métier, commune, délai, période, budget, tri), clic `Appliquer ces filtres`, puis recherche UCP avec ses contrôles d’éligibilité. Aucune mission ni candidature n’est créée par l’IA.
-- Tous : questions sur la navigation, profils, candidatures, messagerie, assistance. Le chatbot ne lit pas les données privées du compte : il répond à partir du prompt et des messages saisis seulement. Boutons d'accès aux rubriques existantes.
-- Chaque clic d'action est volontaire ; suggestions et textes restent modifiables et soumis à la validation applicative.
+**Limitation importante :** ce moteur demande WebGPU et de la mémoire vidéo disponible (ordre de grandeur d'environ 1 Go pour la variante choisie), ainsi qu'un téléchargement initial de plusieurs centaines de mégaoctets. Il ne fonctionne donc **pas sur tous les téléphones**, anciens navigateurs ou ordinateurs. La qualité et la vitesse d'un modèle de 0,5 milliard de paramètres restent nettement inférieures à celles d'un grand modèle hébergé. Une solution universelle pour tous les appareils devra être envisagée séparément (serveur d'inférence auto-hébergé ou fournisseur externe) et pourrait nécessiter une infrastructure payante. Ce lot ne l'active pas.
 
-### Activer sans exposer la clé
+## Fonctionnalités effectivement câblées
 
-**Par défaut, désactivé**. L’application affiche clairement « IA non activée » et n’envoie aucun appel fournisseur.
+1. Fenêtre Assistant UCP après connexion côté particulier et côté professionnel, échanges naturels, maintien du contexte de la conversation en mémoire de page, génération à partir du prompt du système et de l'historique fourni par l'utilisateur.
+2. Bouton particulier **« Préparer mon annonce avec l’IA »** qui demande au modèle une proposition structurée (titre, description, commune, métiers, délai), la valide contre le catalogue actif côté navigateur et n'affiche le bouton **« Utiliser dans mon annonce »** que si la proposition est exploitable. Le transfert vers le brouillon suit l'ancien mécanisme : sauvegarde préalable des éventuelles saisies en cours, pas de publication automatique.
+3. Bouton professionnel **« Configurer ma recherche avec l’IA »** qui propose mots-clés, métier, commune, délai et budget. Après validation explicite, les filtres ouvrent le formulaire de recherche normal ; les droits et le catalogue serveur restent prioritaires. Pas d'envoi de candidature.
+4. Indication d'incompatibilité explicite lorsque WebGPU est absent : **aucune fausse réponse d'IA** ni bascule cachée vers un service payant.
+5. Téléchargement déclenché uniquement par l'utilisateur après acceptation ; progression de téléchargement / chargement indiquée. Aucun téléchargement automatique à l'ouverture de l'application.
+6. Réinitialisation du worker IA et de la conversation lors du changement de compte/session pour éviter des fuites de contenu entre comptes. Le navigateur peut conserver les **poids publics du modèle** en cache, pas les messages.
+7. La saisie est bornée (1 200 caractères par message) ; historique limité en mémoire. Les sorties applicables sont validées (champs, budget, métier du catalogue, coordonnées manifestes) mais restent toujours à relire. Les filtres de coordonnées ne constituent **pas** une garantie d'anonymisation.
 
-Configurer les variables secrètes côté serveur (pour préproduction Vercel : *Project → Settings → Environment Variables*), puis effectuer un nouveau déploiement :
+## Où se trouve le code
 
-```env
-UCP_AI_ENABLED=1
-UCP_AI_API_KEY=<clé API serveur uniquement>
-UCP_AI_MODEL=gpt-4.1-mini
-UCP_AI_USER_DAILY_LIMIT=30
-UCP_AI_GLOBAL_DAILY_LIMIT=200
-```
+- `application/backend/static/local-ai-worker.js` : import WebLLM CDN version épinglée, modèle, prompts, génération texte et génération JSON encadrée.
+- `application/backend/static/local-ai.js` : compatibilité, worker, messages, prévalidation des annonces et filtres.
+- `application/backend/static/assistant-ai.js` : interface de chat et boutons de confirmation.
+- `application/backend/static/app.js` : connexion aux brouillons/recherches existants sans publication automatique.
+- `application/backend/app.py` : politique CSP restreinte aux domaines nécessaires pour charger scripts, poids modèles et WebAssembly.
 
-Ne jamais placer `UCP_AI_API_KEY` dans GitHub, un `NEXT_PUBLIC_*`, JavaScript navigateur ou un document partagé. **La clé OpenAI API n’est pas fournie par ChatGPT Plus** ; l’utilisation de l’API peut générer des frais. L'activation n'est pas faite ici : elle requiert votre autorisation explicite du budget/fournisseur et une clé. Les plafonds ci-dessus sont des **quotas de requêtes**, et non un plafond monétaire réel ; mettre également un budget au niveau du fournisseur et un contrôle de facturation. Les quotas sont transactionnels dans la base UCP (table `ai_assistant_usage`), avec compteurs globaux et par utilisateur, pas de transcript.
+## Tests et vérifications
 
-### Sécurité et confidentialité
+Exécuter `node --test application/qa/assistant-ai.test.cjs application/qa/local-ai.test.cjs` et `pytest -q application/backend/tests/test_local_ai_assets.py`.
 
-- Sécurité de session/CSRF héritée de `get_user` et revérification de session avant de rendre la réponse du modèle.
-- Sortie JSON structurée et filtrée par les métiers actifs. Champs hors catalogue, budget incohérent, coordonnées évidentes et rôle inadapté ne deviennent jamais des suggestions applicables.
-- Les messages sont limités (1200 caractères, maximum 12 tours précédents). Les sorties sont limitées (900 tokens modèle, 1600 caractères affichés). Délai réseau de 22 secondes. Quotas quotidiens en base.
-- `store:false` pour la requête Responses. Aucune conversation n'est enregistrée par UCP ; cela n'est **pas** une garantie de rétention nulle chez le fournisseur. À documenter avant utilisateurs réels : traitement des données, base légale, durée de conservation, transfert hors UE éventuel.
-- Les consignes indiquent données fictives uniquement en préproduction. Le filtre de coordonnées est une barrière indicative, pas une anonymisation infaillible.
-- Modèle externe non autorisé pour publier, candidater, débloquer un compte, diagnostiquer techniquement, vérifier un document ou promettre la disponibilité d’un chantier.
-- Pas de clé configurée ni d’appel réel au fournisseur lors de la livraison ; les tests fournisseur sont **mockés**. Recette manuelle avec la clé, tests navigateur réel et vérification du coût restant à faire avant activation.
+Les tests automatisés simulent la génération et vérifient les droits/confirmations, mais **ne prouvent pas encore le téléchargement WebGPU complet ni la qualité des réponses**. Avant d'ouvrir l'outil aux utilisateurs, faire la recette sur un PC Chrome/Edge avec WebGPU et sur plusieurs appareils Android/iPhone représentatifs. Vérifier les erreurs réseau/CORS/CSP, téléchargement complet, réponse à trois messages successifs, extraction d'annonce et de filtres, performances, consommation mémoire, puis session expirée.
 
-### Points de contrôle
+En préproduction UCP, saisissez uniquement des données fictives. Les hébergeurs publics voient les requêtes de téléchargement d'assets (par exemple IP/agent utilisateur), même si les messages de discussion n'y sont pas envoyés.
 
-- `pytest -q backend/tests/test_ai_assistant.py`
-- `node --test qa/guided-help.test.cjs`
-- Connexion particulier : ouvrir assistant, accepter le transfert, décrire une annonce, vérifier la suggestion, ouvrir le brouillon et relire.
-- Connexion pro : demander une recherche, confirmer les filtres, vérifier droits, communes et résultats.
-- Déconnecter le compte pendant une réponse longue : aucune réponse d'une ancienne session ne doit se réafficher.
-- Désactiver `UCP_AI_ENABLED` : l’interface doit afficher un blocage explicite sans générer de texte artificiel.
+## Contrainte budgétaire
 
-### Suites utiles
-
-Conserver et reprendre l'historique de conversations avec consentement, assistance contextuelle à partir des projets privés avec permissions contrôlées, suggestion de réponses aux messages sans envoi automatique, aide au suivi des devis, notifications d'assistance humaine et contrôle qualité de la pertinence des métiers/recherches. Ces fonctionnalités ne sont **pas** incluses dans le lot.
+**Aucun coût de génération par message, aucune consommation d'API IA payante.** Cela n'affirme pas que l'hébergement web, la bande passante CDN, les limites gratuites de Vercel, les appareils ou l'accès Internet resteront toujours gratuits et illimités. Aucun nouveau service payant, abonnement, quota limité d'agent/Work/Codex ou automatisation ChatGPT n'a été activé.
