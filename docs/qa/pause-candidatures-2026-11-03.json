@@ -1,0 +1,42 @@
+{
+  "date": "2026-11-03",
+  "requirement": "F18",
+  "conclusion": "partial_developed_deployment_pending",
+  "historical_requirements": 92,
+  "still_to_reevaluate": 29,
+  "new_full_acceptances": 0,
+  "application_commit": "75c3b4f5e5c3f514cf51fcfc3daf11334e405c09",
+  "pr": 54,
+  "ci": {
+    "run_id": 41655725118,
+    "head": "7ae7392cefed661ef71ede2f9f831104c4991a9d",
+    "result": "success",
+    "python": 286,
+    "dom_logic_worker": 126,
+    "new_dedicated_sqlite_cases": 13,
+    "new_postgres_scenarios": 3,
+    "new_dom_scenarios": 5
+  },
+  "deployment": {
+    "status": "blocked",
+    "provider": "Vercel",
+    "description": "Deployment rate limited — retry in 24 hours.",
+    "provider_status_created_at": "2026-11-03T14:43:56Z",
+    "paid_upgrade_performed": false,
+    "deployment_for_new_commit_created": false,
+    "current_online_commit": "2f82a071ac26f937fce164d0c306693cc8735c0d",
+    "current_online_deployment": "dpl_DYvEah6SxT7zviWhTLdMJGgWYxHn",
+    "current_online_state": "READY"
+  },
+  "https_acceptance": {
+    "performed": false,
+    "reason": "New commit has no deployment because provider rate limit blocks it.",
+    "new_remote_business_fixtures_created": 0
+  },
+  "vitrine": {
+    "static_check": "PASS",
+    "javascript_tests": 55
+  },
+  "authenticated_visual_acceptance": false,
+  "real_billing": false
+}

@@ -23,6 +23,8 @@ reste une présentation séparée.
 
 [Connexion par identifiant court des comptes de démonstration](application/docs/ACCES_DEMONSTRATION.md).
 
+[Pause et réouverture des candidatures](application/docs/PAUSE_CANDIDATURES.md) — développées et testées, **mise en ligne en attente de la limite Vercel**.
+
 ## Suivi du projet
 
 - [Vitrine publique vérifiée](https://cosscoll.github.io/UnCoupdePouce/site-vitrine/dist/index.html)
@@ -85,8 +87,8 @@ Sous Windows, utilisez `application/DEMARRER.bat`. Ces commandes lancent le dév
 
 ## Vérifications de référence
 
-- Application : 270 tests Python réussis sur GitHub Actions le 03/11/2026 (SQLite et PostgreSQL 17).
-- Interface de l'application : 115 tests DOM, 3 tests de logique de l’assistant et 3 tests de service worker réussis (121 au total).
+- Application : 286 tests Python réussis sur GitHub Actions le 03/11/2026 (SQLite et PostgreSQL 17).
+- Interface de l'application : 120 tests DOM, 3 tests de logique de l’assistant et 3 tests de service worker réussis (126 au total).
 - Vitrine : contrôles statiques et tests des scénarios de brief réussis.
 - Parcours HTTPS réel publication → candidature → sélection → messagerie et refus inter-comptes réussis sur la préproduction.
 - Vitrine ouverte dans un navigateur réel ; rendu mobile sur appareils, installation/réouverture PWA et restauration PostgreSQL distante restent à vérifier.

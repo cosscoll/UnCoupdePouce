@@ -91,6 +91,8 @@ ni email, ni push, ni tâche récurrente. Voir [effets et limites](ENTREPRISE_EF
 
 ## Pause et réouverture des candidatures — 3 novembre
 
+Ces deux événements sont développés et testés ; la livraison du lot reste bloquée par la limite Vercel.
+
 `project_intake_paused` et `project_intake_resumed` ciblent les professionnels dont
 la candidature est en attente ou sélectionnée, une seule fois par compte pour
 chaque transition. `entity_id` désigne le projet. Les messages internes expliquent

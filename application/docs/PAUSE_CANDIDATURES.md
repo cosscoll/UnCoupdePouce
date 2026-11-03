@@ -1,5 +1,7 @@
 # Mettre les nouvelles candidatures en pause
 
+**Disponibilité : développé et testé, mise en ligne en attente.** Vercel refuse actuellement le déploiement pour limite de builds et indique de réessayer dans 24 heures. L’application en ligne conserve la version précédente.
+
 Depuis le détail de son projet encore ouvert, le demandeur peut **mettre les
 candidatures en pause**, puis les rouvrir après confirmation explicite. La pause
 concerne la réception de nouvelles candidatures. Elle ne supprime pas le projet,
