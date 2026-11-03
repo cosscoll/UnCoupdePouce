@@ -2,56 +2,80 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {JSDOM}=require('jsdom');
 const assistant=require('../backend/static/assistant-ai.js');
-
-function harness(role='requester',configured=true,answer={reply:'Je vous aide à préparer une demande.',draft:null,search:null}){
+function harness(role='requester',configured=true){
  const dom=new JSDOM('<!doctype html><html><body><dialog open></dialog></body></html>');
  const doc=dom.window.document,dialog=doc.querySelector('dialog');
- let actor={id:123,role},session='csrf-demo',applied=null,searched=null,requests=[];
- const el=(tag,attrs={},...children)=>{const n=doc.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k==='text')n.textContent=v;else if(k==='class')n.className=v;else if(['disabled','required','checked'].includes(k))n[k]=v;else n.setAttribute(k,v)}for(const child of children.flat(Infinity)){if(child==null)continue;n.append(child.nodeType?child:doc.createTextNode(String(child)))}return n};
- const button=(name,fn,cls='outline')=>{const n=el('button',{type:'button',class:cls,text:name});n.addEventListener('click',fn);return n};
- const ai=assistant.create({
-  el,button,context:()=>({actor,session,role,catalog:[],wizardStep:null}),
+ let actor={id:123,role},session='csrf-demo',applied=null,searched=null,resetCount=0;
+ const calls=[];
+ const el=(tag,attrs={},...children)=>{const n=doc.createElement(tag);
+  for(const[k,v]of Object.entries(attrs)){
+   if(k==='text')n.textContent=v;else if(k==='class')n.className=v;
+   else if(['disabled','required','checked'].includes(k))n[k]=v;else n.setAttribute(k,v);
+  }
+  for(const child of children.flat(Infinity)){if(child!=null)n.append(child.nodeType?child:doc.createTextNode(String(child)))}return n;
+ };
+ const button=(label,fn,cls='outline')=>{const n=el('button',{type:'button',class:cls,text:label});n.addEventListener('click',fn);return n};
+ let response={reply:'Je peux vous aider à préciser votre besoin.',draft:null,search:null};
+ const local={
+  status:()=>({configured,reason:'WebGPU indisponible sur cet appareil.'}),
+  send:async payload=>{calls.push(payload);return response},
+  reset:()=>{resetCount++}
+ };
+ const ai=assistant.create({el,button,local,
+  context:()=>({actor,session,role,catalog:[{id:'plomberie',label:'Plomberie'}],wizardStep:null}),
   show:node=>{dialog.replaceChildren(node);dialog.open=true},close:()=>{dialog.open=false},
-  request:async(path,body)=>{requests.push({path,body});return path==='/assistant/status'?{configured}:answer},
-  navigate:()=>{},
-  apply:async d=>{applied=d;return true},
-  search:async s=>{searched=s;return true}
+  navigate:()=>{},apply:async d=>{applied=d;return true},search:async s=>{searched=s;return true}
  });
- return {ai,doc,requests,get applied(){return applied},get searched(){return searched},sessionChange(){actor={id:999,role};session='csrf-new';ai.sync()}};
+ return {ai,doc,calls,local,set response(v){response=v},get applied(){return applied},get searched(){return searched},
+  get resets(){return resetCount},sessionChange(){actor={id:999,role};session='csrf-new';ai.sync()}};
 }
 const settle=async()=>{await Promise.resolve();await new Promise(resolve=>setImmediate(resolve))};
-function findButton(doc,name){return [...doc.querySelectorAll('button')].find(x=>x.textContent===name)}
-
-test('AI assistant sends no request until consent and a typed message',async()=>{
- const d={title:'Rénover la cuisine',description:'Je souhaite refaire la cuisine de mon appartement fictif à Toulouse.',town:'Toulouse',trades:['plomberie'],timing:'month',budget_min:null,budget_max:null,version:0,photos:[]};
- const h=harness('requester',true,{reply:'Je vous propose une annonce adaptée.',draft:d,search:null});h.ai.open();await settle();
- const send=findButton(h.doc,'Envoyer');assert.equal(send.disabled,true);
- h.doc.querySelector('input[type=checkbox]').click();assert.equal(send.disabled,false);
- h.doc.querySelector('textarea').value='Je voudrais rénover la cuisine de mon logement fictif à Toulouse';
- h.doc.querySelector('form').dispatchEvent(new h.doc.defaultView.Event('submit',{bubbles:true,cancelable:true}));await settle();
- assert.deepEqual(h.requests.map(x=>x.path),['/assistant/status','/assistant/chat']);
- assert.equal(h.requests[1].body.message,'Je voudrais rénover la cuisine de mon logement fictif à Toulouse');
- assert.ok(h.doc.body.textContent.includes('Je vous propose une annonce adaptée.'));
+const btn=(doc,label)=>[...doc.querySelectorAll('button')].find(b=>b.textContent===label);
+async function say(h,message){
+ h.doc.querySelector('textarea').value=message;
+ h.doc.querySelector('form').dispatchEvent(new h.doc.defaultView.Event('submit',{bubbles:true,cancelable:true}));
+ await settle();
+}
+test('local AI requires acknowledgement and sends to the on-device model only',async()=>{
+ const h=harness();h.ai.open();
+ assert.equal(btn(h.doc,'Envoyer').disabled,true);
+ h.doc.querySelector('input[type=checkbox]').click();
+ assert.equal(btn(h.doc,'Envoyer').disabled,false);
+ await say(h,'Je veux rénover ma salle de bains à Toulouse.');
+ assert.equal(h.calls.length,1);
+ assert.equal(h.calls[0].mode,'reply');
+ assert.equal(h.calls[0].messages.at(-1).content,'Je veux rénover ma salle de bains à Toulouse.');
+ assert.match(h.doc.body.textContent,/Je peux vous aider/);
  assert.equal(h.applied,null);
- findButton(h.doc,'Utiliser dans mon annonce').click();await settle();
+});
+test('generated draft must be explicitly transferred after local model output',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ await say(h,'Je veux refaire la plomberie de ma salle de bains à Toulouse.');
+ const d={title:'Rénover ma salle de bains',description:'Je souhaite rénover la plomberie dans ma salle de bains.',town:'Toulouse',
+  trades:['plomberie'],timing:'flexible',budget_min:null,budget_max:null,version:0,photos:[]};
+ h.response={reply:'Voici mon annonce proposée.',draft:d,search:null};
+ btn(h.doc,'Préparer mon annonce avec l’IA').click();await settle();
+ assert.equal(h.calls[1].mode,'draft');assert.equal(h.applied,null);
+ btn(h.doc,'Utiliser dans mon annonce').click();await settle();
  assert.deepEqual(h.applied,d);
 });
-
-test('professional filters must be explicitly confirmed',async()=>{
- const search={q:'rénovation',town:'Toulouse',trade:'plomberie',sort:'newest'};
- const h=harness('professional',true,{reply:'Voici des filtres adaptés.',draft:null,search});h.ai.open();await settle();
- h.doc.querySelector('input[type=checkbox]').click();
- h.doc.querySelector('textarea').value='Je cherche des chantiers de plomberie à Toulouse';
- h.doc.querySelector('form').dispatchEvent(new h.doc.defaultView.Event('submit',{cancelable:true}));await settle();
+test('generated search does not apply without confirmation',async()=>{
+ const h=harness('professional');h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ await say(h,'Je veux des chantiers de plomberie à Toulouse.');
+ const search={q:'plomberie',trade:'plomberie',town:'Toulouse',sort:'newest'};
+ h.response={reply:'Filtres proposés.',search,draft:null};
+ btn(h.doc,'Configurer ma recherche avec l’IA').click();await settle();
  assert.equal(h.searched,null);
- findButton(h.doc,'Appliquer ces filtres').click();await settle();
+ btn(h.doc,'Appliquer ces filtres').click();await settle();
  assert.deepEqual(h.searched,search);
 });
-
-test('disabled AI never masquerades as a model answer',async()=>{
- const h=harness('requester',false);h.ai.open();await settle();
- h.doc.querySelector('input[type=checkbox]').click();
- assert.equal(findButton(h.doc,'Envoyer').disabled,true);
- assert.ok(h.doc.body.textContent.includes('Service IA non activé'));
- assert.deepEqual(h.requests.map(x=>x.path),['/assistant/status']);
+test('unsupported device never fakes an AI reply',async()=>{
+ const h=harness('requester',false);h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ assert.equal(btn(h.doc,'Envoyer').disabled,true);
+ assert.match(h.doc.body.textContent,/WebGPU indisponible/);
+ assert.equal(h.calls.length,0);
+});
+test('session change stops the local AI worker and clears conversation',async()=>{
+ const h=harness();h.ai.open();h.sessionChange();
+ assert.equal(h.resets,1);
 });
