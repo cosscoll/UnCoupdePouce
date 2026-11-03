@@ -1247,6 +1247,7 @@ from saved_searches import install as install_saved_searches
 from project_favorites import install as install_favorites
 from demo_access import install as install_demo_access
 from project_intake import install as install_project_intake
+from ai_assistant import install as install_ai_assistant
 if DATABASE_URL:
     from postgres import initialize_schema
     initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
@@ -1261,6 +1262,7 @@ with initialization:
     install_favorites(sys.modules[__name__])
     install_demo_access(sys.modules[__name__])
     install_project_intake(sys.modules[__name__])
+    install_ai_assistant(sys.modules[__name__])
     # Optional, one-time fictional seed under the initialization lock.
     if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
         with connect() as c:

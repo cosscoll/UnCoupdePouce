@@ -27,7 +27,7 @@ async function api(path,o={}){
  const stale=()=>actor!==appState.user||session!==appState.csrf;
  let res;
  try{
-  res=await fetch('/api'+path,{method,headers,credentials:'same-origin',body:o.body!=null?JSON.stringify(o.body):undefined,signal:AbortSignal.timeout(15000)});
+  res=await fetch('/api'+path,{method,headers,credentials:'same-origin',body:o.body!=null?JSON.stringify(o.body):undefined,signal:AbortSignal.timeout(o.timeoutMs||15000)});
  }catch{
   if(stale())throw staleResponse();
   UCPAnalytics.track('technical_error',{kind:'network'});
@@ -823,7 +823,18 @@ $('#dialog').addEventListener('close',()=>{if($('#dialog').open)return;const pre
 $('#dialog-close').addEventListener('click',()=>$('#dialog').close());
 $('#privacy-open').addEventListener('click',()=>showDialog('Vos données dans cette version',el('div',{},el('p',{text:'Cette version privée conserve les comptes, projets et messages dans la base de cet environnement (PostgreSQL en préproduction, SQLite en local). N’utilisez que des données fictives. Aucun traceur PostHog, enregistrement de session ou paiement n’est activé.'}),el('p',{text:'Les photos sont réencodées sans métadonnées GPS. Elles ne sont accessibles qu’à leur propriétaire, à la modération et au professionnel sélectionné autorisé.'}),el('p',{text:'L’export est disponible dans Mon compte. La suppression d’un compte ayant un historique nécessite une intervention opérateur. Les conditions et durées de conservation doivent être validées avant toute ouverture.'}))));
 $('#reset-open').addEventListener('click',()=>{const f=el('form',{},el('p',{text:'Dans ce laboratoire, l’opérateur génère un code temporaire avec la commande recovery.py. Aucun email n’est envoyé. Saisissez le code ici.'}),field('Code de récupération','token','text',{minlength:20,maxlength:128}),field('Nouveau mot de passe','password','password',{minlength:12,maxlength:128}),el('button',{type:'submit',class:'primary',text:'Réinitialiser mon mot de passe'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/account/reset',{method:'POST',body:formValue(f)}),'Mot de passe remplacé. Les anciennes sessions ont été révoquées.');if(r)$('#dialog').close()});showDialog('Récupérer votre accès',f)});
-const guidedHelp=window.UCPGuidedHelp?.create({
+const guidedHelp=(window.UCPAssistantAI||window.UCPGuidedHelp)?.create({
+ request:(path,body)=>api(path,body?{method:'POST',body,timeoutMs:28000}:{}),
+ search:async filters=>{
+  const actor=appState.user;
+  if(actor?.role!=='professional')return false;
+  const allowed=new Set(catalog.filter(t=>t.active!==false).map(t=>t.id));
+  if(filters.trade&&!allowed.has(filters.trade))return false;
+  const values={};
+  for(const k of ['q','trade','town','timing','published_within','budget_from','budget_to','sort'])if(filters[k]!=null&&filters[k]!=='')values[k]=filters[k];
+  appState.projectFilters={owner:actor.id,values};
+  $('#dialog').close();await go('projects');return true;
+ },
  el,button,context:()=>({actor:appState.user,session:appState.csrf,role:appState.user?.role,catalog,wizardStep:currentDraft?wizardStep:null}),
  show:content=>showDialog('Assistant UCP',content),close:()=>$('#dialog').close(),
  navigate:async view=>{const allowed=appState.user?.role==='professional'?['profile','projects','favorites','applications','conversations','support']:['projects','conversations','support'];if(!allowed.includes(view))return;$('#dialog').close();await go(view)},
