@@ -1,0 +1,93 @@
+{
+  "date": "2026-11-03",
+  "pr": 52,
+  "application_commit": "75b6a2e6fba8137f3ac4a79c2ee15cb28ecf8c9d",
+  "ci": {
+    "run_id": 41644161575,
+    "head": "dbf2378c9b77d6b492fc36c536a609a7a4c05542",
+    "result": "success",
+    "python": 262,
+    "dom_logic_worker": 120,
+    "vitrine_run_id": 41644161530,
+    "vitrine_javascript": 55,
+    "main_run_id": 41644753705,
+    "main_result": "success"
+  },
+  "vercel": {
+    "deployment_id": "dpl_3AxZw9jffE48odaETGfRsmoi9PYk",
+    "state": "READY",
+    "alias": "ucp-preproduction.vercel.app"
+  },
+  "pages": {
+    "run_id": 41644754018,
+    "result": "success",
+    "root_sha256": "2e135b9f5c25e743e43c04fefd5732d21e2305392a17cb4240a8e8a010cd8d0b",
+    "root_http_content_identical": true,
+    "automatic_redirect_removed": true
+  },
+  "public_browser": {
+    "url": "https://cosscoll.github.io/UnCoupdePouce/?v=75b6a2e",
+    "two_role_entries_visible": true,
+    "screenshot": "accueil-deux-espaces-1793712734357.jpg",
+    "viewport": [
+      1348,
+      926
+    ],
+    "old_redirect_was_cached": true,
+    "authenticated_dashboard_visual_acceptance": false,
+    "real_mobile_acceptance": false
+  },
+  "https": {
+    "date": "2026-11-03",
+    "result": "PASS",
+    "roles": [
+      {
+        "role": "requester",
+        "entry_served": true,
+        "opposite_entry_keeps_role": true,
+        "dashboard_apis_accessible": [
+          "/api/projects",
+          "/api/v4/drafts",
+          "/api/conversations",
+          "/api/notifications?unread_only=true"
+        ],
+        "forbidden_api_refused": true,
+        "counts": {
+          "/api/projects": 11,
+          "/api/v4/drafts": 2,
+          "/api/conversations": 1,
+          "/api/notifications?unread_only=true": 11
+        }
+      },
+      {
+        "role": "professional",
+        "entry_served": true,
+        "opposite_entry_keeps_role": true,
+        "dashboard_apis_accessible": [
+          "/api/projects",
+          "/api/my-applications",
+          "/api/conversations",
+          "/api/my-profile",
+          "/api/notifications?unread_only=true"
+        ],
+        "forbidden_api_refused": true,
+        "counts": {
+          "/api/projects": 5,
+          "/api/my-applications": 9,
+          "/api/conversations": 1,
+          "/api/notifications?unread_only=true": 9
+        }
+      }
+    ],
+    "assets_sha256": {
+      "app.js": "c3ea83ad4c072f42874aede90731f68e8a41b6c16e0736f31621aa370f463d81",
+      "style.css": "d4d119e9eb7da4931ab00382a2a68ac99ef98ab44bd5c628cb29a28e4f531ffc"
+    },
+    "staging_postgresql": true,
+    "business_mutations": 0,
+    "visual_acceptance_of_authenticated_dashboards": false,
+    "real_accounts_or_billing": false
+  },
+  "private_access_preserved": true,
+  "new_full_cdc_acceptances": 0
+}

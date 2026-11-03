@@ -51,3 +51,39 @@ protection, ne crée pas de compte réel et n’active aucun paiement. Le verrou
 HTTP Basic ayant bloqué la précédente recette navigateur, aucune recette visuelle
 des tableaux de bord connectés n’est revendiquée ici. Cette correction d’accès
 ne vaut pas conformité complète au cahier des charges.
+
+
+## Publication et vérification constatées
+
+La [PR nº 52](https://github.com/cosscoll/UnCoupdePouce/pull/52) est fusionnée dans
+`main` au commit `75b6a2e6fba8137f3ac4a79c2ee15cb28ecf8c9d`.
+La [CI applicative](https://github.com/cosscoll/UnCoupdePouce/actions/runs/41644161575)
+réussit sur `dbf2378c9b77d6b492fc36c536a609a7a4c05542` : **262 tests Python et
+120 tests DOM/logique/worker**. La
+[CI de vitrine](https://github.com/cosscoll/UnCoupdePouce/actions/runs/41644161530)
+réussit également, y compris régénération identique et 55 tests JavaScript.
+
+Le déploiement Vercel `dpl_3AxZw9jffE48odaETGfRsmoi9PYk` est `READY` sur le
+commit fusionné et associé à `ucp-preproduction.vercel.app`. La publication
+[GitHub Pages](https://github.com/cosscoll/UnCoupdePouce/actions/runs/41644754018)
+réussit sur le même commit. Le HTML de l’adresse principale, récupéré par HTTPS
+avec revalidation, est identique au fichier publié et ne contient plus de redirection.
+
+Dans le navigateur de contrôle, l’ancienne redirection était encore en cache.
+L’[adresse actualisée](https://cosscoll.github.io/UnCoupdePouce/?v=75b6a2e)
+affiche les deux entrées et leurs boutons réels. La
+[capture de l’accueil publié](qa/accueil-deux-espaces-1793712734357.jpg) montre ce
+rendu sur le navigateur de bureau de contrôle ; elle ne montre pas les tableaux
+de bord connectés et ne vaut pas recette mobile ou sur appareil réel.
+
+
+Les contrôles HTTPS des deux comptes fictifs réussissent après déploiement : les
+pages d’entrée et les API des deux accueils répondent, une entrée opposée conserve
+le rôle authentifié et les routes de l’autre rôle restent refusées. Le JavaScript
+et le CSS servis sont identiques aux fichiers livrés ; le service reste en mode
+staging PostgreSQL. Aucune donnée métier n’a été créée ou modifiée par ce contrôle.
+La CI automatique de `main` réussit également au
+[run 41644753705](https://github.com/cosscoll/UnCoupdePouce/actions/runs/41644753705).
+
+La [preuve structurée](qa/deux-espaces-2026-11-03.json) distingue les contrôles
+serveur/DOM, le contrôle HTTPS et le seul rendu visuel observé : l’accueil public.
