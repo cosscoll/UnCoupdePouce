@@ -1004,3 +1004,20 @@ test('chatbot appends new messages without replacing earlier log nodes',async()=
 test('unavailable chatbot module leaves the core application usable',async()=>{
  const x=await boot({},w=>Object.defineProperty(w,'UCPGuidedHelp',{configurable:true,get:()=>undefined,set:()=>{}}));try{assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.match(x.w.document.querySelector('#view').textContent,/Vos projets/);x.w.openGuidedHelp();assert.match(x.w.document.querySelector('#alert').textContent,/assistant n’a pas pu être chargé/)}finally{x.close()}
 });
+
+const enterpriseEffectsData={enterprise:{id:4,label:'Entreprise fictive'},members:[{id:8,alias:'Equipe plomberie',trades:['plomberie'],zones:['Toulouse'],is_active:1}],pricing:{active_artisans:1,monthly_ht:35,linked_artisans_active:1,manager_counted_as_artisan:false}};
+
+test('linked profile deactivation explains withdrawals and blocked messages before sending',async()=>{
+ const x=await boot({'/api/session':savedProSession,'/api/enterprise':enterpriseEffectsData,'POST /api/enterprise/artisans/8/set-active':{ok:true}});try{
+  await x.w.go('enterprise');savedButton(x.w,'Désactiver ce profil','#view').click();await tick();
+  assert.match(x.w.document.querySelector('#dialog-content').textContent,/candidatures en attente.*retirées/);assert.match(x.w.document.querySelector('#dialog-content').textContent,/messages deviennent inaccessibles/);assert.ok(!x.calls.some(c=>c.url.endsWith('/set-active')));
+  x.w.document.querySelector('#dialog-close').click();assert.ok(!x.calls.some(c=>c.url.endsWith('/set-active')));
+  savedButton(x.w,'Désactiver ce profil','#view').click();savedButton(x.w,'Confirmer','#dialog-content').click();await tick();assert.equal(x.calls.filter(c=>c.url.endsWith('/set-active')).length,1);
+ }finally{x.close()}
+});
+
+test('linked profile reactivation states that withdrawals and chat permissions are not restored implicitly',async()=>{
+ const x=await boot({'/api/session':savedProSession,'/api/enterprise':{...enterpriseEffectsData,members:[{...enterpriseEffectsData.members[0],is_active:0}]}});try{
+  await x.w.go('enterprise');savedButton(x.w,'Réactiver ce profil','#view').click();await tick();assert.match(x.w.document.querySelector('#dialog-content').textContent,/candidatures retirées ne seront pas rétablies/);assert.match(x.w.document.querySelector('#dialog-content').textContent,/ne garantit pas son ouverture/);assert.ok(!x.calls.some(c=>c.url.endsWith('/set-active')));
+ }finally{x.close()}
+});

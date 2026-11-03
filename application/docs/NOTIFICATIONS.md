@@ -75,3 +75,15 @@ n'est promis. Aucun réglage de désactivation sélective n'est ajouté à ce st
 Les emails transactionnels, notifications système sur téléphone, liens directs
 vers chaque objet et politique de conservation définitive restent à réaliser.
 La pagination n'est pas une preuve de rendu ou d'accessibilité sur appareil réel.
+
+## Profils liés d’entreprise — 3 novembre 2026
+
+La désactivation notifie le gestionnaire (`linked_profile_paused`), les demandeurs
+des candidatures en attente retirées (`application_withdrawn`) et ceux des sélections
+sur projets non clôturés (`linked_conversation_paused`). La réactivation crée
+`linked_profile_resumed` pour le gestionnaire et `linked_conversation_changed` pour
+ces demandeurs, sans promettre une ouverture du chat. Les retraits restent acquis.
+
+Ces alertes génériques partagent la transaction du changement d'état et de l'audit ;
+les refus et répétitions sans changement ne créent aucune alerte. Elles n'ajoutent
+ni email, ni push, ni tâche récurrente. Voir [effets et limites](ENTREPRISE_EFFETS.md).
