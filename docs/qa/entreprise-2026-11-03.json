@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-03",
+  "requirements": {
+    "historical_total": 92,
+    "reevaluated_in_this_lot": [
+      "F41",
+      "F43",
+      "F52",
+      "F53",
+      "F54",
+      "F55",
+      "F56"
+    ],
+    "conclusions": {
+      "F41": "**Partiel renforcé** — Sélection/refus/clôture notifiés ; désactivation liée maintenant confirmée avec effets explicites, retrait des candidatures en attente et alertes des deux parties. Réactivation sans restauration des retraits ni garantie de chat. Annulation distincte et règles commerciales non livrées. Voir [entreprise](../application/docs/ENTREPRISE_EFFETS.md).",
+      "F43": "**Partiel réévalué** — Unicité projet/compte gestionnaire en base, y compris entre profils liés. Empêcher les doublons entre utilisateurs nominatifs d’une même entreprise n’est pas livré, faute de comptes rattachés distincts. Voir [réévaluation](REVALIDATION_ENTREPRISE_2026-11-03.md).",
+      "F52": "**Identité distincte non livrée** — L’entreprise de test possède un libellé et un gestionnaire. Le SIREN reste dans le profil de ce gestionnaire ; identité juridique propre à l’entreprise, établissements SIRET et vérification officielle absents. Voir [réévaluation](REVALIDATION_ENTREPRISE_2026-11-03.md).",
+      "F53": "**Partiel réévalué** — Vue du gestionnaire sur ses profils liés, métiers, communes et activation, avec isolation des autres comptes. Vue d’administration nominative utilisateurs/rôles/droits/sièges non livrée. Voir [réévaluation](REVALIDATION_ENTREPRISE_2026-11-03.md).",
+      "F54": "**Arbitrage ouvert** — Quantité calculée selon les profils actifs et l’activation explicite du gestionnaire dans la simulation historique. Unité tarifaire commerciale non approuvée ; aucun contrôle nominatif anti-partage ni facturation réelle. Voir [réévaluation](REVALIDATION_ENTREPRISE_2026-11-03.md).",
+      "F55": "**Non livré** — Profils liés sans identifiants personnels ; aucun salarié authentifié, invitation, rôle d’équipe ou siège opérationnel nominatif. Les droits du gestionnaire ne constituent pas ces fonctions. Voir [réévaluation](REVALIDATION_ENTREPRISE_2026-11-03.md).",
+      "F56": "**Partiel réévalué** — Candidatures via profils liés, suivi et échanges pilotés par un gestionnaire, sous droits serveur. Organisation hors plateforme et gestion multi-utilisateurs non contrôlées. Voir [réévaluation](REVALIDATION_ENTREPRISE_2026-11-03.md)."
+    },
+    "still_to_reevaluate": 30,
+    "new_full_acceptances": 0
+  },
+  "regressions": {
+    "initial": {
+      "commit": "e93c2f897c0bf4881ae07bdbcf54cec9ce584566",
+      "failed": 3,
+      "passed": 1
+    },
+    "audit_unique_failure_before_fix": {
+      "commit": "6179719123135c09232cb10aa08e30d580d8ec82",
+      "failed": 1
+    },
+    "dedicated_sqlite_after": 9,
+    "postgres_scenarios": [
+      "effects_and_notifications",
+      "parallel_same_profile_pause"
+    ],
+    "new_dom_scenarios": 2
+  },
+  "effects_https": {
+    "application_commit": "6179719123135c09232cb10aa08e30d580d8ec82",
+    "deployment_id": "dpl_CCzFMyGpiFivNQyJvSuxvWUfqTZH",
+    "date": "2026-11-03",
+    "result": "PASS",
+    "https_check_groups": 2,
+    "linked_profile_id": 4,
+    "created_enterprise_id": 2,
+    "projects": [
+      18,
+      19
+    ],
+    "applications": [
+      16,
+      17
+    ],
+    "pending_withdrawn_and_not_restored": true,
+    "selected_chat_blocked_while_inactive": true,
+    "both_parties_notified": true,
+    "duplicate_no_new_notices": true,
+    "closed_project_no_extra_conversation_notice": true,
+    "fictional_projects_closed": true,
+    "fictional_profile_left_inactive": true,
+    "no_message_sent": true,
+    "app_js_sha256": "d06c02ecdd02bd867ce97ba31b1afe76619f7fc08b43b93558dadbd1f659f374",
+    "visual_acceptance": false,
+    "real_billing": false
+  },
+  "visual_acceptance": false,
+  "real_billing": false,
+  "final_ci": {
+    "run_id": 41637476751,
+    "revision": "3b8e4933030832d3cb6c2138220a30fe09428bc8",
+    "result": "success",
+    "python_tests": 260,
+    "dom_logic_worker_tests": 114
+  },
+  "final_release": {
+    "application_commit": "1d5c64eb331ab575e55b0d8304068bdce8272a79",
+    "deployment_id": "dpl_n78VytjioL4VjkyqK7n6atwgkxhf",
+    "deployment_state": "READY",
+    "alias": "ucp-preproduction.vercel.app",
+    "mode": "staging",
+    "commercial_opening": false
+  },
+  "final_https": {
+    "application_commit": "1d5c64eb331ab575e55b0d8304068bdce8272a79",
+    "deployment_id": "dpl_n78VytjioL4VjkyqK7n6atwgkxhf",
+    "date": "2026-11-03",
+    "result": "PASS",
+    "duplicate_enterprise_refused": true,
+    "enterprise_and_activity_unchanged": true,
+    "staging_postgresql": true,
+    "app_js_sha256": "d06c02ecdd02bd867ce97ba31b1afe76619f7fc08b43b93558dadbd1f659f374",
+    "audit_failure_injected_remotely": false,
+    "visual_acceptance": false
+  }
+}

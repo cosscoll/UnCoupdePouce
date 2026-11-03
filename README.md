@@ -7,6 +7,8 @@ Dépôt principal du projet **Un Coup de Pouce**, une plateforme de mise en rela
 - [Vitrine publique vérifiée](https://cosscoll.github.io/UnCoupdePouce/site-vitrine/dist/index.html)
 - [Application — préproduction privée](https://ucp-preproduction.vercel.app) : FastAPI sur Vercel, PostgreSQL Neon persistant (offre Free). Accès Vercel puis identifiant de préproduction requis ; données fictives uniquement.
 - [Préproduction : configuration et blocages](application/docs/PREPRODUCTION.md)
+- [Entreprise : effets des profils liés et limites](application/docs/ENTREPRISE_EFFETS.md)
+- [Réévaluation entreprise du 3 novembre](docs/REVALIDATION_ENTREPRISE_2026-11-03.md)
 - [Assistant UCP : chatbot guidé particuliers et professionnels](application/docs/ASSISTANT_GUIDE.md)
 - [Centre de notifications et historique](application/docs/NOTIFICATIONS.md)
 - [Recette des alertes de statut et confidentialité](docs/RECETTE_ALERTES_STATUT_2026-10-28.md)
@@ -62,8 +64,8 @@ Sous Windows, utilisez `application/DEMARRER.bat`. Ces commandes lancent le dév
 
 ## Vérifications de référence
 
-- Application : 249 tests Python réussis sur GitHub Actions le 02/11/2026 (SQLite et PostgreSQL 17).
-- Interface de l'application : 106 tests DOM, 3 tests de logique de l’assistant et 3 tests de service worker réussis (112 au total).
+- Application : 260 tests Python réussis sur GitHub Actions le 03/11/2026 (SQLite et PostgreSQL 17).
+- Interface de l'application : 108 tests DOM, 3 tests de logique de l’assistant et 3 tests de service worker réussis (114 au total).
 - Vitrine : contrôles statiques et tests des scénarios de brief réussis.
 - Parcours HTTPS réel publication → candidature → sélection → messagerie et refus inter-comptes réussis sur la préproduction.
 - Vitrine ouverte dans un navigateur réel ; rendu mobile sur appareils, installation/réouverture PWA et restauration PostgreSQL distante restent à vérifier.

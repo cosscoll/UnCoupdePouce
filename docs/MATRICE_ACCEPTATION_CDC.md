@@ -1,4 +1,4 @@
-# Matrice d’acceptation UCP — réévaluation partielle du 2 novembre 2026
+# Matrice d’acceptation UCP — réévaluation partielle au 3 novembre 2026
 
 Les 92 exigences sont reprises du cahier des charges consolidé du 27 octobre.
 Cette matrice ne transforme pas une fonctionnalité codée en exigence acceptée.

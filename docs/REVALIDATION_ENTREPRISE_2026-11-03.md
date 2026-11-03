@@ -45,3 +45,55 @@ Voir [contrat et limites](../application/docs/ENTREPRISE_EFFETS.md).
 
 Les tests ne valent pas recette sur appareils réels ou audit juridique. Invitations,
 paiements, vérification légale et politique commerciale restent ouverts.
+
+## CI et livraison
+
+La [CI complète](https://github.com/cosscoll/UnCoupdePouce/actions/runs/41636022860)
+réussit : **259 tests Python SQLite/PostgreSQL et 114 tests DOM/logique/worker**
+(108 DOM, 3 logique de l'assistant et 3 worker), sur la révision
+`e51ee7e6a015bad6ceac699b08ce9f840de30a6b`. Le commit fusionné est
+`6179719123135c09232cb10aa08e30d580d8ec82`. Le lot ajoute huit cas dédiés SQLite,
+deux parcours PostgreSQL et deux scénarios DOM.
+
+Le déploiement `dpl_CCzFMyGpiFivNQyJvSuxvWUfqTZH` est `READY` sur le même
+commit applicatif. La vitrine réussit ses contrôles statiques et ses 55 tests
+JavaScript.
+
+## Correctif final du journal et CI définitive
+
+La relecture ajoute un cas distinct : une contrainte d'unicité défaillante dans
+l'audit ne doit pas être présentée comme une entreprise déjà existante. Le test
+échoue sur `6179719` (409 au lieu de 500), puis réussit après limitation du traitement
+de doublon à la seule insertion de l'entreprise. La création reste annulée en cas
+d'erreur du journal. Voir [PR nº 51](https://github.com/cosscoll/UnCoupdePouce/pull/51).
+
+La [CI définitive](https://github.com/cosscoll/UnCoupdePouce/actions/runs/41637476751)
+réussit : **260 tests Python SQLite/PostgreSQL et 114 tests DOM/logique/worker**,
+sur la révision `3b8e4933030832d3cb6c2138220a30fe09428bc8`. Elle inclut neuf cas
+dédiés entreprise, deux parcours PostgreSQL et deux scénarios DOM ajoutés par ce lot.
+Le commit applicatif final est `1d5c64eb331ab575e55b0d8304068bdce8272a79`.
+
+
+## Contrôles HTTPS et état final de livraison
+
+Les effets métier ont été exercés sur le déploiement `dpl_CCzFMyGpiFivNQyJvSuxvWUfqTZH`
+(commit `6179719`) : retrait des candidatures en attente sans restauration au retour,
+blocage du chat sélectionné pendant la désactivation, notifications internes aux
+participants, répétition sans doublon et absence de nouvelle alerte de conversation
+pour un projet fermé. Les deux projets fictifs ont été clôturés et le profil créé
+laissé inactif ; aucun message de conversation n’a été envoyé.
+
+Le déploiement final `dpl_n78VytjioL4VjkyqK7n6atwgkxhf` est `READY`, associé à
+`ucp-preproduction.vercel.app` et au commit `1d5c64eb331ab575e55b0d8304068bdce8272a79`.
+Le contrôle HTTPS final réussit : une nouvelle tentative de création d’entreprise
+est refusée en 409 sans changer l’entreprise ni son journal ; le service répond
+en mode staging avec PostgreSQL et sert exactement le JavaScript vérifié.
+
+La défaillance d’audit a été injectée uniquement dans les tests isolés, jamais dans
+la base distante. La CI finale réexécute les scénarios métier, y compris PostgreSQL
+et concurrence ; le contrôle HTTPS final ne répète pas les créations fictives du
+premier parcours. Ces résultats ne valent pas recette visuelle sur navigateur ou
+appareils réels, ni acceptation complète du cahier des charges.
+
+Les révisions, résultats et limites figurent dans la
+[preuve synthétique](qa/entreprise-2026-11-03.json).
