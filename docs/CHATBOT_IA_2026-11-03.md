@@ -44,6 +44,7 @@ Pour éviter une dépendance bloquante au démarrage du Worker :
 - L'interface affiche la progression réelle, ou la cause diagnostiquée, et propose **« Réessayer de générer la réponse »** sans ressaisir le message.
 - Les longs avertissements techniques sont dans une section repliée afin que la zone de conversation reste visible.
 - Le fichier partagé `application/backend/static/local-ai-engine.js` centralise modèle, instructions, validation de génération et rechargement des bibliothèques.
+- Le modèle Qwen quantifié **q4f16** est utilisé lorsque le GPU prend en charge `shader-f16`; sinon le moteur sélectionne la variante **q4f32**, un peu plus gourmande en mémoire (environ 1,06 Go de VRAM recommandés au lieu de 0,94 Go). Les deux variantes sont dans le catalogue officiel WebLLM.
 - Tests à répéter après publication : Chromium + WebGPU, connexion requise et 1er téléchargement, réponse textuelle réelle, génération d'annonce, filtres de recherche, scénario CDN inaccessible et navigateur incompatible.
 
 Ce correctif **n'établit pas encore** la réussite d'une génération réelle sur le matériel utilisateur. Un environnement de test sans WebGPU GPU exploitable ne peut pas remplacer ce test.
