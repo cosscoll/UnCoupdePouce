@@ -1,5 +1,6 @@
 /* UCP IA locale : moteur partagé Worker / page, sans API d'inférence. */
-const MODEL='Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+const MODEL_F16='Qwen2.5-0.5B-Instruct-q4f16_1-MLC';
+const MODEL_F32='Qwen2.5-0.5B-Instruct-q4f32_1-MLC';
 const CDN_URLS=[
  'https://esm.run/@mlc-ai/web-llm@0.2.87',
  'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.87/+esm'
@@ -32,7 +33,11 @@ async function ensureEngine(progress){
   enginePromise=(async()=>{
    libraryPromise ||= importLibrary();
    const lib=await libraryPromise;
-   const e=await lib.CreateMLCEngine(MODEL,{
+   const adapter=await globalThis.navigator.gpu.requestAdapter?.({powerPreference:'high-performance'});
+   if(!adapter)throw Error('WebGPU est présent, mais aucune carte graphique compatible n’est disponible.');
+   const selected=adapter.features?.has?.('shader-f16')?MODEL_F16:MODEL_F32;
+   notify?.('Initialisation du modèle '+(selected===MODEL_F16?'GPU optimisé':'GPU compatible')+'…',0);
+   const e=await lib.CreateMLCEngine(selected,{
     initProgressCallback:p=>notify?.(String(p?.text||'Téléchargement et initialisation du modèle…'),Number(p?.progress)||0)
    });
    engine=e;return e;
