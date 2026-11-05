@@ -49,3 +49,30 @@ test('worker bootstrap failure attempts in-page local engine, never an API call'
   }
  }
 });
+
+test('current wizard draft is sanitized and passed only for a requester',()=>{
+ const entered={title:'Salle de bain',description:'Changer la douche',town:'Blagnac',
+  trades:['plomberie','inconnu-metier'],timing:'quarter',budget_min:1000,budget_max:4000,
+  photos:['sensitive-photo'],id:'secret-id',version:2};
+ const c=ai.cleanContext('requester',entered,null,trades);
+ assert.equal(c.draft.title,'Salle de bain');
+ assert.deepEqual(c.draft.trades,['plomberie']);
+ assert.equal(c.draft.budget_min,1000);
+ assert.equal(c.draft.photos,undefined);
+ assert.equal(c.draft.id,undefined);
+ assert.equal(c.search,undefined);
+ const other=ai.cleanContext('professional',entered,null,trades);
+ assert.equal(other.draft,undefined,'professional context must not include a requester draft');
+});
+test('only a professional can send sanitized current filters to the model',()=>{
+ const saved={q:'réparation',trade:'plomberie',town:'Toulouse',timing:'month',
+  published_within:7,budget_from:1500,budget_to:3000,
+  owner:123,confidential:'do not send'};
+ const c=ai.cleanContext('professional',null,saved,trades);
+ assert.equal(c.search.q,'réparation');
+ assert.equal(c.search.town,'Toulouse');
+ assert.equal(c.search.owner,undefined);
+ assert.equal(c.search.confidential,undefined);
+ assert.equal(ai.cleanContext('requester',null,saved,trades).search,undefined);
+ assert.equal(ai.cleanContext('professional',null,{...saved,trade:'unknown'},trades).search.trade,'');
+});

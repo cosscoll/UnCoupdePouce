@@ -66,6 +66,14 @@ function create(hooks){
    textarea.value=text;
    textarea.focus();
   }
+  const workingDraft=isRequester&&c.draftContext&&(c.draftContext.title||c.draftContext.description||c.draftContext.trades?.length);
+  const workingSearch=!isRequester&&c.searchContext&&Object.values(c.searchContext).some(Boolean);
+  if(workingDraft){
+   suggestions.append(button('Améliorer mon brouillon',()=>prefill('Aide-moi à améliorer mon brouillon actuel en réutilisant les informations déjà saisies et pose-moi une seule question utile.'),'ai-suggestion'));
+  }
+  if(workingSearch){
+   suggestions.append(button('Affiner mes critères',()=>prefill('Aide-moi à affiner les filtres de recherche déjà sélectionnés dans mon espace professionnel.'),'ai-suggestion'));
+  }
   if(isRequester){
    suggestions.append(
     button('Rédiger une annonce',()=>prefill('J’ai besoin d’aide pour rédiger une annonce de travaux.'),'ai-suggestion'),
@@ -194,7 +202,9 @@ function create(hooks){
    scrollBottom();
    const messages=s.messages.slice(-12).map(m=>({role:m.role,content:m.text}));
    try{
-    const output=await hooks.local.send({mode,role:s.role,catalog:get().catalog,messages,modelTier,
+    const appContext=get();
+    const output=await hooks.local.send({mode,role:s.role,catalog:appContext.catalog,messages,modelTier,
+     draftContext:appContext.draftContext,searchContext:appContext.searchContext,
      onProgress:(label,pct)=>{
       if(valid(s)&&ui?.closest('dialog')?.open){
        const percentage=Number.isFinite(pct)&&pct>0?' ('+Math.min(100,Math.round(pct*100))+' %)':'';
@@ -206,7 +216,10 @@ function create(hooks){
     say('assistant',output.reply);
     s.pending=output.draft||output.search?{draft:output.draft||null,search:output.search||null}:null;
     showPending();
-    status.textContent='';
+    if(output.downgraded){
+     modelTier='light';qualitySelect.value='light';saveModelTier('light');
+     status.textContent='Le modèle léger (1,5B) a été chargé automatiquement : votre appareil manquait de mémoire pour le modèle 3B.';
+    }else status.textContent='';
    }catch(e){
     if(valid(s)&&ui?.closest('dialog')?.open){
      status.textContent=(e?.message||'Le modèle local est indisponible. Réessayez.')+

@@ -65,3 +65,22 @@ Ce correctif **n'établit pas encore** la réussite d'une génération réelle s
 ## Contrainte budgétaire
 
 **Aucun coût de génération par message, aucune consommation d'API IA payante.** Cela n'affirme pas que l'hébergement web, la bande passante CDN, les limites gratuites de Vercel, les appareils ou l'accès Internet resteront toujours gratuits et illimités. Aucun nouveau service payant, abonnement, quota limité d'agent/Work/Codex ou automatisation ChatGPT n'a été activé.
+
+## Lot du 5 novembre — continuité entre les formulaires et l’assistant
+
+À la suite des tests utilisateurs, l'assistant local reste **non validé sur une matrice réelle de navigateurs/GPU** : les tests automatisés isolent le code et les échanges simulés. Ce lot renforce les parcours de bout en bout sans déployer de fournisseur d'IA payant.
+
+- **Particulier / F20** : quand l'utilisateur ouvre l'assistant depuis un brouillon en cours, le titre, la description, la commune, les métiers, le délai et le budget déjà saisis peuvent être utilisés pour répondre à sa question ou produire une proposition. Le bouton « Améliorer mon brouillon » préremplit une demande (sans l'envoyer à sa place). Les photos, identifiants et informations de compte ne sont jamais inclus dans ce contexte.
+- **Professionnel / F25** : les derniers filtres de recherche validés peuvent servir de point de départ à la discussion et à la préparation d'une nouvelle recherche. Les critères restent soumis à confirmation explicite avant application ; le chatbot ne lit pas de chantiers privés et ne candidate pas.
+- **Compatibilité** : en cas d'erreur **de mémoire GPU** lors du chargement de Qwen 3B, le moteur essaie automatiquement le Qwen 1,5B sur le **même appareil**, sans API facturée. L'utilisateur est informé et son mode léger est conservé pour les prochains messages. Ce repli n'est **pas** tenté lors d'une erreur réseau ou d'un accès CDN bloqué.
+- **Conversations longues** : nombre de tours et longueur cumulée de contexte bornés avant génération pour limiter les dépassements de la fenêtre de contexte WebLLM. Les plus anciens messages peuvent être omis : l'IA ne dispose donc pas d'une mémoire complète de la conversation, ni des anciennes sessions.
+- **Séparation des rôles** : les valeurs du brouillon d'un particulier ne peuvent pas être transmises comme contexte à l'espace professionnel, et réciproquement pour les filtres. Les champs inconnus, photos et identifiants sont exclus par liste blanche côté navigateur. Les messages ne sont jamais sauvegardés dans l'autorisation locale.
+
+### Tests et preuves
+
+Tests QA JS spécifiques : reconnaissance des erreurs GPU pertinentes, absence de repli lors de pannes réseau, sélection des variantes Qwen, limites de contexte, isolation des données brouillon/recherche et affichage du passage automatique au mode léger. Tests existants Python/JS doivent rester verts. Un navigateur avec GPU réel reste nécessaire pour valider taille de téléchargement, temps de réponse, qualité des messages générés et limites mémoire sur mobile.
+
+### Restant au cahier des charges
+
+F20 et F25 restent **partiellement réalisés**, sans nouvelle acceptation complète : une IA locale 3B ne garantit ni compréhension parfaite ni recommandation de métier fiable. À vérifier : essais réels sur Android/iPhone/PC, conformité accessibilité clavier/lecteur d'écran, extraction d'annonce cohérente sur plusieurs métiers, recherche sur un profil pro à zones multiples. Aucune publication ou candidature automatique.
+

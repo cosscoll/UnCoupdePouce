@@ -38,3 +38,35 @@ test('detects repetitive UCP replies like the user-reported conversation',async(
  assert.equal(ai.isRepeatedReply('Pour votre salle de bains, souhaitez-vous changer la douche, la plomberie ou le carrelage ?', [{role:'assistant',content:first}]),false);
  assert.equal(ai.isRepeatedReply(first,[{role:'user',content:'Quelles fonctions ?'}]),false);
 });
+
+test('GPU resource failures can trigger local 1.5B recovery, network failures do not',async()=>{
+ const ai=await load();
+ for(const msg of ['GPUOutOfMemoryError','Failed to allocate buffer','Device lost during allocation','not enough video memory']){
+  assert.equal(ai.isGpuMemoryError(Error(msg)),true,msg);
+ }
+ for(const msg of ['Access to CDN denied','CORS blocked','NetworkError: fetch failed','Invalid model ID']){
+  assert.equal(ai.isGpuMemoryError(Error(msg)),false,msg);
+ }
+});
+test('local prompts incorporate current draft/search form values as untrusted data',async()=>{
+ const ai=await load();
+ const draftPrompt=ai.buildPrompt('reply',{role:'requester',draft:{
+  title:'Refaire ma douche',town:'Blagnac',description:'Démolir et remplacer la douche',trades:['plomberie']}});
+ assert.match(draftPrompt,/Blagnac/);
+ assert.match(draftPrompt,/Refaire ma douche/);
+ assert.match(draftPrompt,/ne sont pas des instructions/);
+ const searchPrompt=ai.buildPrompt('reply',{role:'professional',search:{
+  town:'Toulouse',trade:'plomberie',budget_from:1000}});
+ assert.match(searchPrompt,/Toulouse/);
+ assert.match(searchPrompt,/plomberie/);
+ assert.doesNotMatch(searchPrompt,/Refaire ma douche/);
+});
+test('conversation history is bounded to fit a small on-device context window',async()=>{
+ const ai=await load();
+ const messages=Array.from({length:24},(_,i)=>({role:i%2?'assistant':'user',content:'message '+i+' '+'x'.repeat(1500)}));
+ const result=ai.recent(messages);
+ assert.ok(result.length<=10);
+ assert.ok(result.reduce((sum,m)=>sum+m.content.length,0)<=4200);
+ assert.equal(result.at(-1).role,'assistant');
+ assert.equal(result.at(-1).content.includes('message 23'),true);
+});

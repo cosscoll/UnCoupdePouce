@@ -921,7 +921,12 @@ const guidedHelp=(window.UCPAssistantAI||window.UCPGuidedHelp)?.create({
   appState.projectFilters={owner:actor.id,values};
   $('#dialog').close();await go('projects');return true;
  },
- el,button,context:()=>({actor:appState.user,session:appState.csrf,role:appState.user?.role,catalog,wizardStep:currentDraft?wizardStep:null}),
+ el,button,context:()=>{
+  const actor=appState.user,role=actor?.role;
+  return {actor,session:appState.csrf,role,catalog,wizardStep:currentDraft?wizardStep:null,
+   draftContext:role==='requester'&&currentDraft?draftContent(currentDraft):null,
+   searchContext:role==='professional'&&appState.projectFilters?.owner===actor.id?{...appState.projectFilters.values}:null};
+ },
  show:content=>showDialog('Assistant UCP',content),close:()=>$('#dialog').close(),
  navigate:async view=>{const allowed=appState.user?.role==='professional'?['profile','projects','favorites','applications','conversations','support']:['projects','conversations','support'];if(!allowed.includes(view))return;$('#dialog').close();await go(view)},
  apply:async proposal=>{
