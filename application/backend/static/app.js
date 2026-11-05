@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s);
 const appState={user:null,csrf:null,view:null},trades={};
 let catalog=[],renderEpoch=0,currentDraft=null,wizardStep=1,chatTimer=null,chatEpoch=0,dialogEpoch=0;
 const draftSaveStates=new WeakMap();let draftSaveTimer=null,dialogReturnFocus=null;
-const labels={open:'Ouvert aux candidatures',selected:'Professionnel sélectionné',closed:'Clôturé',pending:'En attente',accepted:'Sélectionnée',rejected:'Non retenue',withdrawn:'Retirée'};
+const labels={open:'Ouvert aux candidatures',selected:'Professionnel sélectionné',closed:'Clôturé',cancelled:'Annulé',pending:'En attente',accepted:'Sélectionnée',rejected:'Non retenue',withdrawn:'Retirée'};
 const icons={projects:'M4 7h16v14H4z M8 7V3h8v4 M4 12h16',messages:'M4 4h16v13H9l-5 4z',profile:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M4 21v-2a7 7 0 0 1 14 0v2',new:'M12 4v16 M4 12h16',arrow:'M5 12h14 M13 6l6 6-6 6',check:'m5 12 4 4L19 6',settings:'M4 6h16 M4 12h16 M4 18h16',bell:'M6 16V9a6 6 0 0 1 12 0v7l2 2H4z M10 21h4'};
 function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.6');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');const p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',icons[name]||icons.projects);svg.append(p);return svg}
 function el(tag,attrs={},...children){const n=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k.startsWith('on'))n.addEventListener(k.slice(2).toLowerCase(),v);else if(k==='text')n.textContent=v;else if(['value','checked','hidden','disabled','required','selected'].includes(k))n[k]=v;else if(k==='class')n.className=v;else if(k==='htmlFor')n.htmlFor=v;else n.setAttribute(k,v)}for(const c of children.flat(Infinity))if(c!=null)n.append(c.nodeType?c:document.createTextNode(String(c)));return n}
@@ -14,7 +14,7 @@ function field(t,name,type='text',o={}){const l=el('label',{},el('span',{text:t}
 function panel(t,p){const n=el('section',{class:'panel'},el('h3',{text:t}));if(p)n.append(el('p',{class:'muted small',text:p}));return n}
 function empty(t,p,cta,fn){return el('section',{class:'empty'},el('h3',{text:t}),el('p',{text:p}),cta?button(cta,fn,'primary'):null)}
 function heading(t,p,cta,fn){return el('div',{class:'page-head'},el('div',{},el('div',{class:'eyebrow',text:'UN COUP DE POUCE'}),el('h2',{text:t}),el('p',{text:p})),cta?button(cta,fn,'primary'):null)}
-function badge(status){return el('span',{class:'chip '+({open:'green',accepted:'green',pending:'amber',selected:'violet'}[status]||''),text:labels[status]||status})}
+function badge(status){return el('span',{class:'chip '+({open:'green',accepted:'green',pending:'amber',selected:'violet',cancelled:'red'}[status]||''),text:labels[status]||status})}
 function intakeBadge(p){return p.status==='open'&&p.applications_paused?el('span',{class:'chip amber',text:'Candidatures en pause'}):null}
 function viewError(n,e){n.append(empty('Impossible de charger cette page',e.message,'Réessayer',render))}
 function staleResponse(){return Object.assign(Error('Réponse ignorée : le compte ou la session a changé.'),{stale:true})}
@@ -61,7 +61,7 @@ async function go(v){if(currentDraft){const saved=await action(saveDraft,'Brouil
 function focusPageHeading(){const target=$('#view h2')||$('#view h3')||$('#main');target.setAttribute('tabindex','-1');target.focus()}
 function setNavigationOpen(open){const toggle=$('#navigation-toggle');$('.sidebar').dataset.navigationOpen=String(open);toggle.setAttribute('aria-expanded',String(open))}
 function showDialog(title,content){++dialogEpoch;const dialog=$('#dialog'),wasOpen=dialog.open;if(!wasOpen)dialogReturnFocus=document.activeElement;const n=clear($('#dialog-content')),heading=el('h3',{id:'dialog-title',tabindex:'-1',text:title});n.append(heading,content);dialog.setAttribute('aria-labelledby','dialog-title');dialog.showModal();(wasOpen?heading:n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')||$('#dialog-close')).focus()}
-function ask(title,desc,fn){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const dialogToken=dialogEpoch;const r=await action(fn);if(r){if(dialogToken===dialogEpoch&&$('#dialog').open)$('#dialog').close();const token=renderEpoch+1;await render();if(token===renderEpoch&&!$('#dialog').open)focusPageHeading()}},'primary'));showDialog(title,body)}
+function ask(title,desc,fn,success){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const dialogToken=dialogEpoch;const r=await action(fn,success);if(r){if(dialogToken===dialogEpoch&&$('#dialog').open)$('#dialog').close();const token=renderEpoch+1;await render();if(token===renderEpoch&&!$('#dialog').open)focusPageHeading()}},'primary'));showDialog(title,body)}
 function roleNavigation(role){
  const items=role==='requester'?[['requester-home','Mon accueil','settings'],['projects','Mes projets','projects'],['conversations','Messages','messages']]:role==='professional'?[['professional-home','Vue d’ensemble','settings'],['projects','Trouver des projets','projects'],['favorites','Mes favoris','check'],['applications','Mes candidatures','check'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','settings']]:[['admin','Vue d’ensemble','settings'],['moderation','Modération','projects'],['catalog','Métiers du bâtiment','settings']];
  return [...items,['support','Assistance','messages'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']];
@@ -158,7 +158,7 @@ async function renderProfessionalHome(n){
  const applications=section('Vos candidatures','applications',(data,node)=>{
   const active=data.items.filter(a=>a.project_status!=='closed');
   node.append(el('dl',{class:'overview-totals'},el('dt',{text:'En attente · projet non clôturé'}),el('dd',{text:active.filter(a=>a.status==='pending').length}),el('dt',{text:'Sélectionnées · projet non clôturé'}),el('dd',{text:active.filter(a=>a.status==='accepted').length})));
-  for(const a of data.items.slice(0,3))node.append(el('div',{class:'item'},el('h4',{text:a.title}),badge(a.status),a.project_status==='closed'?el('span',{class:'chip',text:'Projet clôturé'}):null));
+  for(const a of data.items.slice(0,3))node.append(el('div',{class:'item'},el('h4',{text:a.title}),a.project_cancelled&&a.status==='rejected'?null:badge(a.status),a.project_status==='closed'?el('span',{class:'chip',text:a.project_cancelled?'Projet annulé':'Projet clôturé'}):null));
  });
  const messages=section('Conversations accessibles','conversations',(data,node)=>{
   const available=data.items.filter(a=>!!a.subscription_active&&(!a.linked_profile_id||!!a.linked_active));
@@ -209,7 +209,7 @@ async function renderProjects(n){
     select('Publication','published_within',{'':'Toutes les dates','1':'Dernières 24 heures','7':'Sept derniers jours','30':'Trente derniers jours'}),
     amountField('Budget recherché · minimum (€)','budget_from',saved.budget_from),amountField('Budget recherché · maximum (€)','budget_to',saved.budget_to),
     el('p',{class:'hint budget-filter-note',text:'Le budget annoncé doit recouper votre plage. Les projets sans budget sont exclus uniquement lorsque vous utilisez ce filtre.'}),
-    req?select('Statut','status',{'':'Tous les projets',open:'Ouverts',selected:'Professionnel sélectionné',closed:'Clôturés'}):null));
+    req?select('Statut','status',{'':'Tous les projets',open:'Ouverts',selected:'Professionnel sélectionné',closed:'Terminés',cancelled:'Annulés'}):null));
   advanced.open=Object.entries(saved).some(([k,v])=>v&&!['q','sort'].includes(k));
   const order=select('Trier','sort',{newest:'Plus récents',oldest:'Plus anciens'});order.querySelector('select').value=saved.sort||'newest';
   const reset=button('Effacer les filtres',()=>{for(const c of form.querySelectorAll('input,select'))c.value=c.name==='sort'?'newest':'';action(()=>load())});
@@ -220,7 +220,7 @@ async function renderProjects(n){
   function draw(rows){
     clear(list);count.textContent=rows.length+' projet'+(rows.length>1?'s':'')+' selon vos critères';
     for(const p of rows){
-      const info=el('div',{},el('div',{class:'line'},badge(p.status),intakeBadge(p),p.hidden?el('span',{class:'chip red',text:'En modération'}):null),
+      const info=el('div',{},el('div',{class:'line'},badge(p.cancelled?'cancelled':p.status),intakeBadge(p),p.hidden?el('span',{class:'chip red',text:'En modération'}):null),
         el('h3',{text:p.title}),el('p',{text:p.town+' · '+tradeNames(p)}),el('p',{class:'small muted',text:'Début souhaité : '+(timingNames[p.timing]||'Date flexible')}),el('p',{class:'small muted',text:'Budget indicatif : '+budgetText(p)}),!req?matchExplanation(p):null);
       list.append(el('article',{class:'project-row'},el('div',{class:'project-icon'},icon('projects')),info,
         el('div',{class:'row-actions'},button(req?'Voir les candidatures →':'Voir le projet →',()=>projectDetail(p)),!req?favoriteButton(p,()=>epoch===renderEpoch&&appState.user?.id===owner):null)));
@@ -316,8 +316,37 @@ function renderSavedSearches(n,searchForm,load,valid){
  refresh();
 }
 const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-async function projectDetail(p){if(acting)return;const epoch=++renderEpoch,actor=appState.user,sourceView=appState.view;await action(async()=>{const d=await api('/v4/projects/'+p.id);if(epoch!==renderEpoch||actor!==appState.user)return false;const n=el('div'),req=actor.role==='requester';n.append(button(sourceView==='professional-home'?'← Vue d’ensemble':sourceView==='favorites'?'← Mes favoris':actor.role==='professional'?'← Trouver des projets':'← Mes projets',()=>go(sourceView),'link'),heading(d.title,d.town+' · '+tradeNames(d)),badge(d.status),intakeBadge(d),el('section',{class:'panel'},el('h3',{text:'Le projet en quelques mots'}),el('p',{text:d.description}),el('p',{class:'small muted',text:'Début souhaité : '+({flexible:'flexible',month:'dans le mois',quarter:'dans les trois mois',urgent:'dès que possible'}[d.timing]||'flexible')})));n.append(el('p',{class:'hint',text:'Budget indicatif : '+budgetText(d)+'. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.'}));if(d.photos.length)n.append(el('div',{class:'photos'},...d.photos.map(id=>el('a',{href:'/api/v4/photos/'+id,target:'_blank',rel:'noopener'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de test du projet',width:160,height:120})))));
-if(req){const apps=(await api('/projects/'+p.id+'/applications')).items;const box=panel('Les professionnels intéressés','Comparez les profils déclarés avant de choisir. Une candidature ne constitue pas un devis. Dans cette préproduction, le chat nécessite une sélection et des droits de test actifs.');if(!apps.length)box.append(empty('Pas encore de candidature',d.applications_paused?'Les nouvelles candidatures sont en pause. Vous pouvez les rouvrir quand vous êtes prêt.':'Votre demande reste disponible pour les professionnels éligibles.'));renderCandidateCards(box,apps,d.id);n.append(box);if(d.status==='open')n.append(button(d.applications_paused?'Rouvrir les candidatures':'Mettre les candidatures en pause',()=>ask(d.applications_paused?'Rouvrir les candidatures ?':'Mettre les candidatures en pause ?',d.applications_paused?'Votre annonce pourra de nouveau apparaître aux professionnels éligibles. Les candidats en attente seront informés ; leur candidature conserve son état.':'Votre annonce disparaîtra de la recherche et refusera les nouvelles candidatures. Les candidatures reçues restent conservées et vous pouvez encore les examiner. Les professionnels concernés seront informés. Les droits des échanges existants restent inchangés.',()=>api('/projects/'+d.id+'/application-intake',{method:'POST',body:{paused:!d.applications_paused,version:d.intake_version??0}}))));if(d.status!=='closed')n.append(button('Clôturer le projet',()=>ask('Clôturer votre projet ?','Les candidatures en attente seront refusées et les échanges seront fermés. Cette clôture est définitive dans cette version.',()=>api('/projects/'+d.id+'/close',{method:'POST'}))));if(d.content_editable??(!apps.length&&d.status==='open'))n.append(button('Modifier la demande',()=>editProject(d)))}else if(d.own_application){n.append(el('section',{class:'status-note'},badge(d.own_application.status),el('p',{text:'Votre candidature est déjà enregistrée pour ce projet. Retrouvez son suivi dans Mes candidatures.'}),button('Voir ma candidature',()=>go('applications'))))}else if(d.application_profiles?.length)n.append(projectApplication(d));else n.append(el('p',{class:'status-note',text:'Les candidatures sont indisponibles pour ce projet.'}));n.append(button('Signaler un problème',()=>report('project',p.id),'link'));if(epoch!==renderEpoch||actor!==appState.user)return false;$('#view').replaceChildren(...n.childNodes);focusPageHeading();UCPAnalytics.track('project_viewed');return true})}
+async function projectDetail(p){if(acting)return;const epoch=++renderEpoch,actor=appState.user,sourceView=appState.view;await action(async()=>{const d=await api('/v4/projects/'+p.id);if(epoch!==renderEpoch||actor!==appState.user)return false;const n=el('div'),req=actor.role==='requester';n.append(button(sourceView==='professional-home'?'← Vue d’ensemble':sourceView==='favorites'?'← Mes favoris':actor.role==='professional'?'← Trouver des projets':'← Mes projets',()=>go(sourceView),'link'),heading(d.title,d.town+' · '+tradeNames(d)),badge(d.cancelled?'cancelled':d.status),intakeBadge(d),el('section',{class:'panel'},el('h3',{text:'Le projet en quelques mots'}),el('p',{text:d.description}),el('p',{class:'small muted',text:'Début souhaité : '+({flexible:'flexible',month:'dans le mois',quarter:'dans les trois mois',urgent:'dès que possible'}[d.timing]||'flexible')})));n.append(el('p',{class:'hint',text:'Budget indicatif : '+budgetText(d)+'. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.'}));if(d.photos.length)n.append(el('div',{class:'photos'},...d.photos.map(id=>el('a',{href:'/api/v4/photos/'+id,target:'_blank',rel:'noopener'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de test du projet',width:160,height:120})))));
+if(req){
+ const apps=(await api('/projects/'+p.id+'/applications')).items;
+ const box=panel('Les professionnels intéressés','Comparez les profils déclarés avant de choisir. Une candidature ne constitue pas un devis. Dans cette préproduction, le chat nécessite une sélection et des droits de test actifs.');
+ if(!apps.length){
+  const availability=d.status==='closed'?'L’historique du projet est conservé.':d.applications_paused?'Les nouvelles candidatures sont en pause. Vous pouvez les rouvrir quand vous êtes prêt.':'Votre demande reste disponible pour les professionnels éligibles.';
+  box.append(empty('Pas encore de candidature',availability));
+ }
+ renderCandidateCards(box,apps,d.id);n.append(box);
+ if(d.status==='open'){
+  n.append(button(d.applications_paused?'Rouvrir les candidatures':'Mettre les candidatures en pause',()=>ask(
+   d.applications_paused?'Rouvrir les candidatures ?':'Mettre les candidatures en pause ?',
+   d.applications_paused?'Votre annonce pourra de nouveau apparaître aux professionnels éligibles. Les candidats en attente seront informés ; leur candidature conserve son état.':'Votre annonce disparaîtra de la recherche et refusera les nouvelles candidatures. Les candidatures reçues restent conservées et vous pouvez encore les examiner. Les professionnels concernés seront informés. Les droits des échanges existants restent inchangés.',
+   ()=>api('/projects/'+d.id+'/application-intake',{method:'POST',body:{paused:!d.applications_paused,version:d.intake_version??0}}))));
+ }
+ if(d.status!=='closed'){
+  n.append(el('div',{class:'row'},
+   button('Clôturer le projet',()=>ask('Clôturer votre projet ?','Les candidatures en attente seront refusées et les échanges seront fermés. Cette clôture est définitive dans cette version.',()=>api('/projects/'+d.id+'/close',{method:'POST'}))),
+   button('Annuler le projet',()=>ask('Annuler définitivement votre projet ?','L’annonce apparaîtra comme annulée. Les candidatures en attente prendront fin, les échanges seront fermés et les candidats en attente ou sélectionnés seront avertis. L’historique du projet est conservé.',()=>api('/projects/'+d.id+'/cancel',{method:'POST'}),'Votre projet a été annulé.'))));
+ }
+ if(d.content_editable??(!apps.length&&d.status==='open'))n.append(button('Modifier la demande',()=>editProject(d)));
+}else if(d.own_application){
+ n.append(el('section',{class:'status-note'},badge(d.own_application.status),el('p',{text:'Votre candidature est déjà enregistrée pour ce projet. Retrouvez son suivi dans Mes candidatures.'}),button('Voir ma candidature',()=>go('applications'))));
+}else if(d.application_profiles?.length){
+ n.append(projectApplication(d));
+}else{
+ n.append(el('p',{class:'status-note',text:'Les candidatures sont indisponibles pour ce projet.'}));
+}
+n.append(button('Signaler un problème',()=>report('project',p.id),'link'));
+if(epoch!==renderEpoch||actor!==appState.user)return false;
+$('#view').replaceChildren(...n.childNodes);focusPageHeading();UCPAnalytics.track('project_viewed');return true})}
 
 function projectApplication(project){
  const profiles=project.application_profiles;
@@ -616,25 +645,27 @@ async function renderApplications(n){
  n.append(el('div',{class:'stat-grid'},...[
   ['En attente',count(a=>a.status==='pending'&&a.project_status!=='closed')],
   ['Sélectionnées · projet non clôturé',count(a=>a.status==='accepted'&&a.project_status!=='closed')],
-  ['Projets clôturés',count(a=>a.project_status==='closed')]
+  ['Projets terminés',count(a=>a.project_status==='closed')]
  ].map(([text,value])=>el('div',{class:'stat'},el('strong',{text:value}),text))));
- const filter=field('Afficher les candidatures','application_status','select',{required:false,options:{all:'Toutes',pending:'En attente',accepted:'Sélectionnées · projet non clôturé',rejected:'Non retenues',withdrawn:'Retirées',closed:'Projets clôturés'}});
+ const filter=field('Afficher les candidatures','application_status','select',{required:false,options:{all:'Toutes',pending:'En attente',accepted:'Sélectionnées · projet non clôturé',rejected:'Non retenues',withdrawn:'Retirées',closed:'Projets terminés',cancelled:'Projets annulés'}});
  const list=el('div',{'aria-live':'polite'});n.append(filter,list);
  const explanations={not_selected:'La messagerie s’ouvre après sélection et selon les droits de test actifs.',closed:'Projet clôturé : les échanges sont fermés.',unavailable:'L’accès aux échanges est actuellement suspendu. Consultez votre profil ou contactez l’assistance.',linked_inactive:'Le profil lié est inactif. Consultez Mon entreprise.',test_access_required:'Candidature sélectionnée. L’accès messagerie de test doit être activé par l’administrateur.',available:'Vous pouvez échanger avec le demandeur.'};
  function draw(){
   clear(list);const value=filter.querySelector('select').value;
-  const visible=items.filter(a=>value==='all'||(value==='closed'?a.project_status==='closed':a.status===value&&(value!=='pending'&&value!=='accepted'||a.project_status!=='closed')));
+  const visible=items.filter(a=>value==='all'||(value==='closed'&&a.project_status==='closed')||
+   (value==='cancelled'&&a.project_cancelled)||(a.status===value&&(!['pending','accepted'].includes(value)||a.project_status!=='closed')));
   if(!visible.length){list.append(el('p',{class:'status-note',text:'Aucune candidature pour ce filtre.'}));return}
   for(const a of visible){
    const state=a.conversation_state||(a.status==='accepted'?'unavailable':'not_selected');
    const card=panel(a.title);
    card.id='application-'+a.id;card.tabIndex=-1;
-   card.append(el('p',{class:'muted',text:(trades[a.trade]||a.trade)+' · '+a.town}),badge(a.status));
-   if(a.project_status==='closed')card.append(el('span',{class:'chip',text:'Projet clôturé'}));
+   card.append(el('p',{class:'muted',text:(trades[a.trade]||a.trade)+' · '+a.town}));
+   if(!a.project_cancelled||a.status!=='rejected')card.append(badge(a.status));
+   if(a.project_status==='closed')card.append(el('span',{class:'chip',text:a.project_cancelled?'Projet annulé':'Projet clôturé'}));
    if(a.project_paused&&a.project_status==='open')card.append(el('p',{class:'status-note',text:'Le demandeur a mis les nouvelles candidatures en pause. Votre candidature est conservée ; vous pouvez encore la retirer si elle est en attente.'}));
    if(a.linked_artisan_alias)card.append(el('p',{class:'small',text:'Candidature pour le profil lié « '+a.linked_artisan_alias+' »'}));
    if(a.submitted_at)card.append(el('p',{class:'small muted',text:'Envoyée le '+new Date(a.submitted_at).toLocaleString('fr-FR')}));
-   if(a.status==='pending'||a.status==='accepted'||state==='closed')card.append(el('p',{class:'hint',text:explanations[state]||explanations.unavailable}));
+   if(a.status==='pending'||a.status==='accepted'||state==='closed')card.append(el('p',{class:'hint',text:a.project_cancelled?'Projet annulé par le demandeur. Les échanges sont fermés.':explanations[state]||explanations.unavailable}));
    if(a.status==='pending')card.append(button('Retirer ma candidature',()=>ask('Retirer cette candidature ?','Elle ne pourra pas être renvoyée sur ce projet dans ce laboratoire.',()=>api('/applications/'+a.id+'/withdraw',{method:'POST'}))));
    if(a.status==='accepted'&&['available','linked_inactive','test_access_required'].includes(state))card.append(button(state==='available'?'Ouvrir mes messages':'Consulter l’état de mes échanges',()=>go('conversations'),'secondary'));
    list.append(card);
@@ -793,7 +824,7 @@ async function renderNotifications(n){
   if(readers.has(note.id))return;
   const flag=el('span',{class:'chip '+(!note.read_at?'violet':''),text:note.read_at?'Lue':'Non lue'});
   const card=el('article',{class:'item'},el('p',{text:note.message}),el('time',{class:'small muted',text:new Date(note.created_at).toLocaleString('fr-FR')}),flag);
-  if(note.event_type==='project_updated'&&actor.role==='professional'){
+  if(['project_updated','project_cancelled'].includes(note.event_type)&&actor.role==='professional'){
    card.append(button('Voir ma candidature',async()=>{
     await go('applications');
     if(appState.user===actor&&appState.view==='applications')document.getElementById('application-'+note.entity_id)?.focus();

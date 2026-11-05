@@ -416,3 +416,8 @@ def test_postgres_project_content_edit_is_versioned_and_serialized_with_applicat
 def test_postgres_password_change_revokes_sessions_and_recovery(pg):
     from test_password_change import exercise_password_change
     exercise_password_change(pg)
+
+
+def test_postgres_cancellation_lifecycle_and_visibility(pg):
+    from test_project_cancellation import exercise_cancellation
+    exercise_cancellation(pg,*project_intake_setup(pg))

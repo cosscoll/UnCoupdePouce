@@ -144,6 +144,8 @@ def init_db():
             if column not in project_cols:c.execute(f'ALTER TABLE projects ADD COLUMN {column} INTEGER CHECK ({column}>=0)')
         if 'applications_paused' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN applications_paused INTEGER NOT NULL DEFAULT 0 CHECK (applications_paused IN (0,1))')
         if 'intake_version' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN intake_version INTEGER NOT NULL DEFAULT 0 CHECK (intake_version>=0)')
+        if 'cancelled' not in project_cols:
+            c.execute("ALTER TABLE projects ADD COLUMN cancelled INTEGER NOT NULL DEFAULT 0 CHECK (cancelled=0 OR (cancelled=1 AND status='closed'))")
         if 'content_version' not in project_cols:
             c.execute('ALTER TABLE projects ADD COLUMN content_version INTEGER NOT NULL DEFAULT 0 CHECK (content_version>=0)')
         application_cols=[r['name'] for r in c.execute('PRAGMA table_info(applications)').fetchall()]
@@ -243,6 +245,7 @@ NOTIFICATION_TYPES = {
     'application_rejected': 'Une de vos candidatures de test a été refusée.',
     'application_withdrawn': 'Une candidature sur votre projet a été retirée.',
     'project_closed': 'Un projet auquel vous avez candidaté a été clôturé.',
+    'project_cancelled': 'Le demandeur a annulé un projet auquel vous avez candidaté.',
     'project_updated': 'Une annonce pour laquelle vous avez une candidature en attente a été modifiée.',
     'project_intake_paused': 'Le demandeur a mis les nouvelles candidatures en pause. Votre candidature est conservée ; les échanges restent soumis aux droits en cours.',
     'project_intake_resumed': 'Le demandeur reçoit de nouveau des candidatures. Votre candidature conserve son état ; les échanges restent soumis aux droits en cours.',
@@ -901,23 +904,36 @@ def edit_project(project_id:int,body:EditProject,user=Depends(require('requester
         c.execute('COMMIT')
     return {'ok':True,'status':'open','content_version':body.content_version+1,'notified':len(pending),'changed':True}
 
-@app.post('/api/projects/{project_id}/close')
-def close_project(project_id:int,user=Depends(require('requester'))):
-    # Closing a project also shuts down its chat (see check_conversation).
+def end_project(project_id, user, *, cancelled):
     with authenticated_db(user,write=True) as c:
-        project=c.execute('SELECT requester_id,status,trade,trades_json FROM projects WHERE id=?',(project_id,)).fetchone()
+        project=c.execute('SELECT requester_id,status FROM projects WHERE id=?',(project_id,)).fetchone()
         if not project:error(404,'Projet inconnu')
         if project['requester_id']!=user['id']:error(403,'Projet appartenant à un autre demandeur')
-        if project['status']=='closed':error(409,'Projet déjà clôturé')
-        targets=c.execute("SELECT professional_id FROM applications WHERE project_id=? AND status IN ('pending','accepted')",
-                          (project_id,)).fetchall()
-        c.execute("UPDATE projects SET status='closed',applications_paused=0,intake_version=intake_version+1 WHERE id=?",(project_id,))
+        if project['status']=='closed':
+            error(409,'Projet déjà terminé' if cancelled else 'Projet déjà clôturé')
+        targets=c.execute("""SELECT id,professional_id FROM applications
+                             WHERE project_id=? AND status IN ('pending','accepted')""",(project_id,)).fetchall()
+        c.execute("""UPDATE projects SET status='closed',cancelled=?,applications_paused=0,intake_version=intake_version+1
+                     WHERE id=?""",(int(cancelled),project_id))
         c.execute("UPDATE applications SET status='rejected' WHERE project_id=? AND status='pending'",(project_id,))
-        for target in targets:queue_notice(c,target['professional_id'],'project_closed',project_id)
+        event='project_cancelled' if cancelled else 'project_closed'
+        for target in targets:
+            queue_notice(c,target['professional_id'],event,target['id'] if cancelled else project_id)
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
-                  (user['id'],'close_project','project',project_id,now()))
-        c.execute('COMMIT')
+                  (user['id'],'cancel_project' if cancelled else 'close_project','project',project_id,now()))
+
+
+@app.post('/api/projects/{project_id}/close')
+def close_project(project_id:int,user=Depends(require('requester'))):
+    end_project(project_id,user,cancelled=False)
     return {'ok':True,'status':'closed','chat_access':False}
+
+
+@app.post('/api/projects/{project_id}/cancel')
+def cancel_project(project_id:int,user=Depends(require('requester'))):
+    end_project(project_id,user,cancelled=True)
+    return {'ok':True,'status':'closed','cancelled':True,'chat_access':False}
+
 
 def linked_application_profiles(c, professional_id):
     return c.execute("""SELECT a.id,a.alias,a.service_trades,a.service_areas FROM enterprise_artisans a
@@ -950,7 +966,7 @@ def project_profile_matches(project, profile, members):
 def discover_projects(c,user):
     """Authorized project discovery, reused by lists and private favorites."""
     from project_search import decorate
-    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,p.applications_paused,p.intake_version,
+    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,p.applications_paused,p.intake_version,p.cancelled,
     (SELECT payload FROM drafts WHERE project_id=p.id ORDER BY id LIMIT 1) AS draft_payload'''
     discovery='not_applicable'
     if user['role']=='requester':
@@ -981,7 +997,7 @@ def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
              trade:Annotated[str,Query(max_length=61)]='',town:Annotated[str,Query(max_length=90)]='',
              category:Annotated[str,Query(max_length=80)]='',
              timing:Literal['flexible','month','quarter','urgent']|None=None,
-             status:Literal['open','selected','closed']|None=None,
+             status:Literal['open','selected','closed','cancelled']|None=None,
              published_within:Annotated[int|None,Query(ge=1,le=365)]=None,
              sort:Literal['newest','oldest']='newest',
              budget_from:Annotated[int|None,Query(ge=0,le=MAX_BUDGET)]=None,
@@ -1064,6 +1080,7 @@ def my_applications(user=Depends(require('professional'))):
     with authenticated_db(user,write=False) as c:
         rows=c.execute('''SELECT applications.id,applications.status,applications.created_at AS submitted_at,
         projects.title,projects.trade,projects.town,projects.status AS project_status,projects.applications_paused AS project_paused,
+        projects.cancelled AS project_cancelled,
         linked.alias AS linked_artisan_alias FROM applications JOIN projects ON projects.id=applications.project_id
         LEFT JOIN enterprise_artisans linked ON linked.id=applications.linked_profile_id
         WHERE applications.professional_id=? ORDER BY applications.id DESC''',(user['id'],)).fetchall()
@@ -1219,7 +1236,7 @@ def send_message(aid:int,body:Message,request:Request,user=Depends(get_user)):
 def account_export(user=Depends(get_user)):
     # Limited lab export: only the authenticated participant's records, never another user's messages.
     with authenticated_db(user,write=False) as c:
-        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,applications_paused,intake_version,content_version FROM projects WHERE requester_id=?',(user['id'],))]
+        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,applications_paused,intake_version,content_version,cancelled FROM projects WHERE requester_id=?',(user['id'],))]
         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
         import base64
         own_photos=[{'id':r['id'],'draft_id':r['draft_id'],'jpeg_base64':base64.b64encode(r['body']).decode()} for r in c.execute('SELECT photos.id,draft_id,body FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.owner_id=?',(user['id'],))]
