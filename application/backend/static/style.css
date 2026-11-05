@@ -236,3 +236,77 @@ body:has(#dialog[open]) .chatbot-launcher{visibility:hidden}
 .account-actions-buttons button{min-height:42px;border:1px solid #9295ad;border-radius:9px;font-size:12px;background:#fff}
 .account-actions-buttons #logout:hover{border-color:#b14d45;color:#9b312e}
 @media(max-width:680px){.account-actions{padding:16px;margin:4px 0 20px;align-items:stretch}.account-actions-buttons{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.account-actions-buttons button{min-width:0;padding:10px 8px;white-space:normal}.header{justify-content:space-between}}
+
+/* UX audit 2026-11-05: one priority, secondary details and less visual noise. */
+.home-priority{display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;
+ margin:12px 0 22px;padding:24px 28px;border:1px solid #d8dcee;border-left:4px solid var(--violet);
+ border-radius:13px;background:#f7f8ff}
+.home-priority-copy{flex:1 1 260px;min-width:0}
+.home-priority .eyebrow{display:block;font-size:10px;letter-spacing:.12em;color:#4653ae}
+.home-priority h3{font-family:Montserrat,Arial,sans-serif;font-size:20px;line-height:1.3;margin:7px 0;font-weight:700}
+.home-priority p{font-size:13px;line-height:1.65;color:#42465c;margin:0;max-width:590px}
+.home-priority .primary{min-height:46px;white-space:normal;flex-shrink:0}
+body[data-space=professional] .home-priority{border-left-color:var(--orange);background:#fffaf5}
+body[data-space=professional] .home-priority .eyebrow{color:#a04608}
+.home-overview{margin-top:10px}
+.home-overview>summary{display:list-item;cursor:pointer;font-size:13px;font-weight:700;
+ border-bottom:1px solid var(--line);padding:15px 10px;min-height:48px;color:#41465b}
+.home-overview[open]>summary{margin-bottom:18px}
+.home-overview>summary:hover{color:var(--violet)}
+/* The professional sidebar shows four primary pages and one expandable group. */
+.nav-secondary{min-width:0}
+.nav-secondary>summary{min-height:44px;cursor:pointer;display:list-item;padding:13px 12px 13px 18px;
+ color:#3b415d;font-size:13px;font-weight:700;border-radius:10px;line-height:1.5}
+.nav-secondary>summary:hover,.nav-secondary[open]>summary{background:#eff0fa;color:#4653aa}
+.nav-secondary-items{display:grid;gap:5px;padding:5px 0 10px 13px;margin-left:10px;border-left:1px solid #d9dceb}
+.nav-secondary-items .navlink{width:100%;font-size:12px;padding:11px 10px;min-height:43px}
+.nav-secondary-items svg{width:18px;height:18px}
+/* Role-specific project search: three essential filters, advanced on demand. */
+.project-search{background:#fff}
+.search-core{display:grid;grid-template-columns:minmax(0,1.6fr) repeat(2,minmax(0,1fr));gap:14px;align-items:end}
+.search-core:has(>label:only-child){grid-template-columns:minmax(0,1fr)}
+.search-core label{min-width:0}
+.search-advanced{margin-top:10px}
+.search-advanced>summary{font-size:12px;font-weight:700;color:#4652a8}
+.search-actions{border-top:1px solid #edeef2;padding-top:12px}
+.project-search .search-actions>.primary{min-height:44px}
+.project-search .search-actions label{font-size:12px}
+.project-list>.project-row:hover{background:#fafbff}
+.project-row .row-actions button{min-height:44px}
+.candidate-guidance{margin:0 0 18px;padding:11px 15px;background:#f8f9fd;
+ border-left:3px solid var(--violet);font-size:12px;line-height:1.6;color:#454960}
+.candidate-card{border:1px solid #e1e3ec;border-radius:14px;padding:19px;background:#fff;margin-bottom:15px}
+.candidate-card-intro{display:flex;align-items:center;gap:13px;min-width:0}
+.candidate-card-avatar{flex-shrink:0;display:grid;place-items:center;width:45px;height:45px;
+ border-radius:12px;background:#eef0fa;color:var(--violet)}
+.candidate-card-avatar svg{width:24px;height:24px}
+.candidate-card-heading{min-width:0;flex:1}
+.candidate-card h4{margin:0 0 6px;font-size:16px;line-height:1.35;overflow-wrap:anywhere}
+.candidate-card-skill{font-size:14px;font-weight:700;color:#282d47;line-height:1.55;margin:15px 0 4px}
+.candidate-card-zones{font-size:13px;color:#53576a;line-height:1.6;margin:4px 0}
+.candidate-verification{font-size:12px;color:#696573;line-height:1.55;margin:12px 0 10px}
+.candidate-more{border-top:1px solid #ebedf2;margin:10px 0;padding:0}
+.candidate-more>summary{cursor:pointer;min-height:44px;padding:13px 0;font-size:12px;font-weight:650;color:var(--violet)}
+.candidate-more .candidate-facts{margin-top:0}
+.candidate-card .row{flex-wrap:wrap}
+.candidate-card .row button{min-height:42px}
+.candidate-comparison .comparison-card{background:#fff}
+#view .panel{min-width:0}
+#view .panel>.muted{line-height:1.6}
+#view .hint{line-height:1.55}
+@media(max-width:1000px){
+ .search-core{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .search-core>label:first-child{grid-column:1/-1}
+}
+@media(max-width:680px){
+ .home-priority{padding:18px;gap:15px}
+ .home-priority h3{font-size:17px}
+ .home-priority .primary{width:100%}
+ .search-core{grid-template-columns:1fr}
+ .search-core>label:first-child{grid-column:auto}
+ .search-core label,.search-grid label{min-width:0}
+ .candidate-card{padding:14px}
+ .candidate-card-intro{align-items:flex-start}
+ .candidate-card .row button{flex:1 1 130px}
+}
+@media(prefers-reduced-motion:reduce){.project-list>.project-row{transition:none}}
