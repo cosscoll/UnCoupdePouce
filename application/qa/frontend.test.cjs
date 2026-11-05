@@ -1273,3 +1273,16 @@ test('floating assistant entry is visible and opens the same assistant as the he
   assert.equal(launcher.hidden,false,'entry remains visible while navigating');
  }finally{x.close()}
 });
+
+test('Yahya displays Assistant IA below its name in launcher and chat header',async()=>{
+ const x=await boot();
+ try{
+  const launcher=x.w.document.querySelector('#chatbot-launcher');
+  assert.equal(launcher.querySelector('.chatbot-label-stack strong')?.textContent,'Yahya');
+  assert.equal(launcher.querySelector('.chatbot-label-stack small')?.textContent,'Assistant IA');
+  launcher.click();await tick();
+  const heading=x.w.document.querySelector('#dialog-title');
+  assert.equal(heading?.firstChild?.textContent,'Yahya');
+  assert.equal(heading?.querySelector('.ai-chat-subtitle')?.textContent,'Assistant IA');
+ }finally{x.close()}
+});
