@@ -11,7 +11,7 @@ from typing import Literal, Annotated
 from fastapi import FastAPI, Request, Response, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, StrictInt, field_validator
 
 ROOT = Path(__file__).parent
 import sys
@@ -139,6 +139,8 @@ def init_db():
             if column not in project_cols:c.execute(f'ALTER TABLE projects ADD COLUMN {column} INTEGER CHECK ({column}>=0)')
         if 'applications_paused' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN applications_paused INTEGER NOT NULL DEFAULT 0 CHECK (applications_paused IN (0,1))')
         if 'intake_version' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN intake_version INTEGER NOT NULL DEFAULT 0 CHECK (intake_version>=0)')
+        if 'content_version' not in project_cols:
+            c.execute('ALTER TABLE projects ADD COLUMN content_version INTEGER NOT NULL DEFAULT 0 CHECK (content_version>=0)')
         application_cols=[r['name'] for r in c.execute('PRAGMA table_info(applications)').fetchall()]
         if 'linked_profile_id' not in application_cols:
             c.execute('ALTER TABLE applications ADD COLUMN linked_profile_id INTEGER REFERENCES enterprise_artisans(id)')
@@ -226,6 +228,10 @@ def pw(password,salt): return hashlib.pbkdf2_hmac('sha256',password.encode(), by
 def hash_token(t): return hashlib.sha256(t.encode()).hexdigest()
 def error(status,detail): raise HTTPException(status_code=status,detail=detail)
 
+def session_csrf(session_token, csrf_seed):
+    # Keep the CSRF token stable across tabs without exposing the HttpOnly cookie or its hash.
+    return hmac.new(session_token.encode(), b'ucp:csrf:v1:' + csrf_seed.encode(), 'sha256').hexdigest()
+
 NOTIFICATION_TYPES = {
     'new_application': 'Une candidature a été reçue sur votre projet fictif.',
     'application_accepted': 'Votre candidature de test a été acceptée.',
@@ -266,7 +272,10 @@ def get_user(request:Request):
     if not user or user['expires'] <= int(time.time()): error(401,'Session expirée')
     if request.method not in ('GET','HEAD','OPTIONS'):
         csrf=request.headers.get('x-ucp-csrf','')
-        if not csrf or not hmac.compare_digest(hash_token(csrf),user['csrf_hash']): error(403,'Protection CSRF : jeton invalide')
+        # Existing sessions may still have a tab using the token issued by the previous release.
+        if not csrf or not (hmac.compare_digest(csrf.encode(),session_csrf(t,user['csrf_hash']).encode())
+                            or hmac.compare_digest(hash_token(csrf),user['csrf_hash'])):
+            error(403,'Protection CSRF : jeton invalide')
         origin=request.headers.get('origin')
         if origin and origin.rstrip('/') != str(request.base_url).rstrip('/'):
             error(403,'Origine non autorisée')
@@ -413,6 +422,7 @@ class Message(BaseModel):
     body: str = Field(min_length=1,max_length=2000)
 
 class EditProject(Budget):
+    content_version: StrictInt = Field(ge=0)
     title: str = Field(min_length=5,max_length=120)
     description: str = Field(min_length=20,max_length=5000)
     trade: str
@@ -424,11 +434,6 @@ class EditProject(Budget):
         required={'title':5,'description':20,'town':2}[info.field_name]
         if len(clean)<required:raise ValueError('Texte trop court après suppression des espaces')
         return clean
-    @field_validator('trade')
-    @classmethod
-    def trade_valid(cls,v):
-        if not active_trade(v): raise ValueError('Métier inconnu ou désactivé')
-        return v
 
 
 class EnterpriseAccountCreate(BaseModel):
@@ -661,12 +666,12 @@ def login(body:Login,response:Response):
         if locked and locked['locked_until']>stamp:error(429,'Trop de tentatives de démonstration. Réessayez plus tard.')
         user=current
         c.execute('DELETE FROM auth_failures WHERE email=?',(email,))
-        t=secrets.token_urlsafe(32); csrf=secrets.token_urlsafe(32)
+        t=secrets.token_urlsafe(32); csrf_seed=hash_token(secrets.token_urlsafe(32))
         c.execute('INSERT INTO sessions(token_hash,user_id,csrf_hash,expires) VALUES(?,?,?,?)',
-                  (hash_token(t),user['id'],hash_token(csrf),stamp+SESSION_SECONDS))
+                  (hash_token(t),user['id'],csrf_seed,stamp+SESSION_SECONDS))
         c.execute('COMMIT')
     response.set_cookie('ucp_lab_sid',t,max_age=SESSION_SECONDS,httponly=True,samesite='strict',secure=HOSTING.staging,path='/')
-    return {'user_id':user['id'],'role':user['role'],'name':user['name'],'csrf':csrf}
+    return {'user_id':user['id'],'role':user['role'],'name':user['name'],'csrf':session_csrf(t,csrf_seed)}
 
 @app.get('/api/me')
 def me(user=Depends(get_user)):
@@ -707,11 +712,11 @@ def admin_audit(user=Depends(require('admin'))):
 
 
 @app.get('/api/session')
-def renew_csrf(request:Request,user=Depends(get_user)):
-    token=secrets.token_urlsafe(32)
-    with authenticated_db(user,write=True) as c:
-        c.execute('UPDATE sessions SET csrf_hash=? WHERE token_hash=?',(hash_token(token),hash_token(request.cookies['ucp_lab_sid'])))
-    return {'id':user['id'],'name':user['name'],'email':user['email'],'role':user['role'],'csrf':token}
+def read_session(request:Request,user=Depends(get_user)):
+    with authenticated_db(user) as c:
+        seed=c.execute('SELECT csrf_hash FROM sessions WHERE token_hash=?',(user['session_token_hash'],)).fetchone()['csrf_hash']
+    return {'id':user['id'],'name':user['name'],'email':user['email'],'role':user['role'],
+            'csrf':session_csrf(request.cookies['ucp_lab_sid'],seed)}
 
 @app.post('/api/logout')
 def logout(response:Response,request:Request,user=Depends(get_user)):
@@ -783,22 +788,25 @@ def create_project(body:Project,user=Depends(require('requester'))):
 def edit_project(project_id:int,body:EditProject,user=Depends(require('requester'))):
     # Do not allow changing an advertised job after any professional applied.
     with authenticated_db(user,write=True) as c:
-        project=c.execute('SELECT requester_id,status,trade,trades_json,budget_min,budget_max FROM projects WHERE id=?',(project_id,)).fetchone()
+        project=c.execute('SELECT requester_id,status,trade,trades_json,budget_min,budget_max,content_version FROM projects WHERE id=?',(project_id,)).fetchone()
         if not project:error(404,'Projet inconnu')
         if project['requester_id']!=user['id']:error(403,'Projet appartenant à un autre demandeur')
         if project['status']!='open' or c.execute('SELECT 1 FROM applications WHERE project_id=?',(project_id,)).fetchone():
             error(409,'Projet non modifiable après une candidature ou sa fermeture')
+        if body.content_version != project['content_version']:
+            error(409, {'code': 'project_content_conflict', 'message': 'Cette annonce a été modifiée ailleurs. Votre saisie est conservée.'})
+        if not active_trade(body.trade,c):error(422,'Métier inconnu ou désactivé')
         if body.trade!=project['trade'] and len(project_trades(project))>1:error(409,'Les métiers d’un projet multi-métiers ne peuvent être modifiés ici')
         values={k:getattr(body,k) if k in body.model_fields_set else project[k] for k in ('budget_min','budget_max')}
         try:Budget.model_validate(values)
         except ValueError:error(422,'Le budget minimum ne peut pas dépasser le maximum')
         if body.trade!=project['trade']:c.execute('UPDATE projects SET trades_json=? WHERE id=?',(json.dumps([body.trade]),project_id))
-        c.execute('UPDATE projects SET title=?,description=?,trade=?,town=?,budget_min=?,budget_max=? WHERE id=?',
+        c.execute('UPDATE projects SET title=?,description=?,trade=?,town=?,budget_min=?,budget_max=?,content_version=content_version+1 WHERE id=?',
                   (body.title.strip(),body.description.strip(),body.trade,body.town.strip(),values['budget_min'],values['budget_max'],project_id))
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                   (user['id'],'edit_project','project',project_id,now()))
         c.execute('COMMIT')
-    return {'ok':True,'status':'open'}
+    return {'ok':True,'status':'open','content_version':body.content_version+1}
 
 @app.post('/api/projects/{project_id}/close')
 def close_project(project_id:int,user=Depends(require('requester'))):
@@ -1101,7 +1109,7 @@ def send_message(aid:int,body:Message,request:Request,user=Depends(get_user)):
 def account_export(user=Depends(get_user)):
     # Limited lab export: only the authenticated participant's records, never another user's messages.
     with authenticated_db(user,write=False) as c:
-        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,applications_paused,intake_version FROM projects WHERE requester_id=?',(user['id'],))]
+        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,applications_paused,intake_version,content_version FROM projects WHERE requester_id=?',(user['id'],))]
         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
         import base64
         own_photos=[{'id':r['id'],'draft_id':r['draft_id'],'jpeg_base64':base64.b64encode(r['body']).decode()} for r in c.execute('SELECT photos.id,draft_id,body FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.owner_id=?',(user['id'],))]

@@ -347,9 +347,43 @@ test('budget search sends explicit zero bounds and explains missing budgets',asy
 });
 test('project editor sends numeric budget values and explicit null for a cleared bound',async()=>{
  const x=await boot({'PUT /api/projects/18':{ok:true}});try{
-  x.w.editProject({id:18,title:'Budget de travaux fictif',description:'Description fictive suffisamment longue pour la modification.',trade:'plomberie',town:'Toulouse',budget_min:1000,budget_max:3000});
+  x.w.editProject({id:18,title:'Budget de travaux fictif',description:'Description fictive suffisamment longue pour la modification.',trade:'plomberie',town:'Toulouse',budget_min:1000,budget_max:3000,content_version:3});
   input(x.w,'#dialog [name=budget_min]','');input(x.w,'#dialog [name=budget_max]','0');submit(x.w,'#dialog form');await tick();
-  const sent=x.calls.find(c=>c.method==='PUT');assert.equal(sent.body.budget_min,null);assert.equal(sent.body.budget_max,0);
+  const sent=x.calls.find(c=>c.method==='PUT');assert.equal(sent.body.budget_min,null);assert.equal(sent.body.budget_max,0);assert.equal(sent.body.content_version,3);
+ }finally{x.close()}
+});
+
+test('project edit conflict keeps the form and rebases only after the owner loads the published version',async()=>{
+ const original={id:18,title:'Titre initial fictif',description:'Description initiale du projet fictif.',trade:'plomberie',town:'Toulouse',budget_min:null,budget_max:3000,content_version:0,status:'open'};
+ const latest={...original,title:'Titre récent publié',description:'Description récente publiée pour le projet fictif.',budget_min:900,content_version:1};
+ const x=await boot({
+  '/api/v4/projects/18':latest,
+  'PUT /api/projects/18':call=>call.body.content_version===0
+   ?{status:409,data:{detail:{code:'project_content_conflict',message:'Cette annonce a été modifiée ailleurs. Votre saisie est conservée.'}}}
+   :{ok:true,content_version:2},
+ });try{
+  x.w.editProject(original);
+  const dialog=x.w.document.querySelector('#dialog'),form=dialog.querySelector('form');
+  const save=form.querySelector('[type=submit]');
+  const reload=[...form.querySelectorAll('button')].find(b=>b.textContent==='Charger la version actuelle');
+  input(x.w,'#dialog [name=title]','Titre de ma fenêtre');
+  submit(x.w,'#dialog form');await tick();
+  assert.equal(form.elements.title.value,'Titre de ma fenêtre');
+  assert.match(form.querySelector('[role=status]').textContent,/modifiée ailleurs/);
+  assert.equal(save.disabled,true);
+  assert.equal(x.w.document.activeElement,reload);
+  assert.equal(x.calls.filter(c=>c.url==='/api/v4/projects/18').length,0);
+  reload.click();await tick();
+  assert.match(form.textContent,/Titre récent publié/);
+  assert.equal(form.elements.title.value,'Titre de ma fenêtre');
+  assert.equal(form.elements.description.value,latest.description);
+  assert.equal(form.elements.budget_min.value,'900');
+  assert.equal(save.disabled,false);
+  assert.equal(x.calls.filter(c=>c.method==='PUT').length,1);
+  submit(x.w,'#dialog form');await tick();
+  const sent=x.calls.filter(c=>c.method==='PUT').at(-1).body;
+  assert.deepEqual(sent,{title:'Titre de ma fenêtre',town:'Toulouse',description:latest.description,budget_min:900,budget_max:3000,trade:'plomberie',content_version:1});
+  assert.equal(dialog.open,false);
  }finally{x.close()}
 });
 

@@ -231,6 +231,10 @@ def install(m):
             r=visible_project(c,id,user)
             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
             row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version')};row['trades']=list(m.project_trades(r))
+            if r['requester_id']==user['id']:
+                row['content_version']=r['content_version']
+                row['content_editable']=r['status']=='open' and not c.execute(
+                    'SELECT 1 FROM applications WHERE project_id=?',(id,)).fetchone()
             draft=c.execute('SELECT payload FROM drafts WHERE project_id=?',(id,)).fetchone()
             row['timing']=json.loads(draft['payload']).get('timing','flexible') if draft else 'flexible'
             row['photos']=photos if user['role'] in ('requester','admin') or c.execute("SELECT 1 FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone() else []
@@ -311,7 +315,7 @@ def install(m):
             if r['status']!='open' or m.project_trades(r)!={'inconnu'}:error(409,'Seules les demandes sans métier peuvent être classées ici')
             if 'inconnu' in body.trades:error(422,'Choisissez des métiers précis')
             validate_draft(c,Draft(trades=body.trades))
-            c.execute('UPDATE projects SET trade=?,trades_json=? WHERE id=?',(body.trades[0],json.dumps(list(dict.fromkeys(body.trades))),id))
+            c.execute('UPDATE projects SET trade=?,trades_json=?,content_version=content_version+1 WHERE id=?',(body.trades[0],json.dumps(list(dict.fromkeys(body.trades))),id))
             c.execute('INSERT INTO admin_decisions(actor_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',(user['id'],'classify',id,body.reason,now()))
             audit(c,user,'classify_project','project',id);c.execute('COMMIT')
         return {'ok':True}

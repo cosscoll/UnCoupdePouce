@@ -395,3 +395,19 @@ def test_postgres_pause_race_with_new_application(pg):
     from test_project_intake import exercise_apply_pause_race
     owner,_,fresh,pid,_=project_intake_setup(pg)
     exercise_apply_pause_race(pg,owner,fresh,pid)
+
+
+def test_postgres_project_content_edit_is_versioned_and_serialized_with_application(pg):
+    from test_project_edit import EDIT, exercise_concurrent_application, exercise_two_windows
+
+    owner, _ = client_for(pg, 'owner-edit@ucp.test', 'requester')
+    candidate, candidate_id = client_for(pg, 'candidate-edit@ucp.test', 'professional')
+    assert candidate.post('/api/profile', json={'trade':'plomberie','town':'Toulouse','siren':'123456782'}).status_code == 200
+    with pg.connect() as db:
+        db.execute('UPDATE profiles SET approved=1 WHERE user_id=?', (candidate_id,))
+    first = owner.post('/api/projects', json=EDIT)
+    assert first.status_code == 201, first.text
+    exercise_two_windows(pg, owner, first.json()['id'])
+    second = owner.post('/api/projects', json=EDIT)
+    assert second.status_code == 201, second.text
+    exercise_concurrent_application(pg, owner, candidate, second.json()['id'])

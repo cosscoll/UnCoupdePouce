@@ -33,7 +33,8 @@ def test_project_create_edit_and_draft_publication_reject_obfuscated_contact(set
     v=setup;call=v['call'];pid=project(v)
     body={'title':'Travaux fictifs','description':'Travaux fictifs de plomberie. Écrivez à test＠ucp.test','town':'Toulouse','trade':'plomberie'}
     assert call(v['requester'],v['rcsrf'],'post','/api/projects',json=body).status_code==422
-    assert call(v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=body).status_code==422
+    result=call(v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=body|{'content_version':0})
+    assert result.status_code==422 and result.json()['detail'][0]['loc']==['body','description']
     d=call(v['requester'],v['rcsrf'],'post','/api/v4/drafts',json={'title':body['title'],'description':body['description'],'town':'Toulouse','trades':['plomberie']}).json()
     result=call(v['requester'],v['rcsrf'],'post',f'/api/v4/drafts/{d["id"]}/publish',json={'version':d['version']})
     assert result.status_code==422
