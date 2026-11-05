@@ -32,11 +32,14 @@ function create(hooks){
    [['Trouver des projets','projects'],['Mes candidatures','applications'],['Mon profil','profile'],['Assistance','support']];
   for(const [label,view] of items)shortcuts.append(button(label,()=>{if(valid(s)&&!s.busy)hooks.navigate(view)}));
   const actions=el('div',{class:'helper-options ai-actions'},s.role==='requester'?draft:search);
-  ui.append(el('p',{class:'hint',text:'IA gratuite exécutée localement sur votre appareil. Aucun paiement par message, aucune clé API. Le navigateur doit prendre en charge WebGPU. Les performances dépendent de votre appareil.'}),
-   el('p',{class:'hint',text:'Le modèle et son moteur sont téléchargés depuis des hébergeurs publics au premier usage, puis mis en cache. Vos messages ne sont pas envoyés à un service de génération. Testez uniquement avec des données fictives.'}),
+  ui.append(
+   el('p',{class:'ai-intro',text:'Posez votre question, décrivez vos travaux ou demandez une aide pour trouver un chantier. Réponses générées par une IA gratuite directement sur votre appareil.'}),
    log,proposals,status,agreement,form,
-   el('p',{class:'hint',text:'Lorsque vous avez décrit votre besoin, demandez à l’IA une proposition à vérifier :'}),actions,
-   el('div',{class:'ai-tools'},newChat),el('p',{class:'hint',text:'Navigation directe'}),shortcuts);
+   el('p',{class:'hint',text:'Après quelques messages, l’IA peut aussi préparer une proposition à vérifier :'}),actions,
+   el('div',{class:'ai-tools'},newChat),
+   el('details',{class:'ai-technical-details'},el('summary',{text:'Fonctionnement et confidentialité'}),
+    el('p',{class:'hint',text:'Aucune API IA payante. Il faut un navigateur compatible WebGPU. La première utilisation télécharge un modèle volumineux (plusieurs centaines de Mo) depuis des hébergeurs publics ; il peut ensuite être mis en cache. Les messages restent sur cet appareil, mais l’hébergeur du modèle voit les demandes de téléchargement. N’utilisez que des données fictives en préproduction.'})),
+   el('p',{class:'hint',text:'Navigation directe'}),shortcuts);
   const model=hooks.local.status();
   function allowed(){const active=!!model.configured&&acknowledge.checked&&!s.busy;submit.disabled=!active;textarea.disabled=s.busy;draft.disabled=!active||s.messages.length===0;search.disabled=!active||s.messages.length===0;newChat.disabled=s.busy}
   function say(role,text){
@@ -93,7 +96,7 @@ function create(hooks){
      onProgress:(label,pct)=>{
       if(valid(s)&&ui?.closest('dialog')?.open){
        const percentage=Number.isFinite(pct)&&pct>0?' ('+Math.min(100,Math.round(pct*100))+' %)':'';
-       status.textContent='Téléchargement/chargement du modèle : '+label+percentage;
+       status.textContent=label+percentage;
       }
      }});
     if(!valid(s)||!ui?.closest('dialog')?.open)return;
@@ -114,7 +117,7 @@ function create(hooks){
       el('strong',{text:m.role==='user'?'Vous':'Assistant IA'}),el('p',{text:m.text})));
   }
   showPending();allowed();
-  status.textContent=model.configured?'Prêt à télécharger et exécuter le modèle local. Aucune clé API nécessaire.':model.reason;
+  status.textContent=model.configured?'IA locale prête à être initialisée lors de votre premier message.':model.reason;
  }
  return {open,sync,clear};
 }
