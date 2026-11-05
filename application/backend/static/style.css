@@ -82,10 +82,10 @@ body:has(#dialog[open]) .chatbot-launcher{visibility:hidden}
 #dialog:has(.ai-chat)>#dialog-close:hover{background:#f4f5fa}
 #dialog:has(.ai-chat) .ai-chat{
  position:relative;display:flex;flex-direction:column;flex:1;min-height:0;
- width:100%;max-width:none;overflow:hidden;
+ width:100%;max-width:none;overflow:visible;
 }
 .ai-chat .ai-header-actions{position:absolute;z-index:3;top:-54px;right:90px}
-#dialog:has(.ai-chat) .ai-header-actions{position:fixed;top:auto;right:auto;margin-top:-56px;margin-left:calc(100% - 235px)}
+
 .ai-chat .ai-new-chat{
  min-height:37px;padding:7px 8px;border:0;border-radius:8px;
  background:transparent;color:#595d70;font-size:10px;font-weight:600;
@@ -194,7 +194,7 @@ body:has(#dialog[open]) .chatbot-launcher{visibility:hidden}
  }
  #dialog:has(.ai-chat) #dialog-content>h3{min-height:64px;padding:19px 150px 17px 17px;font-size:15px}
  #dialog:has(.ai-chat)>#dialog-close{top:12px;right:10px}
- #dialog:has(.ai-chat) .ai-header-actions{margin-top:-52px;margin-left:calc(100% - 226px)}
+ .ai-chat .ai-header-actions{top:-51px;right:85px}
  .ai-chat .ai-conversation{padding:15px 14px;scroll-behavior:auto}
  .ai-chat .ai-welcome{padding:24px 0 14px}
  .ai-chat .ai-composer{padding:10px 12px max(11px,env(safe-area-inset-bottom))}
