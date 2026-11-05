@@ -226,3 +226,13 @@ body:has(#dialog[open]) .chatbot-launcher{visibility:hidden}
 @media(max-width:600px){
  #dialog:has(.ai-chat) #dialog-content>h3{padding-top:11px;padding-bottom:8px}
 }
+
+/* Account actions: installation/logout belong to Mon compte, never in the header. */
+.account-actions{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;padding:19px 22px;margin:8px 0 25px;border:1px solid var(--line);border-radius:14px;background:var(--soft)}
+.account-actions[hidden]{display:none!important}
+.account-actions h3{font-family:Montserrat,Arial,sans-serif;font-size:17px;font-weight:700;margin:0 0 3px}
+.account-actions p{color:var(--muted);font-size:12px;line-height:1.6;max-width:440px}
+.account-actions-buttons{display:flex;flex-wrap:wrap;gap:10px}
+.account-actions-buttons button{min-height:42px;border:1px solid #9295ad;border-radius:9px;font-size:12px;background:#fff}
+.account-actions-buttons #logout:hover{border-color:#b14d45;color:#9b312e}
+@media(max-width:680px){.account-actions{padding:16px;margin:4px 0 20px;align-items:stretch}.account-actions-buttons{width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.account-actions-buttons button{min-width:0;padding:10px 8px;white-space:normal}.header{justify-content:space-between}}
