@@ -58,7 +58,35 @@ async function action(fn,success){
  catch(e){if(!e.stale)msg(e.message,'error');return null}
  finally{acting=false;$('#main').removeAttribute('aria-busy');if(currentDraft)queueDraftAutosave(currentDraft)}
 }
-async function go(v){if(currentDraft){const saved=await action(saveDraft,'Brouillon enregistré avant de changer de page.');if(!saved)return;stopDraft()}setNavigationOpen(false);appState.view=v;history.replaceState(null,'','#'+v);const token=renderEpoch+1;await render();if(token===renderEpoch)focusPageHeading()}
+async function go(v,options={}){
+ const fromHistory=options.fromHistory===true;
+ if(currentDraft){
+  const saved=await action(saveDraft,'Brouillon enregistré avant de changer de page.');
+  if(!saved){
+   if(fromHistory)history.replaceState({ucpView:appState.view},'','#'+appState.view);
+   return false;
+  }
+  stopDraft();
+ }
+ setNavigationOpen(false);
+ appState.view=v;
+ if(!fromHistory)history.pushState({ucpView:v},'','#'+v);
+ const token=renderEpoch+1;
+ await render();
+ if(token===renderEpoch)focusPageHeading();
+ return true;
+}
+async function restoreHistoryNavigation(){
+ if(!appState.user)return;
+ const requested=location.hash.slice(1);
+ const allowed=roleNavigation(appState.user.role).some(([key])=>key===requested);
+ const destination=allowed?requested:initialView(appState.user.role);
+ if(!allowed)history.replaceState({ucpView:destination},'','#'+destination);
+ if(destination===appState.view&&!currentDraft)return;
+ await go(destination,{fromHistory:true});
+}
+window.addEventListener('popstate',()=>{restoreHistoryNavigation().catch(()=>{})});
+window.addEventListener('hashchange',()=>{restoreHistoryNavigation().catch(()=>{})});
 function focusPageHeading(){const target=$('#view h2')||$('#view h3')||$('#main');target.setAttribute('tabindex','-1');target.focus()}
 function setNavigationOpen(open){const toggle=$('#navigation-toggle');$('.sidebar').dataset.navigationOpen=String(open);toggle.setAttribute('aria-expanded',String(open))}
 function showDialog(title,content){++dialogEpoch;const dialog=$('#dialog'),wasOpen=dialog.open;if(!wasOpen)dialogReturnFocus=document.activeElement;const n=clear($('#dialog-content')),heading=el('h3',{id:'dialog-title',tabindex:'-1',text:title});n.append(heading,content);dialog.setAttribute('aria-labelledby','dialog-title');dialog.showModal();(wasOpen?heading:n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')||$('#dialog-close')).focus()}
@@ -72,10 +100,27 @@ function initialView(role){
  return roleNavigation(role).some(([key])=>key===requested)?requested:role==='requester'?'requester-home':role==='professional'?'professional-home':'admin';
 }
 function menu(){
- const items=roleNavigation(appState.user.role);setNavigationOpen(false);
+ const role=appState.user.role,items=roleNavigation(role);setNavigationOpen(false);
  const current=items.find(([key])=>key===appState.view)?.[1]||'Mon espace';
  $('#navigation-current').textContent=current;document.title=current+' · Un Coup de Pouce';
- const n=clear($('#tabs'));for(const[key,t,i]of items)n.append(el('button',{class:'navlink '+(appState.view===key?'active':''),type:'button','aria-current':appState.view===key?'page':'false',onClick:()=>go(key)},icon(i),t));
+ const n=clear($('#tabs'));
+ const itemButton=([key,label,pictogram])=>el('button',{
+  class:'navlink '+(appState.view===key?'active':''),
+  type:'button','aria-current':appState.view===key?'page':'false',
+  onClick:()=>go(key)
+ },icon(pictogram),label);
+ if(role==='professional'){
+  const main=['professional-home','projects','applications','conversations'];
+  const others=items.filter(([key])=>!main.includes(key));
+  for(const item of items.filter(([key])=>main.includes(key)))n.append(itemButton(item));
+  const group=el('details',{class:'nav-secondary'},
+   el('summary',{text:'Mon activité et réglages','aria-label':'Ouvrir mon activité et les autres rubriques'}),
+   el('div',{class:'nav-secondary-items'},...others.map(itemButton)));
+  group.open=others.some(([key])=>key===appState.view);
+  n.append(group);
+ }else{
+  for(const item of items)n.append(itemButton(item));
+ }
 }
 async function render(){
  guidedHelp?.sync();const hasAssistant=!!appState.user&&['requester','professional'].includes(appState.user.role);$('#chatbot-launcher').hidden=!hasAssistant;
