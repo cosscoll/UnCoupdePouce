@@ -1,3 +1,16 @@
+## Correctif qualité des réponses — 5 novembre 2026
+
+Un test utilisateur a montré que le petit Qwen 2.5 0,5B répétait des réponses génériques à une question « Tu peux m'aider à faire quoi ? » puis à une description de salle de bains, avec une commande inutile « Ignorer la proposition ».
+
+- Modèle conversationnel **Qwen2.5-3B-Instruct** par défaut : q4f16 (~2,50 Go de VRAM) ou q4f32 (~2,89 Go) selon la compatibilité `shader-f16`.
+- Un modèle **Qwen2.5-1.5B-Instruct** (q4f16 ~1,63 Go ou q4f32 ~1,89 Go de VRAM) est disponible dans « À propos de cette IA » pour appareils plus limités. Ce choix est mémorisé dans le navigateur et exige un autre téléchargement la première fois.
+- Le prompt est **spécifique au rôle** et centré sur la question : les simples échanges n'injectent plus toute la liste de métiers ; la liste n'est fournie que pour la génération structurée d'annonces et de filtres. Aide à la rédaction, questions précises sur les travaux, recherches et candidatures. Le chatbot ne consulte aucune donnée réelle du compte.
+- La détection de répétitions est testée contre la conversation signalée et déclenche **une seule nouvelle génération locale**, non une réponse préenregistrée. Toutes les réponses continuent à être produites par le modèle, sans API payante.
+- L'interface n'affiche plus « Ignorer la proposition » lorsqu'aucune proposition d'annonce ou de recherche n'a effectivement été produite.
+
+**Limite importante :** la qualité d'un modèle local 3B reste inférieure à celle d'un grand modèle hébergé sur de nombreux cas. Le chargement est beaucoup plus lourd que l'ancienne version (plusieurs Go de poids/mémoire nécessaires) et peut échouer sur des appareils insuffisants. Le modèle léger améliore la compatibilité mais ne garantit pas la même qualité. Les tests automatisés vérifient l'intégration et des propriétés des prompts ; ils ne remplacent pas une campagne de tests des sorties **réelles** sur ordinateur et mobile WebGPU. Pour le moment, la compatibilité universelle et la qualité conversationnelle ne sont pas garanties.
+
+
 # UCP — assistant IA gratuit directement dans le navigateur (03/11/2026)
 
 ## Choix technique
