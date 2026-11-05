@@ -4,7 +4,7 @@ const appState={user:null,csrf:null,view:null},trades={};
 let catalog=[],renderEpoch=0,currentDraft=null,wizardStep=1,chatTimer=null,chatEpoch=0,dialogEpoch=0;
 const draftSaveStates=new WeakMap();let draftSaveTimer=null,dialogReturnFocus=null;
 const labels={open:'Ouvert aux candidatures',selected:'Professionnel sélectionné',closed:'Clôturé',cancelled:'Annulé',suspended:'Suspendu',pending:'En attente',accepted:'Sélectionnée',rejected:'Non retenue',withdrawn:'Retirée'};
-const icons={projects:'M4 7h16v14H4z M8 7V3h8v4 M4 12h16',messages:'M4 4h16v13H9l-5 4z',profile:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M4 21v-2a7 7 0 0 1 14 0v2',new:'M12 4v16 M4 12h16',arrow:'M5 12h14 M13 6l6 6-6 6',check:'m5 12 4 4L19 6',settings:'M4 6h16 M4 12h16 M4 18h16',bell:'M6 16V9a6 6 0 0 1 12 0v7l2 2H4z M10 21h4'};
+const icons={home:'M3 10.5 12 3l9 7.5V21H5a2 2 0 0 1-2-2z M9 21v-7h6v7',search:'m20 20-4-4 M10.8 17a6.2 6.2 0 1 0 0-12.4 6.2 6.2 0 0 0 0 12.4',heart:'M20.8 9.4 12 18l-8.8-8.6a4.9 4.9 0 0 1 6.9-6.9L12 4.3l1.9-1.8a4.9 4.9 0 0 1 6.9 6.9z',briefcase:'M3 7h18v13H3z M8 7V4h8v3 M3 13h18',help:'M9 9a3 3 0 1 1 4 2.7c-.9.4-1 1-1 2 M12 18h.01 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20',people:'M5 19v-1a5 5 0 0 1 10 0v1 M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M17 8a3 3 0 1 1 0 6 M16 17a4 4 0 0 1 5 4',shield:'M12 2 4 5v6c0 5 3.3 8.2 8 11 4.7-2.8 8-6 8-11V5z M8 12l3 3 5-6',projects:'M4 7h16v14H4z M8 7V3h8v4 M4 12h16',messages:'M4 4h16v13H9l-5 4z',profile:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M4 21v-2a7 7 0 0 1 14 0v2',new:'M12 4v16 M4 12h16',arrow:'M5 12h14 M13 6l6 6-6 6',check:'m5 12 4 4L19 6',settings:'M4 6h16 M4 12h16 M4 18h16',bell:'M6 16V9a6 6 0 0 1 12 0v7l2 2H4z M10 21h4'};
 function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.6');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');const p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',icons[name]||icons.projects);svg.append(p);return svg}
 function el(tag,attrs={},...children){const n=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k.startsWith('on'))n.addEventListener(k.slice(2).toLowerCase(),v);else if(k==='text')n.textContent=v;else if(['value','checked','hidden','disabled','required','selected'].includes(k))n[k]=v;else if(k==='class')n.className=v;else if(k==='htmlFor')n.htmlFor=v;else n.setAttribute(k,v)}for(const c of children.flat(Infinity))if(c!=null)n.append(c.nodeType?c:document.createTextNode(String(c)));return n}
 function clear(n){n.replaceChildren();return n}function formValue(f){return Object.fromEntries(new FormData(f))}
@@ -58,24 +58,76 @@ async function action(fn,success){
  catch(e){if(!e.stale)msg(e.message,'error');return null}
  finally{acting=false;$('#main').removeAttribute('aria-busy');if(currentDraft)queueDraftAutosave(currentDraft)}
 }
-async function go(v){if(currentDraft){const saved=await action(saveDraft,'Brouillon enregistré avant de changer de page.');if(!saved)return;stopDraft()}setNavigationOpen(false);appState.view=v;history.replaceState(null,'','#'+v);const token=renderEpoch+1;await render();if(token===renderEpoch)focusPageHeading()}
+async function go(v,options={}){
+ const fromHistory=options.fromHistory===true;
+ if(currentDraft){
+  const saved=await action(saveDraft,'Brouillon enregistré avant de changer de page.');
+  if(!saved){
+   if(fromHistory)history.replaceState({ucpView:appState.view},'','#'+appState.view);
+   return false;
+  }
+  stopDraft();
+ }
+ setNavigationOpen(false);
+ appState.view=v;
+ if(!fromHistory)history.pushState({ucpView:v},'','#'+v);
+ const token=renderEpoch+1;
+ await render();
+ if(token===renderEpoch)focusPageHeading();
+ return true;
+}
+async function restoreHistoryNavigation(){
+ if(!appState.user)return;
+ const requested=location.hash.slice(1);
+ const allowed=roleNavigation(appState.user.role).some(([key])=>key===requested);
+ const destination=allowed?requested:initialView(appState.user.role);
+ if(!allowed)history.replaceState({ucpView:destination},'','#'+destination);
+ if(destination===appState.view&&!currentDraft)return;
+ await go(destination,{fromHistory:true});
+}
+let historyRestoreInProgress=false;
+async function onHistoryChange(){
+ if(historyRestoreInProgress)return;
+ historyRestoreInProgress=true;
+ try{await restoreHistoryNavigation()}catch{}
+ finally{historyRestoreInProgress=false}
+}
+window.addEventListener('popstate',onHistoryChange);
+window.addEventListener('hashchange',onHistoryChange);
 function focusPageHeading(){const target=$('#view h2')||$('#view h3')||$('#main');target.setAttribute('tabindex','-1');target.focus()}
 function setNavigationOpen(open){const toggle=$('#navigation-toggle');$('.sidebar').dataset.navigationOpen=String(open);toggle.setAttribute('aria-expanded',String(open))}
 function showDialog(title,content){++dialogEpoch;const dialog=$('#dialog'),wasOpen=dialog.open;if(!wasOpen)dialogReturnFocus=document.activeElement;const n=clear($('#dialog-content')),heading=el('h3',{id:'dialog-title',tabindex:'-1',text:title});n.append(heading,content);dialog.setAttribute('aria-labelledby','dialog-title');dialog.showModal();(wasOpen?heading:n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')||$('#dialog-close')).focus()}
 function ask(title,desc,fn,success){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const dialogToken=dialogEpoch;const r=await action(fn,success);if(r){if(dialogToken===dialogEpoch&&$('#dialog').open)$('#dialog').close();const token=renderEpoch+1;await render();if(token===renderEpoch&&!$('#dialog').open)focusPageHeading()}},'primary'));showDialog(title,body)}
 function roleNavigation(role){
- const items=role==='requester'?[['requester-home','Mon accueil','settings'],['projects','Mes projets','projects'],['conversations','Messages','messages']]:role==='professional'?[['professional-home','Vue d’ensemble','settings'],['projects','Trouver des projets','projects'],['favorites','Mes favoris','check'],['applications','Mes candidatures','check'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','settings']]:[['admin','Vue d’ensemble','settings'],['moderation','Modération','projects'],['catalog','Métiers du bâtiment','settings']];
- return [...items,['support','Assistance','messages'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']];
+ const items=role==='requester'?[['requester-home','Mon accueil','home'],['projects','Mes projets','projects'],['conversations','Messages','messages']]:role==='professional'?[['professional-home','Vue d’ensemble','home'],['projects','Trouver des projets','search'],['favorites','Mes favoris','heart'],['applications','Mes candidatures','briefcase'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','people']]:[['admin','Vue d’ensemble','home'],['moderation','Modération','shield'],['catalog','Métiers du bâtiment','settings']];
+ return [...items,['support','Assistance','help'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']];
 }
 function initialView(role){
  const requested=location.hash.slice(1);
  return roleNavigation(role).some(([key])=>key===requested)?requested:role==='requester'?'requester-home':role==='professional'?'professional-home':'admin';
 }
 function menu(){
- const items=roleNavigation(appState.user.role);setNavigationOpen(false);
+ const role=appState.user.role,items=roleNavigation(role);setNavigationOpen(false);
  const current=items.find(([key])=>key===appState.view)?.[1]||'Mon espace';
  $('#navigation-current').textContent=current;document.title=current+' · Un Coup de Pouce';
- const n=clear($('#tabs'));for(const[key,t,i]of items)n.append(el('button',{class:'navlink '+(appState.view===key?'active':''),type:'button','aria-current':appState.view===key?'page':'false',onClick:()=>go(key)},icon(i),t));
+ const n=clear($('#tabs'));
+ const itemButton=([key,label,pictogram])=>el('button',{
+  class:'navlink '+(appState.view===key?'active':''),
+  type:'button','aria-current':appState.view===key?'page':'false',
+  onClick:()=>go(key)
+ },icon(pictogram),label);
+ if(role==='professional'){
+  const main=['professional-home','projects','applications','conversations'];
+  const others=items.filter(([key])=>!main.includes(key));
+  for(const item of items.filter(([key])=>main.includes(key)))n.append(itemButton(item));
+  const group=el('details',{class:'nav-secondary'},
+   el('summary',{text:'Mon activité et réglages','aria-label':'Ouvrir mon activité et les autres rubriques'}),
+   el('div',{class:'nav-secondary-items'},...others.map(itemButton)));
+  group.open=others.some(([key])=>key===appState.view);
+  n.append(group);
+ }else{
+  for(const item of items)n.append(itemButton(item));
+ }
 }
 async function render(){
  guidedHelp?.sync();const hasAssistant=!!appState.user&&['requester','professional'].includes(appState.user.role);$('#chatbot-launcher').hidden=!hasAssistant;
@@ -95,9 +147,43 @@ async function render(){
 async function renderRequesterHome(n){
  if(appState.user.role!=='requester')throw Error('Cet accueil est réservé à l’espace particulier.');
  const epoch=renderEpoch;
- n.append(heading('Votre projet, du début à la rencontre.','Préparez votre demande, retrouvez les candidatures et avancez avec le professionnel que vous choisissez.','Créer un projet',()=>startWizard()));
- n.append(el('div',{class:'home-actions'},button('Être aidé pour mon annonce',openGuidedHelp),button('Voir tous mes projets',()=>go('projects')),button('Ouvrir mes messages',()=>go('conversations'))));
- const grid=el('div',{class:'overview-grid requester-overview'});n.append(grid);
+ n.append(heading('Vos travaux, en toute simplicité.','Retrouvez votre prochaine étape, du projet à la rencontre avec un professionnel.','Créer un projet',()=>startWizard()));
+ const priority=el('section',{class:'home-priority',role:'region','aria-label':'Votre prochaine étape'});
+ priority.append(el('p',{class:'muted small',text:'Recherche de votre prochaine étape…'}));
+ const grid=el('div',{class:'overview-grid requester-overview'});
+ const details=el('details',{class:'home-overview'},el('summary',{text:'Voir toute mon activité'}),grid);
+ n.append(priority,details);
+ const received={};
+ function paintPriority(){
+  if(epoch!==renderEpoch)return;
+  const drafts=received.drafts?.items||[],projects=received.projects?.items||[],conversations=received.conversations?.items||[];
+  const selected=projects.find(p=>p.status==='selected'),open=projects.find(p=>p.status==='open');
+  let title,description,cta,run;
+  if(selected&&conversations.length){
+   title='Votre professionnel est sélectionné';
+   description='Retrouvez votre échange et poursuivez votre projet.';
+   cta='Ouvrir mes messages';run=()=>go('conversations');
+  }else if(drafts.length){
+   title='Une annonce à terminer';
+   description='Votre brouillon est enregistré. Reprenez-le pour publier vos travaux.';
+   cta='Reprendre mon brouillon';run=()=>{appState.view='projects';menu();startWizard(drafts[0])};
+  }else if(open){
+   title='Votre annonce est publiée';
+   description='Consultez les candidatures et choisissez la suite à donner à votre projet.';
+   cta='Voir mon projet';run=()=>projectDetail(open);
+  }else if(conversations.length){
+   title='Une conversation à retrouver';
+   description='Vos échanges avec les professionnels sont disponibles.';
+   cta='Lire mes messages';run=()=>go('conversations');
+  }else{
+   title='Un projet de travaux en tête ?';
+   description='Décrivez simplement votre besoin. Vous pouvez enregistrer un brouillon avant de publier.';
+   cta='Décrire mes travaux';run=()=>startWizard();
+  }
+  priority.replaceChildren(el('div',{class:'home-priority-copy'},
+   el('span',{class:'eyebrow',text:'VOTRE PROCHAINE ÉTAPE'}),
+   el('h3',{text:title}),el('p',{text:description})),button(cta,run,'primary'));
+ }
  const sections=[
   {title:'Mes projets en cours',path:'/projects',view:'projects',cta:'Gérer mes projets',draw(data,node){
    const active=data.items.filter(p=>p.status!=='closed');node.append(el('strong',{class:'overview-count',text:active.length}),el('p',{class:'hint',text:'Projets publiés, sélectionnés ou suspendus.'}));
@@ -120,9 +206,10 @@ async function renderRequesterHome(n){
  ];
  await Promise.all(sections.map(async section=>{
   const box=panel(section.title),content=el('div');box.append(content,button(section.cta,()=>go(section.view),'link'));grid.append(box);
-  try{const data=await api(section.path);if(epoch!==renderEpoch)return;section.draw(data,content)}
+  try{const data=await api(section.path);if(epoch!==renderEpoch)return;received[section.view==='projects'&&section.path==='/v4/drafts'?'drafts':section.view]=data;section.draw(data,content)}
   catch(e){if(epoch===renderEpoch&&!e.stale)content.append(el('p',{class:'hint',text:'Cette rubrique est momentanément indisponible.'}),button('Réessayer',render,'link'))}
  }));
+ paintPriority();
 }
 
 function tradeNames(p){return (p.trades||(p.trades_json?JSON.parse(p.trades_json):[p.trade])).map(x=>trades[x]||x).join(' · ')}
@@ -144,8 +231,43 @@ const timingNames={flexible:'Date flexible',month:'Dans le mois',quarter:'Dans l
 async function renderProfessionalHome(n){
  if(appState.user.role!=='professional')throw Error('Cette vue est réservée à l’espace professionnel.');
  const epoch=renderEpoch;
- n.append(heading('Votre activité, en un regard.','Des informations de votre compte et des projets auxquels vos profils ont accès.'));
- const grid=el('div',{class:'overview-grid'});n.append(grid);
+ n.append(heading('Vos chantiers, au bon endroit.','Trouvez une mission et suivez les réponses à vos candidatures.','Trouver des chantiers',()=>go('projects')));
+ const priority=el('section',{class:'home-priority',role:'region','aria-label':'Prochaine action professionnelle'});
+ priority.append(el('p',{class:'muted small',text:'Chargement de votre prochaine étape…'}));
+ const grid=el('div',{class:'overview-grid'});
+ n.append(priority,el('details',{class:'home-overview'},el('summary',{text:'Voir le détail de mon activité'}),grid));
+ const snapshot={};
+ function updatePriority(){
+  if(epoch!==renderEpoch)return;
+  const profile=snapshot.profile?.profile,missions=snapshot.projects?.items||[],
+   applications=snapshot.applications?.items||[],conversations=snapshot.conversations?.items||[];
+  let title,description,cta,run;
+  if(snapshot.profile&&!profile){
+   title='Complétez votre profil professionnel';
+   description='Indiquez vos métiers et communes d’intervention pour accéder aux chantiers qui vous concernent.';
+   cta='Compléter mon profil';run=()=>go('profile');
+  }else if(profile&&!profile.approved){
+   title='Votre profil est en cours d’examen';
+   description='Vous pouvez vérifier vos informations pendant que votre accès de test est examiné.';
+   cta='Vérifier mon profil';run=()=>go('profile');
+  }else if(conversations.some(c=>c.subscription_active&&(!c.linked_profile_id||c.linked_active))){
+   title='Vos conversations sont accessibles';
+   description='Retrouvez les projets pour lesquels un échange est disponible.';
+   cta='Ouvrir mes messages';run=()=>go('conversations');
+  }else if(applications.some(a=>a.status==='pending'&&a.project_status!=='closed')){
+   title='Vous avez une candidature en attente';
+   description='Suivez votre proposition pendant que le demandeur examine les profils.';
+   cta='Suivre ma candidature';run=()=>go('applications');
+  }else{
+   const count=missions.filter(p=>p.status==='open').length;
+   title=count?'Des chantiers correspondent à votre activité':'Recherchez votre prochain chantier';
+   description=count?'Consultez les missions disponibles pour vos métiers et communes.':'Définissez vos critères pour découvrir les projets éligibles.';
+   cta='Explorer les chantiers';run=()=>go('projects');
+  }
+  priority.replaceChildren(el('div',{class:'home-priority-copy'},
+   el('span',{class:'eyebrow',text:'VOTRE PROCHAINE ACTION'}),
+   el('h3',{text:title}),el('p',{text:description})),button(cta,run,'primary'));
+ }
  function section(title,view,draw){
   const box=panel(title),content=el('div');box.append(content,button({projects:'Voir les projets',applications:'Voir mes candidatures',conversations:'Ouvrir mes conversations',profile:'Voir mon profil',notifications:'Voir les notifications'}[view],()=>go(view),'link'));grid.append(box);
   return {content,draw};
@@ -179,17 +301,18 @@ async function renderProfessionalHome(n){
  });
  async function load(target,path){
   try{
-   const data=await api(path);if(epoch!==renderEpoch)return false;clear(target.content);target.draw(data,target.content);return {ok:true};
+   const data=await api(path);if(epoch!==renderEpoch)return false;snapshot[path.split('?')[0].replace('/my-','/').slice(1)]=data;clear(target.content);target.draw(data,target.content);updatePriority();return {ok:true};
   }catch(e){
    if(e.stale||e.status===401||epoch!==renderEpoch)return false;
    clear(target.content);target.content.append(el('p',{class:'status-note',text:'Information indisponible. Les autres rubriques restent utilisables.'}),button('Réessayer cette rubrique',()=>action(()=>load(target,path))));return false;
   }
  }
  await Promise.all([[missions,'/projects'],[applications,'/my-applications'],[messages,'/conversations'],[profile,'/my-profile'],[notices,'/notifications?unread_only=true']].map(([target,path])=>load(target,path)));
+ updatePriority();
 }
 async function renderProjects(n){
   const req=appState.user.role==='requester',epoch=renderEpoch,owner=appState.user.id;
-  n.append(heading(req?'Vos projets, en bonne voie.':'Le prochain projet est ici.',req?'Retrouvez vos demandes et choisissez avec qui échanger.':'Seules les missions autorisées pour vos profils et vos communes sont affichées.',req?'+ Décrire mon projet':null,()=>startWizard()));
+  n.append(heading(req?'Mes projets de travaux':'Trouver un chantier',req?'Retrouvez vos annonces, brouillons et candidatures.':'Explorez les projets qui correspondent à vos métiers et à vos communes.',req?'Créer une annonce':null,()=>startWizard()));
   const initial=await api('/projects'),items=initial.items;
   if(req){const ds=(await api('/v4/drafts')).items;if(ds.length){const box=panel('À reprendre','Vos brouillons sont enregistrés dans votre compte.');for(const d of ds)box.append(el('div',{class:'item line'},el('strong',{text:d.title||'Nouveau projet'}),button('Continuer',()=>startWizard(d)),button('Supprimer',()=>ask('Supprimer ce brouillon ?','La demande n’a pas été publiée. Ses photos seront également supprimées.',()=>api('/v4/drafts/'+d.id,{method:'DELETE'})))));n.append(box)}}
   if(!req&&initial.search_scope!=='ready'&&initial.search_scope){
@@ -198,23 +321,27 @@ async function renderProjects(n){
   }
   const saved=appState.projectFilters?.owner===owner?appState.projectFilters.values:{};
   const form=el('form',{class:'project-search',role:'search','aria-label':'Rechercher les projets'});
-  const q=field('Rechercher','q','search',{value:saved.q||'',maxlength:120,required:false,placeholder:'Mots-clés, métier, commune…'});
+  const q=field(req?'Rechercher dans mes annonces':'Mots-clés','q','search',{value:saved.q||'',maxlength:120,required:false,placeholder:req?'Ex. Ma salle de bains':'Ex. Carrelage, rénovation, salle de bains…'});
   const select=(label,name,options)=>{const node=field(label,name,'select',{options,required:false});node.querySelector('select').value=saved[name]||'';return node};
   const towns=[...new Set([...items.map(p=>p.town),...(saved.town?[saved.town]:[])])].sort((a,b)=>a.localeCompare(b,'fr'));
   const groups=[...new Set(catalog.map(t=>t.group))].sort((a,b)=>a.localeCompare(b,'fr'));
-  const advanced=el('details',{},el('summary',{text:'Affiner la recherche'}),el('div',{class:'search-grid'},
-    select('Métier','trade',{'':'Tous les métiers',...Object.fromEntries(catalog.map(t=>[t.id,t.label]))}),
-    select('Commune','town',{'':'Toutes les communes disponibles',...Object.fromEntries(towns.map(t=>[t,t]))}),
-    select('Catégorie','category',{'':'Toutes les catégories',...Object.fromEntries(groups.map(t=>[t,t]))}),
-    select('Début souhaité','timing',{'':'Tous les délais',...timingNames}),
-    select('Publication','published_within',{'':'Toutes les dates','1':'Dernières 24 heures','7':'Sept derniers jours','30':'Trente derniers jours'}),
-    amountField('Budget recherché · minimum (€)','budget_from',saved.budget_from),amountField('Budget recherché · maximum (€)','budget_to',saved.budget_to),
-    el('p',{class:'hint budget-filter-note',text:'Le budget annoncé doit recouper votre plage. Les projets sans budget sont exclus uniquement lorsque vous utilisez ce filtre.'}),
-    req?select('Statut','status',{'':'Tous les projets',open:'Ouverts',selected:'Professionnel sélectionné',closed:'Terminés',cancelled:'Annulés',suspended:'Suspendus'}):null));
-  advanced.open=Object.entries(saved).some(([k,v])=>v&&!['q','sort'].includes(k));
+  const trade=select('Métier','trade',{'':'Tous mes métiers',...Object.fromEntries(catalog.map(t=>[t.id,t.label]))});
+  const town=select('Commune','town',{'':'Toutes les communes',...Object.fromEntries(towns.map(t=>[t,t]))});
+  const advanced=el('details',{class:'search-advanced'},
+   el('summary',{text:req?'Filtrer mes projets par statut':'Filtres avancés'}),
+   el('div',{class:'search-grid'},
+    req?select('Statut','status',{'':'Tous mes projets',open:'Ouverts',selected:'Professionnel sélectionné',closed:'Terminés',cancelled:'Annulés',suspended:'Suspendus'}):null,
+    !req?select('Catégorie','category',{'':'Toutes les catégories',...Object.fromEntries(groups.map(t=>[t,t]))}):null,
+    !req?select('Début souhaité','timing',{'':'Tous les délais',...timingNames}):null,
+    !req?select('Publication','published_within',{'':'Toutes les dates','1':'Dernières 24 heures','7':'Sept derniers jours','30':'Trente derniers jours'}):null,
+    !req?amountField('Budget recherché · minimum (€)','budget_from',saved.budget_from):null,
+    !req?amountField('Budget recherché · maximum (€)','budget_to',saved.budget_to):null,
+    !req?el('p',{class:'hint budget-filter-note',text:'Le budget annoncé doit recouper votre plage. Les projets sans budget sont exclus lorsque ce filtre est actif.'}):null));
+  advanced.open=Object.entries(saved).some(([k,v])=>v&&(req?k==='status':!['q','sort','trade','town'].includes(k)));
   const order=select('Trier','sort',{newest:'Plus récents',oldest:'Plus anciens'});order.querySelector('select').value=saved.sort||'newest';
   const reset=button('Effacer les filtres',()=>{for(const c of form.querySelectorAll('input,select'))c.value=c.name==='sort'?'newest':'';action(()=>load())});
-  form.append(q,advanced,el('div',{class:'search-actions'},order,el('button',{type:'submit',class:'primary',text:'Rechercher'}),reset));
+  const core=el('div',{class:'search-core'},q,...(req?[]:[trade,town]));
+  form.append(core,advanced,el('div',{class:'search-actions'},order,el('button',{type:'submit',class:'primary',text:req?'Filtrer':'Rechercher les chantiers'}),reset));
   const list=el('div',{class:'project-list'}),count=el('p',{class:'count',role:'status','aria-live':'polite'});
   n.append(form,count,list);
   if(!req)n.append(el('p',{class:'hint',text:'La commune correspond aux zones déclarées de votre profil ou d’un profil lié actif. Aucun rayon ni temps de trajet n’est calculé.'}));
@@ -227,7 +354,8 @@ async function renderProjects(n){
         el('div',{class:'row-actions'},button(req?'Voir les candidatures →':'Voir le projet →',()=>projectDetail(p)),!req?favoriteButton(p,()=>epoch===renderEpoch&&appState.user?.id===owner):null)));
     }
     if(!rows.length)list.append(empty(req?'Aucun projet ne correspond.':'Aucune mission ne correspond.',
-      'Effacez les filtres ou vérifiez vos métiers et vos communes. Les droits d’accès restent appliqués.',req?'Créer une demande':'Vérifier mon profil',()=>req?startWizard():go('profile')));
+      req?'Essayez d’autres mots-clés ou affichez tous vos projets.':'Élargissez les critères pour trouver davantage de missions disponibles.',
+      'Effacer les filtres',()=>reset.click()));
   }
   let seq=0;
   async function load(){
@@ -474,12 +602,25 @@ function renderCandidateCards(box,apps,projectId=null,suspended=false){
     if(!data||epoch!==renderEpoch||dialogToken!==dialogEpoch||chosen.size!==selection.length||selection.some(a=>!chosen.has(a.id)))return;
     const cards=el('div',{class:'candidate-comparison'},...selection.map((a,i)=>el('article',{class:'comparison-card'},
       el('h4',{text:a.professional_name}),a.linked_artisan_alias?el('p',{text:'Profil lié : '+a.linked_artisan_alias}):null,candidateFacts(a),data[i]?showcaseContent(data[i]):null)));
-    showDialog('Comparer les candidatures',el('div',{},el('p',{class:'hint',text:'Profils actuels et réalisations déclarées, non vérifiés. L’autorisation de test ne vérifie ni l’entreprise ni ses assurances. Avis et justificatifs ne sont pas disponibles.'}),cards));
+    showDialog('Comparer les candidatures',el('div',{},el('p',{class:'hint',text:'Comparez les métiers, les communes et les réalisations effectivement renseignées. Identités, assurances, avis et justificatifs : aucune vérification réelle disponible dans cette préproduction.'}),cards));
   },'secondary');compare.disabled=true;
   function update(){summary.textContent=chosen.size+' / 3 profils sélectionnés pour la comparaison';compare.disabled=chosen.size<2;for(const c of checks)c.disabled=chosen.size>=3&&!c.checked}
+  if(apps.length)box.append(el('p',{class:'candidate-guidance',
+   text:'Comparez les spécialités, zones d’intervention et présentations déclarées. Les identités, assurances et réalisations ne sont pas vérifiées dans cette préproduction.'}));
   if(apps.length>1)box.append(el('div',{class:'comparison-toolbar'},summary,compare));
   for(const a of apps){
-    const item=el('article',{class:'item'},el('h4',{text:a.professional_name}),a.linked_artisan_alias?el('p',{class:'small',text:'Profil lié : '+a.linked_artisan_alias}):null,badge(a.status),candidateFacts(a));
+    const specialties=(a.trades||[a.trade]).map(t=>trades[t]||t).filter(Boolean).join(' · ')||'Métiers à préciser';
+    const zones=(a.service_zones||[a.town]).filter(Boolean).slice(0,4).join(' · ')||'Zones non renseignées';
+    const item=el('article',{class:'item candidate-card'},
+     el('div',{class:'candidate-card-intro'},
+      el('div',{class:'candidate-card-avatar','aria-hidden':'true'},icon('profile')),
+      el('div',{class:'candidate-card-heading'},el('h4',{text:a.professional_name}),
+       a.linked_artisan_alias?el('p',{class:'small muted',text:'Profil présenté : '+a.linked_artisan_alias}):null,
+       badge(a.status))),
+     el('p',{class:'candidate-card-skill',text:specialties}),
+     el('p',{class:'candidate-card-zones',text:'Intervention : '+zones}),
+     el('p',{class:'candidate-verification',text:a.verification_status==='test_authorized'?'Profil autorisé pour les tests · identité et assurances non vérifiées':'Profil non certifié · vérification réelle indisponible'}),
+     el('details',{class:'candidate-more'},el('summary',{text:'Voir tous les détails déclarés'}),candidateFacts(a)));
     if(apps.length>1){const check=el('input',{type:'checkbox','aria-label':'Comparer le profil de '+a.professional_name});
       check.addEventListener('change',()=>{if(check.checked&&chosen.size<3)chosen.add(a.id);else{chosen.delete(a.id);check.checked=false}update()});checks.push(check);
       item.append(el('label',{class:'candidate-choice'},check,'Ajouter au comparatif'));
@@ -642,11 +783,11 @@ function recoverDraft(d){
  showDialog('Récupérer votre saisie',body);
 }
 function wizard(){const n=clear($('#view')),d=currentDraft;n.append(button('← Retour à mes projets',()=>ask('Revenir à vos projets ?','Enregistrez les dernières modifications avant de quitter.',async()=>{await saveDraft();stopDraft();go('projects');return true}),'link'));n.append(button('Besoin d’aide pour mon annonce ?',openGuidedHelp,'link'));const box=el('div',{class:'wizard'});n.append(box);box.append(el('ol',{class:'steps'},...['Vos travaux','Les détails','Vérification'].map((t,i)=>el('li',{class:i+1===wizardStep?'active':'','aria-current':i+1===wizardStep?'step':'false'},el('b',{text:i+1}),t))));const names=['De quoi avez-vous besoin ?','Parlez-nous de votre projet.','Tout est prêt pour publier ?'];box.append(el('h2',{text:names[wizardStep-1]}),el('p',{class:'muted small',text:['Plusieurs métiers ? Sélectionnez tous ceux qui vous concernent.','Quelques précisions pour recevoir des candidatures adaptées.','Relisez votre demande. Vous gardez la main sur le choix du professionnel.'][wizardStep-1]}));const form=el('form');box.append(draftSavePanel(d),form);
-if(wizardStep===1){form.append(field('Un titre pour votre projet','title','text',{value:d.title,placeholder:'Ex. Rénover ma salle de bains',required:false,maxlength:120}),field('Votre besoin, avec vos mots','description','textarea',{value:d.description,placeholder:'Ce que vous souhaitez faire, la pièce concernée, ce qui est déjà en place…',required:false}));const content=()=>Object.assign(d,formValue(form));form.addEventListener('input',content);form.addEventListener('change',content);form.append(el('div',{class:'helper'},el('strong',{text:'Vous n’avez pas besoin de connaître le bon terme.'}),el('p',{text:'Recherchez un mot courant ou choisissez « Je ne sais pas ». Les suggestions restent à confirmer.'})));const suggestion=button('Me suggérer des métiers',()=>{const words=normalize(d.description+' '+d.title);const matches=catalog.filter(t=>[t.label,...t.synonyms].some(w=>w.length>3&&words.includes(normalize(w))));const b=el('div',{},el('p',{text:matches.length?'Suggestions par mots-clés : choisissez celles qui correspondent à vos travaux.':'Aucune suggestion fiable. Vous pouvez utiliser le choix « Je ne sais pas ».'}));for(const t of matches.slice(0,6))b.append(button(t.label,()=>{if(!d.trades.includes(t.id)&&d.trades.length<12){d.trades.push(t.id);queueDraftAutosave(d,true)}$('#dialog').close();wizard()}));showDialog('Pour vous aider à choisir',b)},'link');form.append(suggestion,tradePicker([...d.trades],v=>{d.trades=v;queueDraftAutosave(d,true)}))}
+if(wizardStep===1){form.append(field('Un titre pour votre projet','title','text',{value:d.title,placeholder:'Ex. Rénover ma salle de bains',required:false,maxlength:120}),field('Votre besoin, avec vos mots','description','textarea',{value:d.description,placeholder:'Ce que vous souhaitez faire, la pièce concernée, ce qui est déjà en place…',required:false}));const content=()=>Object.assign(d,formValue(form));form.addEventListener('input',content);form.addEventListener('change',content);form.append(el('div',{class:'helper'},el('strong',{text:'Vous n’avez pas besoin de connaître le bon terme.'}),el('p',{text:'Recherchez un mot courant ou choisissez « Je ne sais pas ». Les suggestions restent à confirmer.'})));const suggestion=button('Me suggérer des métiers',()=>{const words=normalize(d.description+' '+d.title);const matches=catalog.filter(t=>[t.label,...t.synonyms].some(w=>w.length>3&&words.includes(normalize(w))));const b=el('div',{},el('p',{text:matches.length?'Suggestions par mots-clés : choisissez celles qui correspondent à vos travaux.':'Aucune suggestion fiable. Vous pouvez utiliser le choix « Je ne sais pas ».'}));for(const t of matches.slice(0,6))b.append(button(t.label,()=>{if(!d.trades.includes(t.id)&&d.trades.length<12){d.trades.push(t.id);queueDraftAutosave(d,true)}$('#dialog').close();wizard()}));showDialog('Pour vous aider à choisir',b)},'link');const selector=el('details',{class:'wizard-trade-picker'},el('summary',{text:'Choisir les métiers concernés'}),tradePicker([...d.trades],v=>{d.trades=v;queueDraftAutosave(d,true)}));selector.open=!!d.trades.length;form.append(suggestion,selector)}
 if(wizardStep===2){form.append(field('Dans quelle commune ?','town','text',{value:d.town,placeholder:'Toulouse',maxlength:90}),field('Quand souhaitez-vous commencer ?','timing','select',{value:d.timing,options:{flexible:'Je suis flexible',month:'Dans le mois',quarter:'Dans les trois mois',urgent:'Dès que possible'}}),el('p',{class:'hint',text:'Indiquez seulement la commune. L’adresse précise se partage après sélection.'}));form.append(el('h3',{text:'Votre budget · facultatif'}),el('p',{class:'hint',text:'Montants indicatifs en euros entiers, sans valeur de devis. Vous pouvez laisser les deux champs vides. Aucun paiement dans UCP.'}),el('div',{class:'budget-fields'},amountField('Minimum facultatif (€)','budget_min',d.budget_min),amountField('Maximum facultatif (€)','budget_max',d.budget_max)));const details=()=>{const v=formValue(form);Object.assign(d,{town:v.town,timing:v.timing,budget_min:amountValue(v.budget_min),budget_max:amountValue(v.budget_max)})};form.addEventListener('input',details);form.addEventListener('change',details);form.append(el('h3',{text:'Des photos pour mieux comprendre'}),el('p',{class:'hint',text:'Facultatif · 5 photos maximum, 4 Mo par photo. Photos fictives uniquement. Elles seront visibles après votre sélection.'}));const upload=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp','aria-label':'Ajouter une photo de test'});upload.addEventListener('change',async()=>{const file=upload.files[0];if(!file)return;if(file.size>4000000){msg('La photo dépasse 4 Mo.','error');return}const r=await action(async()=>{await saveDraft();const b64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(file)});const p=await api('/v4/drafts/'+d.id+'/photos',{method:'POST',body:{data:b64}});d.photos.push(p.id);d.version=p.version;return p},'Photo enregistrée.');if(r)wizard()});form.append(upload,el('div',{class:'photos'},...d.photos.map(id=>el('div',{class:'photo'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de votre demande'}),button('Retirer',async()=>{const r=await action(async()=>{await saveDraft();return api('/v4/photos/'+id,{method:'DELETE'})});if(r){d.photos=d.photos.filter(x=>x!==id);d.version=r.version;wizard()}}))))) }
 if(wizardStep===3){const rev=el('div',{class:'review'},el('h3',{text:d.title}),el('dl',{},el('dt',{text:'Travaux concernés'}),el('dd',{text:d.trades.map(x=>trades[x]).join(' · ')}),el('dt',{text:'Commune'}),el('dd',{text:d.town}),el('dt',{text:'Description'}),el('dd',{text:d.description}),el('dt',{text:'Début souhaité'}),el('dd',{text:timingNames[d.timing]||'Date flexible'}),el('dt',{text:'Budget indicatif'}),el('dd',{text:budgetText(d)}),el('dt',{text:'Photos privées'}),el('dd',{text:d.photos.length+' photo(s), partagées après sélection'})));form.append(rev,el('label',{},el('input',{type:'checkbox',required:true,name:'confirmed'}),'J’ai vérifié ma demande et elle ne contient aucune coordonnée directe.'))}
 form.addEventListener('input',()=>queueDraftAutosave(d,true));form.addEventListener('change',()=>queueDraftAutosave(d,true));
-const foot=el('div',{class:'wizard-footer'},button(wizardStep===1?'Enregistrer mon brouillon':'← Précédent',async()=>{if(wizardStep>1){const saved=await action(saveDraft);if(saved){wizardStep--;wizard();focusPageHeading()}return}const r=await action(saveDraft,'Brouillon enregistré dans votre compte.');if(r){stopDraft();go('projects')}},'outline'),el('button',{class:'primary',type:'submit',text:wizardStep===3?'Publier ma demande →':'Continuer →'}));form.append(foot);form.addEventListener('submit',async e=>{e.preventDefault();if(wizardStep===1&&(!d.trades.length||d.title.trim().length<5||d.description.trim().length<20)){msg('Ajoutez un titre (5 caractères), une description (20) et au moins un métier.','error');return}const r=await action(async()=>{await saveDraft();if(wizardStep===3)return await api('/v4/drafts/'+d.id+'/publish',{method:'POST',body:{version:d.version}});return true});if(r){if(wizardStep===3){UCPAnalytics.track('project_published');stopDraft();await render();msg('Votre demande est publiée dans cet environnement de test.','success')}else{wizardStep++;UCPAnalytics.track('project_step_completed',{step:wizardStep-1});wizard();focusPageHeading()}}})}
+const foot=el('div',{class:'wizard-footer'},button(wizardStep===1?'Enregistrer mon brouillon':'← Précédent',async()=>{if(wizardStep>1){const saved=await action(saveDraft);if(saved){wizardStep--;wizard();focusPageHeading()}return}const r=await action(saveDraft,'Brouillon enregistré dans votre compte.');if(r){stopDraft();go('projects')}},'outline'),el('button',{class:'primary',type:'submit',text:wizardStep===3?'Publier ma demande →':'Continuer →'}));form.append(foot);form.addEventListener('submit',async e=>{e.preventDefault();if(wizardStep===1&&(!d.trades.length||d.title.trim().length<5||d.description.trim().length<20)){if(!d.trades.length){const picker=form.querySelector('.wizard-trade-picker');if(picker)picker.open=true}msg('Indiquez un titre, décrivez vos travaux et sélectionnez au moins un métier (ou « Je ne sais pas »).','error');return}const r=await action(async()=>{await saveDraft();if(wizardStep===3)return await api('/v4/drafts/'+d.id+'/publish',{method:'POST',body:{version:d.version}});return true});if(r){if(wizardStep===3){UCPAnalytics.track('project_published');stopDraft();await render();msg('Votre demande est publiée dans cet environnement de test.','success')}else{wizardStep++;UCPAnalytics.track('project_step_completed',{step:wizardStep-1});wizard();focusPageHeading()}}})}
 async function renderProfile(n){n.append(button('Poser une question à l’assistant',openGuidedHelp,'link'));n.append(heading('Votre savoir-faire, bien présenté.','Indiquez vos spécialités et vos communes pour recevoir les bonnes demandes.'));const {profile:p}=await api('/my-profile');const selected=p?[p.trade,...p.additional_trades]:[];const form=el('form',{},field('Votre commune principale','town','text',{value:p?.town||'Toulouse',maxlength:90}),field('Autres communes · séparées par des virgules','zones','text',{value:(p?.service_zones||[]).filter(x=>x!==p.town).join(', '),required:false,placeholder:'Blagnac, Colomiers, Balma'}),field('SIREN de test','siren','text',{value:p?.siren||'',maxlength:9,minlength:9,placeholder:'123456782'}),el('p',{class:'hint',text:'Le format du numéro est contrôlé. L’existence de l’entreprise et ses assurances ne sont pas vérifiées.'}),el('h3',{text:'Vos spécialités · 5 maximum'}),tradePicker(selected,v=>{selected.splice(0,selected.length,...v)},true),el('button',{type:'submit',class:'primary',text:'Enregistrer mon profil →'}));form.addEventListener('submit',async e=>{e.preventDefault();if(!selected.length||selected.length>5){msg('Choisissez entre un et cinq métiers.','error');return}const v=formValue(form);const r=await action(()=>api('/profile',{method:'POST',body:{trade:selected[0],additional_trades:selected.slice(1),town:v.town,siren:v.siren,service_zones:v.zones.split(',').map(s=>s.trim()).filter(Boolean)}}),'Profil enregistré. Il doit être examiné par l’administrateur.');if(r)render()});n.append(el('div',{class:'status-note',text:p?(p.approved?'Profil autorisé pour les tests. Aucune certification réelle.':'Profil en attente de revue.'):'Complétez votre profil pour participer aux tests.'}),el('section',{class:'panel'},form));if(p)await renderShowcaseManagement(n)}
 async function renderApplications(n){
  n.append(heading('Vos candidatures.','Suivez vos réponses et les possibilités d’échange pour chaque projet.'));
@@ -955,7 +1096,8 @@ function passwordPanel(available){
 }
 
 async function renderPersonalData(target){
-  const box=panel('Mes données de laboratoire','Toutes les données affichées proviennent exclusivement de votre compte fictif. Aucun transfert externe.');
+  target.append(heading('Mon compte','Retrouvez vos informations personnelles, les réglages de votre session et vos données.'));
+  const box=panel('Mes informations','Données fictives uniquement dans cette préproduction privée.');
   const data=await api('/account/export');
   const form=el('form',{},field('Votre nom affiché','name','text',{value:data.user.name,minlength:2,maxlength:100}),el('button',{type:'submit',text:'Enregistrer mon nom',class:'outline'}));form.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/account',{method:'PUT',body:formValue(form)}),'Nom enregistré.');if(r){appState.user.name=r.name;render()}});box.append(form);
   box.append(el('p',{text:`Compte : ${data.user.name} · ${data.user.email} · rôle ${data.user.role}`}));
@@ -976,7 +1118,8 @@ async function renderPersonalData(target){
     const url=URL.createObjectURL(blob);const a=el('a',{href:url,download:'ucp-lab-donnees-fictives.json'});
     document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
   }));
-  target.append(box,passwordPanel(sessions.password_change_available),log);
+  const history=el('details',{class:'account-history'},el('summary',{text:'Afficher mon historique d’activité'}),log);
+  target.append(box,passwordPanel(sessions.password_change_available),history);
 }
 async function loadCatalog(){catalog=(await api('/catalog')).items;for(const t of catalog)trades[t.id]=t.label}
 let entrySpace='requester';

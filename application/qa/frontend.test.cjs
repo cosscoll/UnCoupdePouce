@@ -363,7 +363,7 @@ test('wizard preserves optional budget, distinguishes explicit zero and refuses 
  }
 });
 test('budget search sends explicit zero bounds and explains missing budgets',async()=>{
- const x=await boot({'/api/projects?budget_from=0&budget_to=0&sort=newest':{items:[]}});try{
+ const x=await boot({'/api/session':{id:2,name:'Artisan',role:'professional',csrf:'pro-token'},'/api/projects':{items:[],search_scope:'ready'},'/api/projects?budget_from=0&budget_to=0&sort=newest':{items:[]}});try{
   input(x.w,'.project-search [name=budget_from]','0');input(x.w,'.project-search [name=budget_to]','0');submit(x.w,'.project-search');await tick();
   assert.ok(x.calls.some(c=>c.url==='/api/projects?budget_from=0&budget_to=0&sort=newest'));
   assert.match(x.w.document.querySelector('.budget-filter-note').textContent,/sans budget sont exclus/);
@@ -1192,7 +1192,7 @@ test('chatbot appends new messages without replacing earlier log nodes',async()=
 });
 
 test('unavailable chatbot module leaves the core application usable',async()=>{
- const x=await boot({},w=>Object.defineProperty(w,'UCPGuidedHelp',{configurable:true,get:()=>undefined,set:()=>{}}));try{assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.match(x.w.document.querySelector('#view').textContent,/Vos projets/);x.w.openGuidedHelp();assert.match(x.w.document.querySelector('#alert').textContent,/assistant n’a pas pu être chargé/)}finally{x.close()}
+ const x=await boot({},w=>Object.defineProperty(w,'UCPGuidedHelp',{configurable:true,get:()=>undefined,set:()=>{}}));try{assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.ok(x.w.document.querySelector('#view .project-search'),'la recherche de projets reste utilisable');x.w.openGuidedHelp();assert.match(x.w.document.querySelector('#alert').textContent,/assistant n’a pas pu être chargé/)}finally{x.close()}
 });
 
 const enterpriseEffectsData={enterprise:{id:4,label:'Entreprise fictive'},members:[{id:8,alias:'Equipe plomberie',trades:['plomberie'],zones:['Toulouse'],is_active:1}],pricing:{active_artisans:1,monthly_ht:35,linked_artisans_active:1,manager_counted_as_artisan:false}};
@@ -1397,4 +1397,103 @@ test('header is minimal and account actions appear only in Mon compte for all ro
    assert.equal(x.w.document.querySelector('#account-actions').hidden,true,'actions not shown elsewhere');
   }finally{x.close()}
  }
+});
+
+test('UX audit: requester home prioritizes an unfinished draft but keeps activity accessible',async()=>{
+ const draft={id:41,title:'Salle de bain',description:'Remplacer douche et carrelage',town:'Toulouse',version:1,trades:[],photos:[],timing:'flexible'};
+ const x=await boot({'/api/projects':{items:[{id:31,title:'Projet publié',town:'Toulouse',status:'open'}]},
+  '/api/v4/drafts':{items:[draft]},'/api/conversations':{items:[]},
+  '/api/notifications?unread_only=true':{unread:1,items:[]}},null,'http://localhost:8765/particulier');
+ try{
+  const d=x.w.document;
+  assert.equal(d.querySelector('.home-priority h3').textContent,'Une annonce à terminer');
+  assert.equal(d.querySelector('.home-priority .primary').textContent,'Reprendre mon brouillon');
+  assert.equal(d.querySelector('.home-overview').open,false);
+  assert.equal(d.querySelectorAll('.requester-overview>.panel').length,4);
+  d.querySelector('.home-priority .primary').click();
+  assert.equal(d.querySelector('.wizard [name=title]').value,draft.title);
+ }finally{x.close()}
+});
+test('UX audit: professional home gives a first-time artisan a profile action before searching',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Artisan',role:'professional',csrf:'abc'},
+ '/api/projects':{items:[],search_scope:'ready'},'/api/my-applications':{items:[]},
+ '/api/conversations':{items:[]},'/api/my-profile':{profile:null},
+ '/api/notifications?unread_only=true':{unread:0,items:[]}},null,'http://localhost:8765/professionnel');
+ try{
+  const d=x.w.document;
+  assert.match(d.querySelector('.home-priority h3').textContent,/Complétez votre profil/);
+  assert.equal(d.querySelector('.home-priority .primary').textContent,'Compléter mon profil');
+  assert.equal(d.querySelector('.home-overview').open,false);
+  assert.equal(d.querySelectorAll('.overview-grid>.panel').length,5);
+  assert.equal(d.querySelectorAll('#tabs>.navlink').length,4);
+  const more=d.querySelector('#tabs>.nav-secondary');
+  assert.ok(more);assert.equal(more.open,false);
+  assert.ok([...more.querySelectorAll('button')].some(b=>b.textContent==='Mon entreprise'));
+  assert.ok([...more.querySelectorAll('button')].some(b=>b.textContent==='Notifications'));
+  more.open=true;
+  [...more.querySelectorAll('button')].find(b=>b.textContent==='Mon profil').click();
+  await tick();assert.equal(d.querySelector('.nav-secondary').open,true);
+  assert.equal(d.querySelector('#navigation-current').textContent,'Mon profil');
+ }finally{x.close()}
+});
+test('UX audit: professional search starts with trade and commune; requester only filters their projects',async()=>{
+ const r=await boot();
+ try{
+  assert.equal(r.w.document.querySelector('.search-core [name=trade]'),null);
+  assert.equal(r.w.document.querySelector('.search-core [name=town]'),null);
+  assert.ok(r.w.document.querySelector('.search-advanced [name=status]'));
+  assert.equal(r.w.document.querySelector('.project-search [name=budget_from]'),null);
+ }finally{r.close()}
+ const p=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},
+ '/api/projects':{items:[],search_scope:'ready'}});
+ try{
+  assert.ok(p.w.document.querySelector('.search-core [name=trade]'));
+  assert.ok(p.w.document.querySelector('.search-core [name=town]'));
+  assert.ok(p.w.document.querySelector('.search-advanced [name=budget_from]'));
+  assert.equal(p.w.document.querySelector('.search-advanced').open,false);
+ }finally{p.close()}
+});
+test('UX audit: artist candidate cards favor skills and disclose unverifiable evidence without fake trust badges',async()=>{
+ const x=await boot();
+ try{
+  const area=x.w.document.createElement('div');x.w.document.body.append(area);
+  x.w.renderCandidateCards(area,[{
+   id:5,professional_name:'Atelier fictif',trades:['plomberie'],town:'Toulouse',
+   service_zones:['Toulouse','Blagnac'],status:'pending',verification_status:'test_authorized',
+   submitted_at:'2026-11-05T10:00:00Z'
+  }]);
+  assert.equal(area.querySelector('.candidate-card-skill').textContent,'Plomberie');
+  assert.match(area.querySelector('.candidate-card-zones').textContent,/Blagnac/);
+  assert.match(area.querySelector('.candidate-verification').textContent,/non vérifiées/);
+  assert.equal(area.querySelector('.candidate-more').open,false);
+  assert.ok(area.querySelector('.candidate-more .candidate-facts'));
+  assert.equal(area.querySelectorAll('.candidate-card').length,1);
+ }finally{x.close()}
+});
+test('UX audit: browser history returns to the prior permitted page',async()=>{
+ const x=await boot({'/api/notifications':{items:[],unread:0,next_before_id:null}});
+ try{
+  await x.w.go('notifications');
+  await x.w.go('support');
+  assert.equal(x.w.location.hash,'#support');
+  x.w.history.back();
+  await new Promise(resolve=>setTimeout(resolve,70));
+  assert.equal(x.w.location.hash,'#notifications');
+  assert.equal(x.w.document.querySelector('#navigation-current').textContent,'Notifications');
+  assert.equal(x.w.document.title,'Notifications · Un Coup de Pouce');
+ }finally{x.close()}
+});
+test('UX audit: account screen keeps install and logout after personal information and hides history by default',async()=>{
+ const x=await boot({'/api/account/export':{user:{name:'Camille',email:'camille@ucp.test',role:'requester'},own_projects:[],own_applications:[],own_messages:[]},
+  '/api/account/sessions':{active_sessions:1,password_change_available:false},
+  '/api/account/activity':{items:[]}});
+ try{
+  await x.w.go('personal-data');
+  const d=x.w.document;
+  assert.equal(d.querySelector('#view h2').textContent,'Mon compte');
+  assert.equal(d.querySelector('#account-actions').previousElementSibling.id,'view');
+  assert.equal(d.querySelector('.account-history').open,false);
+  assert.ok(d.querySelector('#account-actions #install-app'));
+  assert.ok(d.querySelector('#account-actions #logout'));
+ }finally{x.close()}
 });
