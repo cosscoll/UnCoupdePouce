@@ -97,7 +97,7 @@ def install(m):
         if not row:error(404,'Projet introuvable')
         if user['role']=='admin' or row['requester_id']==user['id']:return row, []
         if user['role']=='professional' and not row['hidden']:
-            if row['status']=='open' and not row['applications_paused']:
+            if row['status']=='open' and not row['suspended'] and not row['applications_paused']:
                 requester = c.execute('SELECT suspended FROM users WHERE id=?',(row['requester_id'],)).fetchone()
                 profile = c.execute('SELECT * FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
                 if not requester['suspended'] and profile and profile['approved']:
@@ -233,7 +233,7 @@ def install(m):
         with m.authenticated_db(user,write=False) as c:
             r,matches=visible_project(c,id,user)
             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
-            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version','cancelled')};row['trades']=list(m.project_trades(r))
+            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version','cancelled','suspended')};row['trades']=list(m.project_trades(r))
             if r['requester_id']==user['id']:
                 row['content_version']=r['content_version']
                 applications=m.project_edit_applications(c,id)
@@ -255,8 +255,8 @@ def install(m):
             elif body.kind=='message':
                 message=c.execute('SELECT application_id FROM messages WHERE id=?',(body.target_id,)).fetchone()
                 if not message:error(404,'Message introuvable')
-                m.check_conversation(c,message['application_id'],user['id'])
-            else:m.check_conversation(c,body.target_id,user['id'])
+                m.check_conversation(c,message['application_id'],user['id'],allow_project_suspension=True)
+            else:m.check_conversation(c,body.target_id,user['id'],allow_project_suspension=True)
             if c.execute("SELECT 1 FROM reports WHERE reporter_id=? AND kind=? AND target_id=? AND status='open'",(user['id'],body.kind,body.target_id)).fetchone():error(409,'Un signalement est déjà en cours')
             cur=c.execute('INSERT INTO reports(reporter_id,kind,target_id,reason,created_at) VALUES(?,?,?,?,?)',(user['id'],body.kind,body.target_id,body.reason.strip(),now()));audit(c,user,'report_created','report',cur.lastrowid);c.execute('COMMIT')
             return {'id':cur.lastrowid,'status':'open'}

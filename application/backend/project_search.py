@@ -28,7 +28,9 @@ def filter_projects(items,taxonomy,*,q='',trade='',town='',category='',timing=No
         if timing and p['timing']!=timing:return False
         if status=='cancelled':
             if not p.get('cancelled'):return False
-        elif status and p['status']!=status:return False
+        elif status=='suspended':
+            if not p.get('suspended'):return False
+        elif status and (p['status']!=status or p.get('suspended')):return False
         if cutoff:
             try:stamp=datetime.fromisoformat(p['created_at'])
             except (ValueError,TypeError):return False

@@ -144,6 +144,8 @@ def init_db():
             if column not in project_cols:c.execute(f'ALTER TABLE projects ADD COLUMN {column} INTEGER CHECK ({column}>=0)')
         if 'applications_paused' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN applications_paused INTEGER NOT NULL DEFAULT 0 CHECK (applications_paused IN (0,1))')
         if 'intake_version' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN intake_version INTEGER NOT NULL DEFAULT 0 CHECK (intake_version>=0)')
+        if 'suspended' not in project_cols:
+            c.execute("ALTER TABLE projects ADD COLUMN suspended INTEGER NOT NULL DEFAULT 0 CHECK (suspended=0 OR (suspended=1 AND status!='closed'))")
         if 'cancelled' not in project_cols:
             c.execute("ALTER TABLE projects ADD COLUMN cancelled INTEGER NOT NULL DEFAULT 0 CHECK (cancelled=0 OR (cancelled=1 AND status='closed'))")
         if 'content_version' not in project_cols:
@@ -246,6 +248,8 @@ NOTIFICATION_TYPES = {
     'application_withdrawn': 'Une candidature sur votre projet a été retirée.',
     'project_closed': 'Un projet auquel vous avez candidaté a été clôturé.',
     'project_cancelled': 'Le demandeur a annulé un projet auquel vous avez candidaté.',
+    'project_suspended': 'Le demandeur a suspendu le projet. Votre candidature est conservée et les échanges sont interrompus.',
+    'project_resumed': 'Le demandeur a repris le projet. Retrouvez le statut de votre candidature et de vos échanges.',
     'project_updated': 'Une annonce pour laquelle vous avez une candidature en attente a été modifiée.',
     'project_intake_paused': 'Le demandeur a mis les nouvelles candidatures en pause. Votre candidature est conservée ; les échanges restent soumis aux droits en cours.',
     'project_intake_resumed': 'Le demandeur reçoit de nouveau des candidatures. Votre candidature conserve son état ; les échanges restent soumis aux droits en cours.',
@@ -602,7 +606,7 @@ def apply_with_enterprise_profile(project_id:int,linked_id:int,user=Depends(requ
         except ValueError:
             error(403,'Ancien projet fictif bloqué : données de contact directes')
         trades=json.loads(linked['service_trades']);zones={z.casefold() for z in json.loads(linked['service_areas'])}
-        if proj['hidden'] or proj['applications_paused'] or proj['status']!='open' or not (project_trades(proj) & set(trades)) or proj['town'].casefold() not in zones:
+        if proj['hidden'] or proj['suspended'] or proj['applications_paused'] or proj['status']!='open' or not (project_trades(proj) & set(trades)) or proj['town'].casefold() not in zones:
             error(403,'Projet hors métier, hors zone ou clos')
         created=now()
         enforce_application_rate(c,user['id'],project_id,created,APPLICATION_LIMITS)
@@ -866,7 +870,7 @@ def project_edit_applications(c, project_id):
 
 
 def project_content_editable(project, applications):
-    return project['status']=='open' and not any(a['status']=='accepted' for a in applications)
+    return project['status']=='open' and not project['suspended'] and not any(a['status']=='accepted' for a in applications)
 
 
 @app.put('/api/projects/{project_id}')
@@ -875,6 +879,7 @@ def edit_project(project_id:int,body:EditProject,user=Depends(require('requester
         project=c.execute('SELECT * FROM projects WHERE id=?',(project_id,)).fetchone()
         if not project:error(404,'Projet inconnu')
         if project['requester_id']!=user['id']:error(403,'Projet appartenant à un autre demandeur')
+        if project['suspended']:error(409,'Reprenez le projet avant de modifier l’annonce.')
         applications=project_edit_applications(c,project_id)
         if not project_content_editable(project,applications):
             error(409,'Projet non modifiable après sélection d’un professionnel ou clôture')
@@ -913,7 +918,7 @@ def end_project(project_id, user, *, cancelled):
             error(409,'Projet déjà terminé' if cancelled else 'Projet déjà clôturé')
         targets=c.execute("""SELECT id,professional_id FROM applications
                              WHERE project_id=? AND status IN ('pending','accepted')""",(project_id,)).fetchall()
-        c.execute("""UPDATE projects SET status='closed',cancelled=?,applications_paused=0,intake_version=intake_version+1
+        c.execute("""UPDATE projects SET status='closed',cancelled=?,suspended=0,applications_paused=0,intake_version=intake_version+1
                      WHERE id=?""",(int(cancelled),project_id))
         c.execute("UPDATE applications SET status='rejected' WHERE project_id=? AND status='pending'",(project_id,))
         event='project_cancelled' if cancelled else 'project_closed'
@@ -942,7 +947,7 @@ def linked_application_profiles(c, professional_id):
 
 
 def project_profile_matches(project, profile, members):
-    if not profile or not profile['approved'] or project['status']!='open' or project['hidden'] or project['applications_paused']:
+    if not profile or not profile['approved'] or project['status']!='open' or project['hidden'] or project['suspended'] or project['applications_paused']:
         return []
     try:
         precontact_safe(' '.join(str(project[key]) for key in ('title','description','town')))
@@ -966,7 +971,7 @@ def project_profile_matches(project, profile, members):
 def discover_projects(c,user):
     """Authorized project discovery, reused by lists and private favorites."""
     from project_search import decorate
-    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,p.applications_paused,p.intake_version,p.cancelled,
+    columns='''p.id,p.title,p.description,p.trade,p.town,p.status,p.trades_json,p.hidden,p.created_at,p.budget_min,p.budget_max,p.applications_paused,p.intake_version,p.cancelled,p.suspended,
     (SELECT payload FROM drafts WHERE project_id=p.id ORDER BY id LIMIT 1) AS draft_payload'''
     discovery='not_applicable'
     if user['role']=='requester':
@@ -976,7 +981,7 @@ def discover_projects(c,user):
         discovery='profile_required' if not p else 'pending_review' if not p['approved'] else 'ready'
         # Authorization precedes all filters. No requester identity or outside counts.
         possible=c.execute('SELECT '+columns+''' FROM projects p JOIN users u ON u.id=p.requester_id
-            WHERE p.status=? AND p.hidden=0 AND p.applications_paused=0 AND u.suspended=0 ORDER BY p.id DESC''',('open',)).fetchall() if p and p['approved'] else []
+            WHERE p.status=? AND p.hidden=0 AND p.suspended=0 AND p.applications_paused=0 AND u.suspended=0 ORDER BY p.id DESC''',('open',)).fetchall() if p and p['approved'] else []
         members = linked_application_profiles(c, user['id']) if possible else []
         rs=[]
         for pr in possible:
@@ -997,7 +1002,7 @@ def projects(user=Depends(get_user),q:Annotated[str,Query(max_length=120)]='',
              trade:Annotated[str,Query(max_length=61)]='',town:Annotated[str,Query(max_length=90)]='',
              category:Annotated[str,Query(max_length=80)]='',
              timing:Literal['flexible','month','quarter','urgent']|None=None,
-             status:Literal['open','selected','closed','cancelled']|None=None,
+             status:Literal['open','selected','closed','cancelled','suspended']|None=None,
              published_within:Annotated[int|None,Query(ge=1,le=365)]=None,
              sort:Literal['newest','oldest']='newest',
              budget_from:Annotated[int|None,Query(ge=0,le=MAX_BUDGET)]=None,
@@ -1029,7 +1034,7 @@ def apply(project_id:int,user=Depends(require('professional'))):
         eligible={zone.casefold() for zone in json.loads(p['service_areas'] or '[]')}
         eligible.add(p['town'].casefold())
         valid_trades={p['trade'],*json.loads(p['service_trades'] or '[]')}
-        if project['hidden'] or project['applications_paused'] or project['status']!='open' or not (project_trades(project) & valid_trades) or project['town'].casefold() not in eligible:
+        if project['hidden'] or project['suspended'] or project['applications_paused'] or project['status']!='open' or not (project_trades(project) & valid_trades) or project['town'].casefold() not in eligible:
             error(403,'Projet non éligible au métier, à la zone ou au statut')
         created=now()
         enforce_application_rate(c,user['id'],project_id,created,APPLICATION_LIMITS)
@@ -1063,10 +1068,11 @@ def withdraw_application(application_id:int,user=Depends(require('professional')
 @app.post('/api/applications/{application_id}/reject')
 def reject_application(application_id:int,user=Depends(require('requester'))):
     with authenticated_db(user,write=True) as c:
-        row=c.execute('''SELECT applications.status,applications.professional_id,projects.requester_id FROM applications
+        row=c.execute('''SELECT applications.status,applications.professional_id,projects.requester_id,projects.suspended FROM applications
           JOIN projects ON projects.id=applications.project_id WHERE applications.id=?''',(application_id,)).fetchone()
         if not row:error(404,'Candidature inconnue')
         if row['requester_id']!=user['id']:error(403,'Candidature non autorisée')
+        if row['suspended']:error(409,'Reprenez le projet avant de traiter les candidatures.')
         if row['status']!='pending':error(409,'Candidature déjà traitée')
         c.execute("UPDATE applications SET status='rejected' WHERE id=?",(application_id,))
         queue_notice(c,row['professional_id'],'application_rejected',application_id)
@@ -1080,7 +1086,7 @@ def my_applications(user=Depends(require('professional'))):
     with authenticated_db(user,write=False) as c:
         rows=c.execute('''SELECT applications.id,applications.status,applications.created_at AS submitted_at,
         projects.title,projects.trade,projects.town,projects.status AS project_status,projects.applications_paused AS project_paused,
-        projects.cancelled AS project_cancelled,
+        projects.cancelled AS project_cancelled,projects.suspended AS project_suspended,
         linked.alias AS linked_artisan_alias FROM applications JOIN projects ON projects.id=applications.project_id
         LEFT JOIN enterprise_artisans linked ON linked.id=applications.linked_profile_id
         WHERE applications.professional_id=? ORDER BY applications.id DESC''',(user['id'],)).fetchall()
@@ -1089,6 +1095,7 @@ def my_applications(user=Depends(require('professional'))):
             item=restrict_public_fields(dict(row),{'title':'Projet','town':'Commune non affichée','trade':'Métier non affiché'})
             state='not_selected'
             if row['project_status']=='closed':state='closed'
+            elif row['project_suspended']:state='project_suspended'
             elif row['status']=='accepted':
                 try:access=check_conversation(c,row['id'],user['id'],allow_locked=True)
                 except HTTPException as exc:
@@ -1105,7 +1112,7 @@ def my_applications(user=Depends(require('professional'))):
 @app.get('/api/projects/{project_id}/applications')
 def get_applications(project_id:int,user=Depends(require('requester'))):
     with authenticated_db(user,write=False) as c:
-        pr=c.execute('SELECT requester_id,status,hidden FROM projects WHERE id=?',(project_id,)).fetchone()
+        pr=c.execute('SELECT requester_id,status,hidden,suspended FROM projects WHERE id=?',(project_id,)).fetchone()
         if not pr:error(404,'Projet inconnu')
         if pr['requester_id']!=user['id']:error(403,'Vous ne possédez pas ce projet')
         rows=c.execute('''SELECT applications.id,applications.status,applications.created_at,
@@ -1127,7 +1134,7 @@ def get_applications(project_id:int,user=Depends(require('requester'))):
             item=({k:row[k] for k in ('id','status','professional_name','trade','town','linked_artisan_alias')} |
                          {'trades':list(dict.fromkeys(scope)),'service_zones':zones,'submitted_at':row['created_at'],
                           'verification_status':'test_authorized' if authorized else 'test_unavailable',
-                          'eligible_for_selection':authorized and row['status']=='pending' and pr['status']=='open' and not pr['hidden']})
+                          'eligible_for_selection':authorized and row['status']=='pending' and pr['status']=='open' and not pr['hidden'] and not pr['suspended']})
             items.append(restrict_public_fields(item,{'professional_name':'Profil professionnel','trade':'Métier non affiché',
                 'town':'Commune non affichée','linked_artisan_alias':'Profil lié','trades':None,'service_zones':None}))
     return {'items':items}
@@ -1135,11 +1142,12 @@ def get_applications(project_id:int,user=Depends(require('requester'))):
 @app.post('/api/applications/{application_id}/accept')
 def accept(application_id:int,user=Depends(require('requester'))):
     with authenticated_db(user,write=True) as c:
-        item=c.execute('''SELECT applications.*,projects.requester_id,projects.status AS project_status,projects.hidden
+        item=c.execute('''SELECT applications.*,projects.requester_id,projects.status AS project_status,projects.hidden,projects.suspended
               FROM applications JOIN projects ON projects.id=applications.project_id WHERE applications.id=?''',(application_id,)).fetchone()
         if not item:error(404,'Candidature inconnue')
         if item['requester_id']!=user['id']:error(403,'Vous ne possédez pas ce projet')
         if item['hidden']:error(409,'Projet en cours de modération')
+        if item['suspended']:error(409,'Reprenez le projet avant de traiter les candidatures.')
         if item['status']!='pending' or item['project_status']!='open':error(409,'Candidature déjà traitée ou projet fermé')
         p=c.execute('SELECT approved FROM profiles WHERE user_id=?',(item['professional_id'],)).fetchone()
         if c.execute('SELECT suspended FROM users WHERE id=?',(item['professional_id'],)).fetchone()[0]:error(409,'Compte professionnel suspendu')
@@ -1183,8 +1191,8 @@ def conversations(user=Depends(get_user)):
             else:visible.append(restrict_public_fields(dict(item),{'title':'Projet','peer':'Compte participant'}))
     return {'items':visible}
 
-def check_conversation(c,aid,uid,allow_locked=False):
-    row=c.execute('''SELECT applications.status,applications.professional_id,projects.requester_id,projects.status AS project_status,projects.hidden,profiles.approved,profiles.subscription_active
+def check_conversation(c,aid,uid,allow_locked=False,*,allow_project_suspension=False):
+    row=c.execute('''SELECT applications.status,applications.professional_id,projects.requester_id,projects.status AS project_status,projects.hidden,projects.suspended,profiles.approved,profiles.subscription_active
       ,applications.linked_profile_id,linked.is_active AS linked_active
       FROM applications JOIN projects ON applications.project_id=projects.id
       JOIN profiles ON profiles.user_id=applications.professional_id
@@ -1195,6 +1203,7 @@ def check_conversation(c,aid,uid,allow_locked=False):
     if c.execute('SELECT 1 FROM users WHERE id IN (?,?) AND suspended=1',(row['professional_id'],row['requester_id'])).fetchone():error(403,'Compte participant suspendu')
     if row['hidden'] or not row['approved']:error(403,'Accès suspendu par modération')
     if row['status']!='accepted' or row['project_status']=='closed':error(403,'Conversation fermée')
+    if row['suspended'] and not allow_project_suspension:error(403,'Le projet est suspendu. Les échanges reprendront selon les droits en vigueur.')
     if not allow_locked and row['linked_profile_id'] and not row['linked_active']:
         error(403,'Accès chat suspendu : artisan lié inactif')
     if not allow_locked and not row['subscription_active']:error(403,'Accès chat suspendu : abonnement de test inactif')
@@ -1236,7 +1245,7 @@ def send_message(aid:int,body:Message,request:Request,user=Depends(get_user)):
 def account_export(user=Depends(get_user)):
     # Limited lab export: only the authenticated participant's records, never another user's messages.
     with authenticated_db(user,write=False) as c:
-        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,applications_paused,intake_version,content_version,cancelled FROM projects WHERE requester_id=?',(user['id'],))]
+        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,applications_paused,intake_version,content_version,cancelled,suspended FROM projects WHERE requester_id=?',(user['id'],))]
         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
         import base64
         own_photos=[{'id':r['id'],'draft_id':r['draft_id'],'jpeg_base64':base64.b64encode(r['body']).decode()} for r in c.execute('SELECT photos.id,draft_id,body FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.owner_id=?',(user['id'],))]
