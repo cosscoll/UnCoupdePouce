@@ -3,6 +3,13 @@
 'use strict';
 function create(hooks){
  const CONSENT_KEY='ucp.ai.local-model-consent.v1';
+ const MODEL_KEY='ucp.ai.model-quality.v1';
+ function savedModelTier(){
+  try{return consentStore()?.getItem(MODEL_KEY)==='light'?'light':'quality'}catch{return 'quality'}
+ }
+ function saveModelTier(tier){
+  try{consentStore()?.setItem(MODEL_KEY,tier)}catch{}
+ }
  let state=null,ui=null,localConsent=false;
  function consentStore(){try{return hooks.storage||root.localStorage}catch{return null}}
  function readConsent(){try{return consentStore()?.getItem(CONSENT_KEY)==='accepted'}catch{return false}}
@@ -29,6 +36,7 @@ function create(hooks){
   const s={actor:c.actor,session:c.session,role:c.role,messages:[],pending:null,busy:false,consent:localConsent};
   state=s;
   const model=hooks.local.status();
+  let modelTier=savedModelTier();
   const isRequester=s.role==='requester';
   ui=el('section',{class:'guided-helper ucp-ai ai-chat',role:'region','aria-label':'Discussion avec l’assistant UCP'});
   const conversation=el('div',{class:'ai-conversation'});
@@ -82,9 +90,21 @@ function create(hooks){
    persistConsent(false);agreement.hidden=false;revoke.hidden=true;allowed();
   },'ai-revoke');
   revoke.hidden=!s.consent;
+  const qualitySelect=el('select',{class:'ai-quality-select','aria-label':'Qualité du modèle IA'},
+   el('option',{value:'quality',text:'Qualité élevée · Qwen 3B (GPU ~2,5–2,9 Go)'}),
+   el('option',{value:'light',text:'Mode léger · Qwen 1,5B (GPU ~1,6–1,9 Go)'}));
+  qualitySelect.value=modelTier;
+  qualitySelect.addEventListener('change',()=>{
+   if(!valid(s)||s.busy){qualitySelect.value=modelTier;return}
+   modelTier=qualitySelect.value==='light'?'light':'quality';
+   saveModelTier(modelTier);
+   hooks.local.reset();
+   status.textContent='Modèle '+(modelTier==='quality'?'qualité élevée':'léger')+' sélectionné. Le prochain message chargera ce modèle.';
+  });
+  const qualitySetting=el('label',{class:'ai-quality-setting'},el('span',{text:'Qualité des réponses'}),qualitySelect);
   const info=el('details',{class:'ai-technical-details'},
    el('summary',{text:'À propos de cette IA'}),
-   el('p',{text:'Le modèle fonctionne dans votre navigateur avec WebGPU, sans API IA facturée. Un téléchargement important est nécessaire au premier usage. Les messages ne sont pas envoyés à un service de génération. L’autorisation est conservée uniquement dans ce navigateur. En navigation privée ou après suppression des données du site, elle sera redemandée. Utilisez uniquement des données fictives en préproduction.'}),revoke);
+   el('p',{text:'Qwen 3B offre des réponses généralement plus pertinentes que l’ancien modèle 0,5B, mais nécessite davantage de mémoire et un téléchargement initial important. Si votre appareil ne le charge pas, passez en mode léger (1,5B). L’IA fonctionne sur votre GPU avec WebGPU, sans API payante. Les messages ne quittent pas votre appareil. L’autorisation est conservée dans le navigateur, sauf navigation privée ou effacement des données. Utilisez des informations fictives en préproduction.'}),qualitySetting,revoke);
   const composer=el('div',{class:'ai-composer'},actions,form,agreement,info);
   conversation.append(welcome,log,proposals,status,retry);
   ui.append(headerActions,conversation,composer);
@@ -116,7 +136,7 @@ function create(hooks){
   function showPending(){
    proposals.replaceChildren();
    const p=s.pending;
-   if(!p)return;
+   if(!p||(p.draft==null&&p.search==null))return;
    if(p.draft){
     const d=p.draft;
     proposals.append(el('div',{class:'helper-proposal ai-proposal'},
@@ -174,7 +194,7 @@ function create(hooks){
    scrollBottom();
    const messages=s.messages.slice(-12).map(m=>({role:m.role,content:m.text}));
    try{
-    const output=await hooks.local.send({mode,role:s.role,catalog:get().catalog,messages,
+    const output=await hooks.local.send({mode,role:s.role,catalog:get().catalog,messages,modelTier,
      onProgress:(label,pct)=>{
       if(valid(s)&&ui?.closest('dialog')?.open){
        const percentage=Number.isFinite(pct)&&pct>0?' ('+Math.min(100,Math.round(pct*100))+' %)':'';
@@ -184,12 +204,13 @@ function create(hooks){
      }});
     if(!valid(s)||!ui?.closest('dialog')?.open)return;
     say('assistant',output.reply);
-    s.pending={draft:output.draft||null,search:output.search||null};
+    s.pending=output.draft||output.search?{draft:output.draft||null,search:output.search||null}:null;
     showPending();
     status.textContent='';
    }catch(e){
     if(valid(s)&&ui?.closest('dialog')?.open){
-     status.textContent=e?.message||'Le modèle local est indisponible. Réessayez.';
+     status.textContent=(e?.message||'Le modèle local est indisponible. Réessayez.')+
+      (modelTier==='quality'?' Si le modèle ne démarre pas, essayez le mode léger dans « À propos de cette IA ».':'');
      retry.hidden=false;scrollBottom();
     }
    }finally{
