@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const {JSDOM}=require('jsdom');
 const assistant=require('../backend/static/assistant-ai.js');
 function harness(role='requester',configured=true,sharedStorage=null){
- const dom=new JSDOM('<!doctype html><html><body><dialog open></dialog></body></html>');
+ const dom=new JSDOM('<!doctype html><html><body><dialog open></dialog></body></html>',{url:'https://ucp.test'});
  const doc=dom.window.document,dialog=doc.querySelector('dialog'),storage=sharedStorage||dom.window.localStorage;
  let actor={id:123,role},session='csrf-demo',applied=null,searched=null,resetCount=0;
  const calls=[];
