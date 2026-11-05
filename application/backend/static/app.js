@@ -595,12 +595,25 @@ function renderCandidateCards(box,apps,projectId=null,suspended=false){
     if(!data||epoch!==renderEpoch||dialogToken!==dialogEpoch||chosen.size!==selection.length||selection.some(a=>!chosen.has(a.id)))return;
     const cards=el('div',{class:'candidate-comparison'},...selection.map((a,i)=>el('article',{class:'comparison-card'},
       el('h4',{text:a.professional_name}),a.linked_artisan_alias?el('p',{text:'Profil lié : '+a.linked_artisan_alias}):null,candidateFacts(a),data[i]?showcaseContent(data[i]):null)));
-    showDialog('Comparer les candidatures',el('div',{},el('p',{class:'hint',text:'Profils actuels et réalisations déclarées, non vérifiés. L’autorisation de test ne vérifie ni l’entreprise ni ses assurances. Avis et justificatifs ne sont pas disponibles.'}),cards));
+    showDialog('Comparer les candidatures',el('div',{},el('p',{class:'hint',text:'Comparez les métiers, les communes et les réalisations effectivement renseignées. Identités, assurances, avis et justificatifs : aucune vérification réelle disponible dans cette préproduction.'}),cards));
   },'secondary');compare.disabled=true;
   function update(){summary.textContent=chosen.size+' / 3 profils sélectionnés pour la comparaison';compare.disabled=chosen.size<2;for(const c of checks)c.disabled=chosen.size>=3&&!c.checked}
+  if(apps.length)box.append(el('p',{class:'candidate-guidance',
+   text:'Comparez les spécialités, zones d’intervention et présentations déclarées. Les identités, assurances et réalisations ne sont pas vérifiées dans cette préproduction.'}));
   if(apps.length>1)box.append(el('div',{class:'comparison-toolbar'},summary,compare));
   for(const a of apps){
-    const item=el('article',{class:'item'},el('h4',{text:a.professional_name}),a.linked_artisan_alias?el('p',{class:'small',text:'Profil lié : '+a.linked_artisan_alias}):null,badge(a.status),candidateFacts(a));
+    const specialties=(a.trades||[a.trade]).map(t=>trades[t]||t).filter(Boolean).join(' · ')||'Métiers à préciser';
+    const zones=(a.service_zones||[a.town]).filter(Boolean).slice(0,4).join(' · ')||'Zones non renseignées';
+    const item=el('article',{class:'item candidate-card'},
+     el('div',{class:'candidate-card-intro'},
+      el('div',{class:'candidate-card-avatar','aria-hidden':'true'},icon('profile')),
+      el('div',{class:'candidate-card-heading'},el('h4',{text:a.professional_name}),
+       a.linked_artisan_alias?el('p',{class:'small muted',text:'Profil présenté : '+a.linked_artisan_alias}):null,
+       badge(a.status))),
+     el('p',{class:'candidate-card-skill',text:specialties}),
+     el('p',{class:'candidate-card-zones',text:'Intervention : '+zones}),
+     el('p',{class:'candidate-verification',text:a.verification_status==='test_authorized'?'Profil autorisé pour les tests · identité et assurances non vérifiées':'Profil non certifié · vérification réelle indisponible'}),
+     el('details',{class:'candidate-more'},el('summary',{text:'Voir tous les détails déclarés'}),candidateFacts(a)));
     if(apps.length>1){const check=el('input',{type:'checkbox','aria-label':'Comparer le profil de '+a.professional_name});
       check.addEventListener('change',()=>{if(check.checked&&chosen.size<3)chosen.add(a.id);else{chosen.delete(a.id);check.checked=false}update()});checks.push(check);
       item.append(el('label',{class:'candidate-choice'},check,'Ajouter au comparatif'));
