@@ -12,7 +12,11 @@ const CDN_URLS=[
  'https://esm.run/@mlc-ai/web-llm@0.2.87',
  'https://cdn.jsdelivr.net/npm/@mlc-ai/web-llm@0.2.87/+esm'
 ];
-let engine=null,enginePromise=null,libraryPromise=null,notify=null,loadedTier=null;
+let engine=null,enginePromise=null,libraryPromise=null,notify=null,loadedTier=null,autoDowngraded=false;
+export function isGpuMemoryError(error){
+ const message=errorText(error);
+ return /out.of.memory|GPUOutOfMemoryError|insufficient (GPU )?memory|not enough (video )?memory|allocation failed|failed to allocate|device lost|device was lost|memory budget|memory allocation/i.test(message);
+}
 function errorText(e){return e instanceof Error?e.message:String(e)}
 function withTimeout(promise,ms){
  let timer;
@@ -34,7 +38,7 @@ async function importLibrary(){
 }
 async function ensureEngine(progress,tier='quality'){
  const wantedTier=tier==='light'?'light':'quality';
- if(engine&&loadedTier!==wantedTier)await resetEngine();
+ if(engine&&loadedTier!==wantedTier&&!(autoDowngraded&&loadedTier==='light'&&wantedTier==='quality'))await resetEngine();
  if(engine)return engine;
  if(!globalThis.navigator?.gpu)throw Error('WebGPU non disponible dans ce contexte. Utilisez un navigateur Chrome/Edge compatible.');
  notify=progress;
@@ -47,16 +51,26 @@ async function ensureEngine(progress,tier='quality'){
    const selected=selectModelVariant(wantedTier,!!adapter.features?.has?.('shader-f16'));
    const approx=wantedTier==='quality'?'2,5 à 2,9 Go':'1,6 à 1,9 Go';
    notify?.('Préparation de Qwen2.5 '+(wantedTier==='quality'?'3B':'1.5B')+' (mémoire GPU conseillée : '+approx+'). Premier chargement volumineux…',0);
-   const e=await lib.CreateMLCEngine(selected,{
-    initProgressCallback:p=>notify?.(String(p?.text||'Téléchargement et initialisation du modèle…'),Number(p?.progress)||0)
-   });
-   engine=e;loadedTier=wantedTier;return e;
+   const options={initProgressCallback:p=>notify?.(String(p?.text||'Téléchargement et initialisation du modèle…'),Number(p?.progress)||0)};
+   let e,effectiveTier=wantedTier;
+   try{e=await lib.CreateMLCEngine(selected,options)}
+   catch(err){
+    if(wantedTier!=='quality'||!isGpuMemoryError(err))throw err;
+    notify?.('Le GPU manque de mémoire pour Qwen 3B. Essai automatique du modèle local 1,5B…',0);
+    const lite=selectModelVariant('light',!!adapter.features?.has?.('shader-f16'));
+    try{e=await lib.CreateMLCEngine(lite,options);effectiveTier='light';autoDowngraded=true}
+    catch(second){
+     const failure=Error('Les modèles 3B et 1,5B ne démarrent pas sur ce GPU. 3B : '+errorText(err).slice(0,200)+' ; 1,5B : '+errorText(second).slice(0,200));
+     failure.cause=second;throw failure;
+    }
+   }
+   engine=e;loadedTier=effectiveTier;return e;
   })().catch(e=>{enginePromise=null;libraryPromise=null;throw e});
  }
  return enginePromise;
 }
 export async function resetEngine(){
- const existing=engine;engine=null;enginePromise=null;libraryPromise=null;notify=null;loadedTier=null;
+ const existing=engine;engine=null;enginePromise=null;libraryPromise=null;notify=null;loadedTier=null;autoDowngraded=false;
  if(existing?.unload){try{await existing.unload()}catch{}}
 }
 
@@ -147,5 +161,5 @@ export async function generate(payload={},onProgress=()=>{}){
    if(typeof candidate==='string'&&candidate.trim()&&!isRepeatedReply(candidate,payload.messages))text=candidate;
   }catch{/* Keep the first generated answer if the local revision fails. */}
  }
- return {text:text.trim(),mode};
+ return {text:text.trim(),mode,modelTier:loadedTier,downgraded:loadedTier==='light'&&payload.modelTier!=='light'};
 }
