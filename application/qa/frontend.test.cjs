@@ -841,7 +841,10 @@ test('navigation menu exposes its state, closes after a successful choice and or
  const x=await boot({'/api/notifications':{items:[],unread:0,next_before_id:null}});
  try{
   const toggle=x.w.document.querySelector('#navigation-toggle');assert.equal(toggle.getAttribute('aria-controls'),'tabs');assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(x.w.document.querySelector('#navigation-current').textContent,'Mes projets');
+  const label=x.w.document.getElementById(toggle.getAttribute('aria-labelledby'));
+  assert.equal(label.textContent,'Menu');assert.equal(toggle.getAttribute('aria-describedby'),'navigation-current');
   toggle.click();assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(x.w.document.querySelector('.sidebar').dataset.navigationOpen,'true');
+  assert.equal(toggle.getAttribute('aria-labelledby'),label.id);
   [...x.w.document.querySelectorAll('#tabs button')].find(b=>b.textContent==='Notifications').click();await tick();
   assert.equal(toggle.getAttribute('aria-expanded'),'false');assert.equal(x.w.document.querySelector('#navigation-current').textContent,'Notifications');assert.equal(x.w.document.activeElement,x.w.document.querySelector('#view h2'));assert.equal(x.w.document.activeElement.getAttribute('tabindex'),'-1');assert.equal(x.w.document.title,'Notifications · Un Coup de Pouce');assert.equal(x.w.document.querySelector('#view').hasAttribute('aria-live'),false);
  }finally{x.close()}
