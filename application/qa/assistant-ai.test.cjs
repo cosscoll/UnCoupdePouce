@@ -94,3 +94,47 @@ test('a failed local model import offers retry without duplicating the user prom
  assert.equal(retry.hidden,true);
  assert.match(h.doc.body.textContent,/Précisez la pièce/);
 });
+
+test('classic chat shows a welcome state, suggestions and a fixed composer without model requests',()=>{
+ const h=harness();h.ai.open();
+ assert.ok(h.doc.querySelector('.ai-chat .ai-conversation'));
+ assert.ok(h.doc.querySelector('.ai-chat .ai-composer .ai-compose-form'));
+ assert.ok(h.doc.querySelector('.ai-chat .ai-messages[role=log]'));
+ assert.equal(h.doc.querySelector('.ai-welcome').hidden,false);
+ btn(h.doc,'Rédiger une annonce').click();
+ assert.match(h.doc.querySelector('textarea').value,/rédiger une annonce/);
+ assert.equal(h.calls.length,0,'suggestions only fill the input');
+ assert.equal(h.doc.querySelector('details.ai-technical-details').open,false);
+});
+test('Enter sends and Shift+Enter does not submit the chat message',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ const textarea=h.doc.querySelector('textarea');
+ textarea.value='Je veux refaire ma toiture dans ma commune.';
+ textarea.dispatchEvent(new h.doc.defaultView.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+ await settle();
+ assert.equal(h.calls.length,1);
+ assert.equal(h.doc.querySelector('.ai-welcome').hidden,true);
+ assert.equal(h.doc.querySelectorAll('.ai-message').length,2,'user and local AI response');
+ textarea.value='Une autre question';
+ textarea.dispatchEvent(new h.doc.defaultView.KeyboardEvent('keydown',{key:'Enter',shiftKey:true,bubbles:true,cancelable:true}));
+ await settle();
+ assert.equal(h.calls.length,1,'Shift+Enter is a line break');
+});
+test('closing and reopening the chat keeps messages and consent until a session change',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ await say(h,'Je recherche un artisan pour ma salle de bains.');
+ const originalCount=h.doc.querySelectorAll('.ai-message').length;
+ h.ai.open();
+ assert.equal(h.doc.querySelectorAll('.ai-message').length,originalCount);
+ assert.equal(h.doc.querySelector('input[type=checkbox]').checked,true);
+ btn(h.doc,'Nouveau chat').click();
+ assert.equal(h.doc.querySelector('.ai-welcome').hidden,false);
+ assert.equal(h.doc.querySelectorAll('.ai-message').length,0);
+ assert.equal(h.doc.querySelector('input[type=checkbox]').checked,true);
+});
+test('professional assistant starts with trade-search suggestions rather than requester prompts',()=>{
+ const h=harness('professional');h.ai.open();
+ assert.ok(btn(h.doc,'Trouver des chantiers'));
+ assert.ok(btn(h.doc,'Configurer ma recherche avec l’IA'));
+ assert.equal(btn(h.doc,'Rédiger une annonce'),undefined);
+});
