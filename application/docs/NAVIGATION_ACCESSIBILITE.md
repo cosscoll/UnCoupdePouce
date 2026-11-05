@@ -2,7 +2,8 @@
 
 Le menu de l'espace connecté devient repliable dans les styles destinés aux écrans
 étroits. Son bouton indique la section courante, expose `aria-expanded` et contrôle
-la navigation par `aria-controls`. Le menu se ferme après une navigation réussie.
+la navigation par `aria-controls`. Son nom accessible reprend « Menu » et sa
+description indique la section courante. Le menu se ferme après une navigation réussie.
 Échap le referme et ramène le focus à son bouton. Si la sauvegarde du brouillon
 échoue, le menu et la saisie restent disponibles dans l'étape courante.
 
@@ -10,8 +11,8 @@ Les styles conservent le menu latéral sur grand écran. Sur petit écran, les l
 ouverts sont répartis sur deux colonnes avec une hauteur bornée et un défilement
 vertical. Les titres longs peuvent revenir à la ligne. Le bandeau supérieur n'a
 plus une hauteur fixe lorsque ses actions passent sur plusieurs lignes.
-Ces règles n'ont pas encore été vérifiées sur un écran réel ou dans une capture
-du navigateur de contrôle ; leur validation visuelle reste ouverte.
+Le bouton flottant de l’assistant laisse une marge de défilement en bas de page
+pour que les actions, y compris celles du pied de page, restent accessibles.
 
 Après une navigation explicite, l'ouverture d'un projet ou un changement d'étape,
 le titre de la page reçoit le focus sans être ajouté à l'ordre normal de tabulation.
@@ -32,15 +33,25 @@ indicatifs sont assombris, et plusieurs cibles passent à une hauteur minimale d
 44 pixels CSS. Le calcul des huit paires choisies est conservé dans
 [la preuve de couleurs](../../docs/qa/navigation-couleurs-2026-11-02.json).
 
-## Limites de la recette
+## Recette Chromium du 5 novembre 2026
 
-Les tests jsdom vérifient les attributs, transitions et mouvements de focus simulés.
-Ils ne calculent pas le rendu responsive, le zoom, les positions ou le défilement
-d'un navigateur réel. Le calcul de couleurs porte uniquement sur huit paires
-déclarées ; il n'est pas un audit de contraste de tous les pixels ou états.
+Vérification avec des comptes fictifs, sur le serveur UCP local et sa base SQLite.
+La recette a parcouru six écrans du particulier et dix du professionnel à
+320, 390 et 1 440 pixels CSS, ainsi que la connexion, le formulaire de
+modification d’une annonce et l’entrée de création d’un brouillon.
 
-Le navigateur de contrôle rencontre `net::ERR_INVALID_AUTH_CREDENTIALS` avant
-d'atteindre l'application protégée par HTTP Basic. Aucune capture de parcours n'est
-acceptée et aucune protection n'est retirée. Les contrôles de code se poursuivent,
-mais la recette visuelle, clavier réel, lecteur d'écran, zoom 200 %, Android/iPhone
-et installation PWA restent à effectuer. Aucune conformité WCAG globale n'est annoncée.
+| Contrôle | Résultat |
+| --- | --- |
+| Écrans principaux et formulaires | Aucun défilement horizontal de la page sur les écrans parcourus. |
+| Menu mobile au clavier | Entrée ouvre le menu, Tab atteint les rubriques, Échap ferme le menu et rend le focus au bouton. Une rubrique activée rend le focus au titre de la page. |
+| Modification d’une annonce | Échap ferme le dialogue et le focus revient à « Modifier la demande ». |
+| Bulle de l’assistant | Avant correction, elle recouvrait le centre de commandes ciblées au clavier dans les projets, le profil pro et le pied de page. Après correction, aucune commande parcourue dans les écrans testés n’a son centre masqué par la bulle. |
+
+## Vérifications restantes
+
+Le calcul de contraste porte sur les huit paires répertoriées. Le zoom natif
+à 200 %, le lecteur d’écran et les téléphones physiques Android et iPhone
+restent à tester. L’installation de la PWA relève d’une recette distincte.
+Les largeurs Chromium caractérisent le rendu à la taille indiquée. Voir les
+[critères de redistribution](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
+et d’[agrandissement du texte](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html).
