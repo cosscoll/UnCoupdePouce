@@ -140,9 +140,43 @@ async function render(){
 async function renderRequesterHome(n){
  if(appState.user.role!=='requester')throw Error('Cet accueil est réservé à l’espace particulier.');
  const epoch=renderEpoch;
- n.append(heading('Votre projet, du début à la rencontre.','Préparez votre demande, retrouvez les candidatures et avancez avec le professionnel que vous choisissez.','Créer un projet',()=>startWizard()));
- n.append(el('div',{class:'home-actions'},button('Être aidé pour mon annonce',openGuidedHelp),button('Voir tous mes projets',()=>go('projects')),button('Ouvrir mes messages',()=>go('conversations'))));
- const grid=el('div',{class:'overview-grid requester-overview'});n.append(grid);
+ n.append(heading('Vos travaux, en toute simplicité.','Retrouvez votre prochaine étape, du projet à la rencontre avec un professionnel.','Créer un projet',()=>startWizard()));
+ const priority=el('section',{class:'home-priority',role:'region','aria-label':'Votre prochaine étape'});
+ priority.append(el('p',{class:'muted small',text:'Recherche de votre prochaine étape…'}));
+ const grid=el('div',{class:'overview-grid requester-overview'});
+ const details=el('details',{class:'home-overview'},el('summary',{text:'Voir toute mon activité'}),grid);
+ n.append(priority,details);
+ const received={};
+ function paintPriority(){
+  if(epoch!==renderEpoch)return;
+  const drafts=received.drafts?.items||[],projects=received.projects?.items||[],conversations=received.conversations?.items||[];
+  const selected=projects.find(p=>p.status==='selected'),open=projects.find(p=>p.status==='open');
+  let title,description,cta,run;
+  if(selected&&conversations.length){
+   title='Votre professionnel est sélectionné';
+   description='Retrouvez votre échange et poursuivez votre projet.';
+   cta='Ouvrir mes messages';run=()=>go('conversations');
+  }else if(drafts.length){
+   title='Une annonce à terminer';
+   description='Votre brouillon est enregistré. Reprenez-le pour publier vos travaux.';
+   cta='Reprendre mon brouillon';run=()=>{appState.view='projects';menu();startWizard(drafts[0])};
+  }else if(open){
+   title='Votre annonce est publiée';
+   description='Consultez les candidatures et choisissez la suite à donner à votre projet.';
+   cta='Voir mon projet';run=()=>projectDetail(open);
+  }else if(conversations.length){
+   title='Une conversation à retrouver';
+   description='Vos échanges avec les professionnels sont disponibles.';
+   cta='Lire mes messages';run=()=>go('conversations');
+  }else{
+   title='Un projet de travaux en tête ?';
+   description='Décrivez simplement votre besoin. Vous pouvez enregistrer un brouillon avant de publier.';
+   cta='Décrire mes travaux';run=()=>startWizard();
+  }
+  priority.replaceChildren(el('div',{class:'home-priority-copy'},
+   el('span',{class:'eyebrow',text:'VOTRE PROCHAINE ÉTAPE'}),
+   el('h3',{text:title}),el('p',{text:description})),button(cta,run,'primary'));
+ }
  const sections=[
   {title:'Mes projets en cours',path:'/projects',view:'projects',cta:'Gérer mes projets',draw(data,node){
    const active=data.items.filter(p=>p.status!=='closed');node.append(el('strong',{class:'overview-count',text:active.length}),el('p',{class:'hint',text:'Projets publiés, sélectionnés ou suspendus.'}));
@@ -165,9 +199,10 @@ async function renderRequesterHome(n){
  ];
  await Promise.all(sections.map(async section=>{
   const box=panel(section.title),content=el('div');box.append(content,button(section.cta,()=>go(section.view),'link'));grid.append(box);
-  try{const data=await api(section.path);if(epoch!==renderEpoch)return;section.draw(data,content)}
+  try{const data=await api(section.path);if(epoch!==renderEpoch)return;received[section.view==='projects'&&section.path==='/v4/drafts'?'drafts':section.view]=data;section.draw(data,content)}
   catch(e){if(epoch===renderEpoch&&!e.stale)content.append(el('p',{class:'hint',text:'Cette rubrique est momentanément indisponible.'}),button('Réessayer',render,'link'))}
  }));
+ paintPriority();
 }
 
 function tradeNames(p){return (p.trades||(p.trades_json?JSON.parse(p.trades_json):[p.trade])).map(x=>trades[x]||x).join(' · ')}
@@ -189,8 +224,43 @@ const timingNames={flexible:'Date flexible',month:'Dans le mois',quarter:'Dans l
 async function renderProfessionalHome(n){
  if(appState.user.role!=='professional')throw Error('Cette vue est réservée à l’espace professionnel.');
  const epoch=renderEpoch;
- n.append(heading('Votre activité, en un regard.','Des informations de votre compte et des projets auxquels vos profils ont accès.'));
- const grid=el('div',{class:'overview-grid'});n.append(grid);
+ n.append(heading('Vos chantiers, au bon endroit.','Trouvez une mission et suivez les réponses à vos candidatures.','Trouver des chantiers',()=>go('projects')));
+ const priority=el('section',{class:'home-priority',role:'region','aria-label':'Prochaine action professionnelle'});
+ priority.append(el('p',{class:'muted small',text:'Chargement de votre prochaine étape…'}));
+ const grid=el('div',{class:'overview-grid'});
+ n.append(priority,el('details',{class:'home-overview'},el('summary',{text:'Voir le détail de mon activité'}),grid));
+ const snapshot={};
+ function updatePriority(){
+  if(epoch!==renderEpoch)return;
+  const profile=snapshot.profile?.profile,missions=snapshot.projects?.items||[],
+   applications=snapshot.applications?.items||[],conversations=snapshot.conversations?.items||[];
+  let title,description,cta,run;
+  if(snapshot.profile&&!profile){
+   title='Complétez votre profil professionnel';
+   description='Indiquez vos métiers et communes d’intervention pour accéder aux chantiers qui vous concernent.';
+   cta='Compléter mon profil';run=()=>go('profile');
+  }else if(profile&&!profile.approved){
+   title='Votre profil est en cours d’examen';
+   description='Vous pouvez vérifier vos informations pendant que votre accès de test est examiné.';
+   cta='Vérifier mon profil';run=()=>go('profile');
+  }else if(conversations.some(c=>c.subscription_active&&(!c.linked_profile_id||c.linked_active))){
+   title='Vos conversations sont accessibles';
+   description='Retrouvez les projets pour lesquels un échange est disponible.';
+   cta='Ouvrir mes messages';run=()=>go('conversations');
+  }else if(applications.some(a=>a.status==='pending'&&a.project_status!=='closed')){
+   title='Vous avez une candidature en attente';
+   description='Suivez votre proposition pendant que le demandeur examine les profils.';
+   cta='Suivre ma candidature';run=()=>go('applications');
+  }else{
+   const count=missions.filter(p=>p.status==='open').length;
+   title=count?'Des chantiers correspondent à votre activité':'Recherchez votre prochain chantier';
+   description=count?'Consultez les missions disponibles pour vos métiers et communes.':'Définissez vos critères pour découvrir les projets éligibles.';
+   cta='Explorer les chantiers';run=()=>go('projects');
+  }
+  priority.replaceChildren(el('div',{class:'home-priority-copy'},
+   el('span',{class:'eyebrow',text:'VOTRE PROCHAINE ACTION'}),
+   el('h3',{text:title}),el('p',{text:description})),button(cta,run,'primary'));
+ }
  function section(title,view,draw){
   const box=panel(title),content=el('div');box.append(content,button({projects:'Voir les projets',applications:'Voir mes candidatures',conversations:'Ouvrir mes conversations',profile:'Voir mon profil',notifications:'Voir les notifications'}[view],()=>go(view),'link'));grid.append(box);
   return {content,draw};
@@ -224,13 +294,14 @@ async function renderProfessionalHome(n){
  });
  async function load(target,path){
   try{
-   const data=await api(path);if(epoch!==renderEpoch)return false;clear(target.content);target.draw(data,target.content);return {ok:true};
+   const data=await api(path);if(epoch!==renderEpoch)return false;snapshot[path.split('?')[0].replace('/my-','/').slice(1)]=data;clear(target.content);target.draw(data,target.content);updatePriority();return {ok:true};
   }catch(e){
    if(e.stale||e.status===401||epoch!==renderEpoch)return false;
    clear(target.content);target.content.append(el('p',{class:'status-note',text:'Information indisponible. Les autres rubriques restent utilisables.'}),button('Réessayer cette rubrique',()=>action(()=>load(target,path))));return false;
   }
  }
  await Promise.all([[missions,'/projects'],[applications,'/my-applications'],[messages,'/conversations'],[profile,'/my-profile'],[notices,'/notifications?unread_only=true']].map(([target,path])=>load(target,path)));
+ updatePriority();
 }
 async function renderProjects(n){
   const req=appState.user.role==='requester',epoch=renderEpoch,owner=appState.user.id;
