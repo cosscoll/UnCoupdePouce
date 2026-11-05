@@ -25,3 +25,27 @@ test('JSON parser handles fenced model responses without treating them as HTML',
  assert.deepEqual(ai.parseJSON('```json\n{"title":"Exemple"}\n```'),{title:'Exemple'});
  assert.equal(ai.parseJSON('Ceci est une réponse sans JSON.'),null);
 });
+
+test('worker bootstrap failure attempts in-page local engine, never an API call',async()=>{
+ const originalWorker=global.Worker,originalNavigator=global.navigator,originalSecure=global.isSecureContext;
+ let constructed=0;
+ class BrokenWorker{
+  constructor(){constructed++;setImmediate(()=>this.onerror?.({message:'Unable to load module worker'}))}
+  postMessage(){}
+  terminate(){}
+ }
+ try{
+  Object.defineProperty(global,'Worker',{configurable:true,value:BrokenWorker});
+  Object.defineProperty(global,'navigator',{configurable:true,value:{gpu:{}}});
+  Object.defineProperty(global,'isSecureContext',{configurable:true,value:true});
+  await assert.rejects(
+   ai.send({role:'requester',catalog:trades,messages:[{role:'user',content:'Je souhaite refaire mon évier.'}]}),
+   /Worker : .*Web Worker.*Page : .*Moteur IA local inaccessible/);
+  assert.equal(constructed,1);
+ }finally{
+  ai.reset();
+  for(const[k,v]of [['Worker',originalWorker],['navigator',originalNavigator],['isSecureContext',originalSecure]]){
+   if(v===undefined)delete global[k];else Object.defineProperty(global,k,{configurable:true,value:v});
+  }
+ }
+});
