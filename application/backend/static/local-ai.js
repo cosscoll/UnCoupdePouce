@@ -10,7 +10,7 @@ function supported(){
  return typeof Worker==='function'&&!!root.navigator?.gpu&&root.isSecureContext!==false;
 }
 function status(){
- return {configured:supported(),local:true,model:'Qwen2.5-0.5B-Instruct',
+ return {configured:supported(),local:true,model:'Qwen2.5-3B-Instruct (ou 1.5B léger)',
   reason:supported()?'':'Cet appareil ou ce navigateur ne propose pas WebGPU. Essayez Chrome ou Edge à jour sur un ordinateur compatible.'};
 }
 let workerUnavailable=false,mainModulePromise=null;
@@ -111,14 +111,14 @@ async function inference(payload,onProgress){
  }
  return mainThreadInference(payload,onProgress);
 }
-async function send({role,catalog,messages,mode='reply',onProgress}){
+async function send({role,catalog,messages,mode='reply',modelTier='quality',onProgress}){
  if(!['reply','draft','search'].includes(mode))throw Error('Action inconnue');
  if(mode==='draft'&&role!=='requester'||mode==='search'&&role!=='professional')throw Error('Action réservée à un autre espace');
  const items=Array.isArray(catalog)?catalog.filter(t=>t&&t.active!==false).map(t=>({id:t.id,label:t.label,active:true})):[];
  const history=(Array.isArray(messages)?messages:[]).filter(m=>m&&['user','assistant'].includes(m.role)&&typeof m.content==='string')
    .slice(-9).map(m=>({role:m.role,content:m.content.slice(0,1200)}));
  if(!history.some(m=>m.role==='user'))throw Error('Décrivez votre besoin pour que l’IA prépare une proposition.');
- const result=await inference({role,catalog:items,messages:history,mode},onProgress);
+ const result=await inference({role,catalog:items,messages:history,mode,modelTier},onProgress);
  if(mode==='reply')return {reply:normalize(result.text,1600),draft:null,search:null};
  const parsed=parseJSON(result.text);
  if(mode==='draft'){
