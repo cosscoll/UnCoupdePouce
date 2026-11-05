@@ -77,14 +77,14 @@ function menu(){
  const n=clear($('#tabs'));for(const[key,t,i]of items)n.append(el('button',{class:'navlink '+(appState.view===key?'active':''),type:'button','aria-current':appState.view===key?'page':'false',onClick:()=>go(key)},icon(i),t));
 }
 async function render(){
- guidedHelp?.sync();const hasAssistant=!!appState.user&&['requester','professional'].includes(appState.user.role);$('#guided-help-open').hidden=!hasAssistant;$('#chatbot-launcher').hidden=!hasAssistant;
+ guidedHelp?.sync();const hasAssistant=!!appState.user&&['requester','professional'].includes(appState.user.role);$('#chatbot-launcher').hidden=!hasAssistant;
  ++chatEpoch;const epoch=++renderEpoch;clearInterval(chatTimer);chatTimer=null;const u=appState.user;
- $('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#logout').hidden=!u;
+ $('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#account-actions').hidden=true;
  document.body.dataset.space=u?.role||entrySpace;
  if(!u){document.title='Un Coup de Pouce · Votre espace travaux';return}
  $('#actor-role').textContent={requester:'ESPACE PARTICULIER',professional:'ESPACE PROFESSIONNEL',admin:'ADMINISTRATION'}[u.role];
  $('#actor-title').textContent='Bonjour, '+u.name;
- if(!appState.view)appState.view=initialView(u.role);menu();
+ if(!appState.view)appState.view=initialView(u.role);menu();$('#account-actions').hidden=appState.view!=='personal-data';
  const target=clear($('#view'));target.append(el('div',{class:'loading',text:'Chargement de votre espace…'}));const fragment=document.createElement('div');
  try{
   const f={'requester-home':renderRequesterHome,'professional-home':renderProfessionalHome,projects:renderProjects,favorites:renderFavorites,applications:renderApplications,conversations:renderConversations,profile:renderProfile,enterprise:renderEnterprise,admin:renderAdmin,moderation:renderModeration,catalog:renderCatalog,support:renderSupport,notifications:renderNotifications,'personal-data':renderPersonalData}[appState.view];
@@ -1007,7 +1007,7 @@ const guidedHelp=(window.UCPAssistantAI||window.UCPGuidedHelp)?.create({
  }
 })||null;
 function openGuidedHelp(){if(guidedHelp)guidedHelp.open();else msg('L’assistant n’a pas pu être chargé. Rechargez la page pour réessayer.','error')}
-$('#guided-help-open').addEventListener('click',openGuidedHelp);
+
 $('#chatbot-launcher').addEventListener('click',openGuidedHelp);
 window.addEventListener('beforeunload',e=>{if(draftUnsaved()){e.preventDefault();e.returnValue=''}});
 (async()=>{try{await loadCatalog();try{const me=await api('/session');appState.user=me;appState.csrf=me.csrf}catch{}await render()}catch(e){msg('Le serveur ne répond pas. Démarrez UCP puis rechargez cette page.','error')}})();
