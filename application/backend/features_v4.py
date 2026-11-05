@@ -95,14 +95,17 @@ def install(m):
     def visible_project(c,id,user):
         row=c.execute('SELECT * FROM projects WHERE id=?',(id,)).fetchone()
         if not row:error(404,'Projet introuvable')
-        if user['role']=='admin' or row['requester_id']==user['id']:return row
+        if user['role']=='admin' or row['requester_id']==user['id']:return row, []
         if user['role']=='professional' and not row['hidden']:
-            # Only authorized projects or accepted relationships reveal attachments.
-            allowed={x['id'] for x in m.discover_projects(c,user)[0]}
+            if row['status']=='open' and not row['applications_paused']:
+                requester = c.execute('SELECT suspended FROM users WHERE id=?',(row['requester_id'],)).fetchone()
+                profile = c.execute('SELECT * FROM profiles WHERE user_id=?',(user['id'],)).fetchone()
+                if not requester['suspended'] and profile and profile['approved']:
+                    matches = m.project_profile_matches(row, profile, m.linked_application_profiles(c, user['id']))
+                    if matches:return row, matches
             selected=c.execute("SELECT id FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone()
-            if id in allowed:return row
             if selected:
-                m.check_conversation(c,selected['id'],user['id']);return row
+                m.check_conversation(c,selected['id'],user['id']);return row, []
         error(404,'Projet introuvable')
 
     @app.get('/api/catalog')
@@ -228,7 +231,7 @@ def install(m):
     @app.get('/api/v4/projects/{id}')
     def project_detail(id:int,user=Depends(m.get_user)):
         with m.authenticated_db(user,write=False) as c:
-            r=visible_project(c,id,user)
+            r,matches=visible_project(c,id,user)
             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
             row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version')};row['trades']=list(m.project_trades(r))
             if r['requester_id']==user['id']:
@@ -242,6 +245,7 @@ def install(m):
             if user['role']=='professional':
                 own=c.execute('SELECT id,status FROM applications WHERE project_id=? AND professional_id=?',(id,user['id'])).fetchone()
                 row['own_application']=dict(own) if own else None
+                row['application_profiles']=[] if own else matches
             return row
 
     @app.post('/api/v4/reports',status_code=201)

@@ -87,10 +87,34 @@ test('project text stays text even when it resembles executable markup',async()=
 });
 
 test('enterprise matching sends the linked application route',async()=>{
- const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/v4/projects/8':{id:8,title:'Travaux de test',description:'Description fictive',town:'Toulouse',trades:['plomberie'],status:'open',photos:[]},'POST /api/projects/8/apply-linked/4':{id:12},'/api/my-applications':{items:[]}});try{
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/v4/projects/8':{id:8,title:'Travaux de test',description:'Description fictive',town:'Toulouse',trades:['plomberie'],status:'open',photos:[],application_profiles:[{profile:'linked',linked_profile_id:4,alias:'Atelier',trades:['plomberie']}]},'POST /api/projects/8/apply-linked/4':{id:12},'/api/my-applications':{items:[]}});try{
   await x.w.projectDetail({id:8,matching_individual_profile:false,matching_linked_profile_id:4});
   [...x.w.document.querySelectorAll('button')].find(b=>b.textContent==='Proposer ma candidature').click();await tick();
   assert.ok(x.calls.some(c=>c.url==='/api/projects/8/apply-linked/4'));
+ }finally{x.close()}
+});
+
+test('multi-trade candidacy requires an explicit current profile and sends only that profile',async()=>{
+ const x=await boot({
+  '/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},
+  '/api/v4/projects/8':{id:8,title:'Travaux de test',description:'Description fictive',town:'Toulouse',trades:['plomberie','electricite'],status:'open',photos:[],application_profiles:[
+   {profile:'individual',trades:['plomberie']},
+   {profile:'linked',linked_profile_id:7,alias:'Atelier électrique',trades:['electricite']},
+  ]},
+  'POST /api/projects/8/apply-linked/7':{id:12},
+  '/api/my-applications':{items:[]},
+ });
+ try{
+  await x.w.projectDetail({id:8,matching_linked_profile_id:4});
+  const select=x.w.document.querySelector('[name="application-profile"]');
+  assert.equal(select.value,'');assert.equal(select.required,true);
+  assert.match(select.options[1].textContent,/Votre profil individuel.*Plomberie/i);
+  assert.match(select.options[2].textContent,/Atelier électrique.*Électricité/i);
+  submit(x.w,'#view form');
+  assert.equal(x.calls.filter(call=>call.method==='POST').length,0);
+  select.value='1';
+  submit(x.w,'#view form');submit(x.w,'#view form');await tick();
+  assert.deepEqual(x.calls.filter(call=>call.method==='POST').map(call=>call.url),['/api/projects/8/apply-linked/7']);
  }finally{x.close()}
 });
 
@@ -965,7 +989,7 @@ test('favorite titles are rendered as literal text and never as active markup',a
 });
 
 test('an application rate refusal preserves the project and waits for an explicit retry',async()=>{
- let attempts=0;const x=await boot({'/api/session':savedProSession,'/api/v4/projects/28':{...favoriteProject,photos:[]},'POST /api/projects/28/apply':()=>++attempts===1?{status:429,data:{detail:'Trop de candidatures rapprochées. Réessayez dans 60 s. Aucune nouvelle candidature n’a été enregistrée.'}}:{id:88},'/api/my-applications':{items:[]}});
+ let attempts=0;const x=await boot({'/api/session':savedProSession,'/api/v4/projects/28':{...favoriteProject,photos:[],application_profiles:[{profile:'individual',trades:['plomberie']}]},'POST /api/projects/28/apply':()=>++attempts===1?{status:429,data:{detail:'Trop de candidatures rapprochées. Réessayez dans 60 s. Aucune nouvelle candidature n’a été enregistrée.'}}:{id:88},'/api/my-applications':{items:[]}});
  try{
   await x.w.projectDetail(favoriteProject);savedButton(x.w,'Proposer ma candidature','#view').click();await tick();
   assert.equal(attempts,1);assert.match(x.w.document.querySelector('#alert').textContent,/60 s/);assert.match(x.w.document.querySelector('#view').textContent,/Mission fictive/);assert.ok(savedButton(x.w,'Proposer ma candidature','#view'));assert.ok(!x.calls.some(c=>c.url==='/api/my-applications'));
