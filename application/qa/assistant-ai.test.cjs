@@ -193,3 +193,26 @@ test('restricted browser storage does not prevent in-session consent',()=>{
  nextPage.ai.open();
  assert.equal(nextPage.doc.querySelector('.ai-consent').hidden,false);
 });
+
+test('simple chat never shows discard proposal when no draft or search was produced',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ await say(h,'Tu peux m’aider à faire quoi ?');
+ assert.equal(btn(h.doc,'Ignorer la proposition'),undefined);
+ assert.equal(h.doc.querySelector('.ai-options').children.length,0);
+});
+test('quality mode defaults to a stronger local model and can be switched to light',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ const select=h.doc.querySelector('select.ai-quality-select');
+ assert.ok(select,'quality selector lives in collapsed technical details');
+ assert.equal(select.value,'quality');
+ await say(h,'Comment préparer mon annonce à Toulouse ?');
+ assert.equal(h.calls.at(-1).modelTier,'quality');
+ select.value='light';
+ select.dispatchEvent(new h.doc.defaultView.Event('change',{bubbles:true}));
+ assert.equal(h.storage.getItem('ucp.ai.model-quality.v1'),'light');
+ assert.equal(h.resets,1,'switch releases the previously loaded model');
+ await say(h,'Pour une douche à changer ?');
+ assert.equal(h.calls.at(-1).modelTier,'light');
+ const next=harness('requester',true,h.storage);next.ai.open();
+ assert.equal(next.doc.querySelector('select.ai-quality-select').value,'light');
+});
