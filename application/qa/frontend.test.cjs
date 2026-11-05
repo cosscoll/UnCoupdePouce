@@ -1192,7 +1192,7 @@ test('chatbot appends new messages without replacing earlier log nodes',async()=
 });
 
 test('unavailable chatbot module leaves the core application usable',async()=>{
- const x=await boot({},w=>Object.defineProperty(w,'UCPGuidedHelp',{configurable:true,get:()=>undefined,set:()=>{}}));try{assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.match(x.w.document.querySelector('#view').textContent,/Vos projets/);x.w.openGuidedHelp();assert.match(x.w.document.querySelector('#alert').textContent,/assistant n’a pas pu être chargé/)}finally{x.close()}
+ const x=await boot({},w=>Object.defineProperty(w,'UCPGuidedHelp',{configurable:true,get:()=>undefined,set:()=>{}}));try{assert.equal(x.w.document.querySelector('#dashboard').hidden,false);assert.ok(x.w.document.querySelector('#view .project-search'),'la recherche de projets reste utilisable');x.w.openGuidedHelp();assert.match(x.w.document.querySelector('#alert').textContent,/assistant n’a pas pu être chargé/)}finally{x.close()}
 });
 
 const enterpriseEffectsData={enterprise:{id:4,label:'Entreprise fictive'},members:[{id:8,alias:'Equipe plomberie',trades:['plomberie'],zones:['Toulouse'],is_active:1}],pricing:{active_artisans:1,monthly_ht:35,linked_artisans_active:1,manager_counted_as_artisan:false}};
