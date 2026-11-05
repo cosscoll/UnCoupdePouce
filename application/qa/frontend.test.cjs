@@ -480,6 +480,34 @@ test('application tracking distinguishes closed projects and filters without sug
 });
 
 // Adversarial audit: delayed responses and changing interface permissions.
+test('account password form confirms the new password and signs out after success',async()=>{
+ const x=await boot({
+  '/api/account/export':{user:{name:'Camille',email:'camille-personnel@ucp.test',role:'requester'},own_projects:[],own_applications:[],own_messages:[]},
+  '/api/account/sessions':{active_sessions:2,password_change_available:true},
+  '/api/account/activity':{items:[]},
+  'POST /api/account/password':{ok:true},
+ },null,'http://localhost:8765/particulier#personal-data');
+ try{
+  const form=x.w.document.querySelector('[name=current_password]').form;
+  const confirm=form.querySelector('input:not([name])');
+  input(x.w,'[name=current_password]','Original-test-password');
+  input(x.w,'[name=new_password]','Replacement-test-password');
+  confirm.value='Different-test-password';
+  form.dispatchEvent(new x.w.Event('submit',{cancelable:true}));await tick();
+  assert.ok(confirm.validationMessage);
+  assert.ok(!x.calls.some(call=>call.url==='/api/account/password'));
+  confirm.value='Replacement-test-password';
+  confirm.dispatchEvent(new x.w.Event('input',{bubbles:true}));
+  form.dispatchEvent(new x.w.Event('submit',{cancelable:true}));await tick();
+  assert.deepEqual(x.calls.filter(call=>call.url==='/api/account/password').map(call=>call.body),[
+   {current_password:'Original-test-password',new_password:'Replacement-test-password'},
+  ]);
+  assert.equal(x.w.document.querySelector('#dashboard').hidden,true);
+  assert.equal(x.w.document.querySelector('#login-form').hidden,false);
+  assert.match(x.w.document.querySelector('#alert').textContent,/Mot de passe modifié/);
+ }finally{x.close()}
+});
+
 test('audit: old account response cannot return private data after logout',async()=>{
  let finish;const x=await boot({'/api/slow-private':()=>new Promise(resolve=>finish=resolve),'POST /api/logout':{ok:true}});
  try{

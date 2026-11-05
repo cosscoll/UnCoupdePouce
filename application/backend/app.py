@@ -11,11 +11,13 @@ from typing import Literal, Annotated
 from fastapi import FastAPI, Request, Response, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, EmailStr, Field, StrictInt, field_validator
+from starlette.concurrency import run_in_threadpool
+from pydantic import BaseModel, EmailStr, Field, SecretStr, StrictInt, ValidationError, field_validator
 
 ROOT = Path(__file__).parent
 import sys
 sys.path.insert(0, str(ROOT))
+from demo_access import DEMO_ROLES
 from hosting import Hosting, database_url
 from project_budget import Budget, MAX_BUDGET
 HOSTING = Hosting.from_env()
@@ -90,6 +92,9 @@ def init_db():
           CREATE TABLE IF NOT EXISTS auth_failures(email TEXT PRIMARY KEY,
             attempts INTEGER NOT NULL DEFAULT 0, last_attempt INTEGER NOT NULL DEFAULT 0,
             locked_until INTEGER NOT NULL DEFAULT 0);
+          CREATE TABLE IF NOT EXISTS password_change_attempts(
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            attempts INTEGER NOT NULL, last_attempt INTEGER NOT NULL, locked_until INTEGER NOT NULL, PRIMARY KEY(user_id));
           CREATE TABLE IF NOT EXISTS profiles(user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
             trade TEXT NOT NULL, town TEXT NOT NULL, siren TEXT, approved INTEGER NOT NULL DEFAULT 0,
             subscription_active INTEGER NOT NULL DEFAULT 0, approved_at TEXT);
@@ -359,6 +364,10 @@ class Register(BaseModel):
 class Login(BaseModel):
     email: str = Field(min_length=5,max_length=254)
     password: str = Field(min_length=1,max_length=128)
+
+class PasswordChange(BaseModel):
+    current_password: SecretStr = Field(min_length=1,max_length=128)
+    new_password: SecretStr = Field(min_length=12,max_length=128)
 
 class Profile(BaseModel):
     trade: str
@@ -686,7 +695,71 @@ def own_sessions(request:Request,user=Depends(get_user)):
     with authenticated_db(user,write=False) as c:
         total=c.execute('SELECT COUNT(*) FROM sessions WHERE user_id=? AND expires>?',
                         (user['id'],int(time.time()))).fetchone()[0]
-    return {'active_sessions':total,'current':True,'laboratory':True}
+    return {'active_sessions':total,'current':True,'laboratory':True,
+            'password_change_available':user['email'] not in DEMO_ROLES}
+
+def change_password(user, body):
+    if user['email'] in DEMO_ROLES:
+        error(403,'Le mot de passe de ce compte de démonstration est géré par l’opérateur.')
+
+    uid=user['id']
+    credentials='SELECT pw_salt,pw_hash FROM users WHERE id=?'
+    attempts='SELECT attempts,last_attempt,locked_until FROM password_change_attempts WHERE user_id=?'
+    throttle_message='Trop de tentatives. Réessayez dans quelques minutes.'
+    with authenticated_db(user) as c:
+        previous=c.execute(credentials,(uid,)).fetchone()
+        failures=c.execute(attempts,(uid,)).fetchone()
+        if failures and failures['locked_until']>int(time.time()):
+            error(429,throttle_message)
+
+    current_password=body.current_password.get_secret_value()
+    new_password=body.new_password.get_secret_value()
+    correct=hmac.compare_digest(pw(current_password,previous['pw_salt']),previous['pw_hash'])
+    if correct and current_password==new_password:
+        error(422,'Choisissez un mot de passe différent du mot de passe actuel.')
+    if correct:
+        salt=secrets.token_hex(16)
+        digest=pw(new_password,salt)
+
+    with authenticated_db(user,write=True) as c:
+        current=c.execute(credentials,(uid,)).fetchone()
+        if current['pw_salt']!=previous['pw_salt'] or not hmac.compare_digest(current['pw_hash'],previous['pw_hash']):
+            error(409,'Les identifiants ont changé. Reconnectez-vous.')
+        failures=c.execute(attempts,(uid,)).fetchone()
+        stamp=int(time.time())
+        if failures and failures['locked_until']>stamp:
+            error(429,throttle_message)
+        if correct:
+            c.execute('UPDATE users SET pw_salt=?,pw_hash=? WHERE id=?',(salt,digest,uid))
+            c.execute('DELETE FROM resets WHERE user_id=?',(uid,))
+            c.execute('DELETE FROM sessions WHERE user_id=?',(uid,))
+            c.execute('DELETE FROM password_change_attempts WHERE user_id=?',(uid,))
+            c.execute('DELETE FROM auth_failures WHERE email=?',(user['email'],))
+            c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
+                      (uid,'password_changed','user',uid,now()))
+            return
+
+        count=failures['attempts']+1 if failures and failures['last_attempt']>=stamp-900 else 1
+        locked_until=stamp+900 if count>=5 else 0
+        c.execute('''INSERT INTO password_change_attempts(user_id,attempts,last_attempt,locked_until) VALUES(?,?,?,?)
+                     ON CONFLICT(user_id) DO UPDATE SET attempts=excluded.attempts,
+                     last_attempt=excluded.last_attempt,locked_until=excluded.locked_until''',(uid,count,stamp,locked_until))
+    if locked_until:
+        error(429,throttle_message)
+    error(403,'Mot de passe actuel incorrect.')
+
+
+@app.post('/api/account/password')
+async def update_password(request:Request,response:Response,user=Depends(get_user)):
+    # FastAPI validation errors can include submitted values; return only a fixed message.
+    try:
+        body=PasswordChange.model_validate(await request.json())
+    except (ValidationError,ValueError,TypeError):
+        error(422,'Saisissez le mot de passe actuel et un nouveau mot de passe de 12 à 128 caractères.')
+    await run_in_threadpool(change_password,user,body)
+    response.delete_cookie('ucp_lab_sid',path='/',httponly=True,secure=HOSTING.staging,samesite='strict')
+    return {'ok':True}
+
 
 @app.post('/api/account/sessions/revoke-others')
 def revoke_other_sessions(request:Request,user=Depends(get_user)):
