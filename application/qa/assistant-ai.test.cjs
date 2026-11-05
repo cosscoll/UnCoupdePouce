@@ -2,7 +2,7 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {JSDOM}=require('jsdom');
 const assistant=require('../backend/static/assistant-ai.js');
-function harness(role='requester',configured=true,sharedStorage=null){
+function harness(role='requester',configured=true,sharedStorage=null,extraContext={}){
  const dom=new JSDOM('<!doctype html><html><body><dialog open></dialog></body></html>',{url:'https://ucp.test'});
  const doc=dom.window.document,dialog=doc.querySelector('dialog'),storage=sharedStorage||dom.window.localStorage;
  let actor={id:123,role},session='csrf-demo',applied=null,searched=null,resetCount=0;
@@ -22,7 +22,7 @@ function harness(role='requester',configured=true,sharedStorage=null){
   reset:()=>{resetCount++}
  };
  const ai=assistant.create({el,button,local,storage,
-  context:()=>({actor,session,role,catalog:[{id:'plomberie',label:'Plomberie'}],wizardStep:null}),
+  context:()=>({actor,session,role,catalog:[{id:'plomberie',label:'Plomberie'}],wizardStep:null,...extraContext}),
   show:node=>{dialog.replaceChildren(node);dialog.open=true},close:()=>{dialog.open=false},
   navigate:()=>{},apply:async d=>{applied=d;return true},search:async s=>{searched=s;return true}
  });
@@ -215,4 +215,38 @@ test('quality mode defaults to a stronger local model and can be switched to lig
  assert.equal(h.calls.at(-1).modelTier,'light');
  const next=harness('requester',true,h.storage);next.ai.open();
  assert.equal(next.doc.querySelector('select.ai-quality-select').value,'light');
+});
+
+test('assistant uses current requester draft and gives a relevant first action',async()=>{
+ const draftContext={title:'Rénover ma salle de bain',description:'Changer la douche et le carrelage',
+  town:'Blagnac',trades:['plomberie'],timing:'month'};
+ const h=harness('requester',true,null,{draftContext});
+ h.ai.open();
+ btn(h.doc,'Améliorer mon brouillon').click();
+ assert.match(h.doc.querySelector('textarea').value,/brouillon actuel/);
+ h.doc.querySelector('input[type=checkbox]').click();
+ await say(h,h.doc.querySelector('textarea').value);
+ assert.equal(h.calls.length,1);
+ assert.deepEqual(h.calls[0].draftContext,draftContext);
+ assert.equal(h.calls[0].searchContext,undefined);
+});
+test('professional search context is forwarded without showing requester suggestions',async()=>{
+ const searchContext={q:'plomberie',trade:'plomberie',town:'Toulouse'};
+ const h=harness('professional',true,null,{searchContext});
+ h.ai.open();
+ assert.ok(btn(h.doc,'Affiner mes critères'));
+ h.doc.querySelector('input[type=checkbox]').click();
+ await say(h,'Affinez ma recherche');
+ assert.deepEqual(h.calls[0].searchContext,searchContext);
+ assert.equal(h.calls[0].draftContext,undefined);
+});
+test('if the GPU falls back to light mode, the user is informed and the next message stays light',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ h.response={reply:'Je peux vous accompagner dans votre projet.',draft:null,search:null,modelTier:'light',downgraded:true};
+ await say(h,'Bonjour, peux-tu aider pour ma salle de bain ?');
+ assert.equal(h.doc.querySelector('select.ai-quality-select').value,'light');
+ assert.match(h.doc.body.textContent,/chargé automatiquement/);
+ assert.equal(h.storage.getItem('ucp.ai.model-quality.v1'),'light');
+ await say(h,'Peux-tu préparer les questions sur la douche ?');
+ assert.equal(h.calls.at(-1).modelTier,'light');
 });
