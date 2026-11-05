@@ -13,26 +13,47 @@ function status(){
  return {configured:supported(),local:true,model:'Qwen2.5-0.5B-Instruct',
   reason:supported()?'':'Cet appareil ou ce navigateur ne propose pas WebGPU. Essayez Chrome ou Edge à jour sur un ordinateur compatible.'};
 }
+let workerUnavailable=false,mainModulePromise=null;
 function reset(){
  if(worker){worker.terminate();worker=null}
- for(const j of jobs.values())j.reject(Error('La conversation a été interrompue.'))
- jobs.clear();
+ for(const j of jobs.values())j.reject(Error('La conversation a été interrompue.'));
+ jobs.clear();workerUnavailable=false;
+ const prior=mainModulePromise;mainModulePromise=null;
+ prior?.then(mod=>mod.resetEngine?.()).catch(()=>{});
+}
+function fallbackError(message,details){
+ const e=Error(message);e.fallback=true;
+ if(details)e.details=details;
+ return e;
+}
+async function mainThreadInference(payload,onProgress){
+ if(!mainModulePromise)mainModulePromise=import('/assets/local-ai-engine.js').catch(e=>{mainModulePromise=null;throw Error('Moteur IA local inaccessible depuis la page : '+(e?.message||e))});
+ const module=await mainModulePromise;
+ return module.generate(payload,onProgress);
 }
 function ensureWorker(){
  if(worker)return worker;
  const w=new Worker(path,{type:'module',name:'ucp-free-ai'});
- w.onmessage=e=>{
-  const msg=e.data||{},job=jobs.get(msg.id);if(!job)return;
-  if(msg.type==='progress'){job.progress?.(String(msg.text||'Chargement du modèle…'),msg.progress);return}
-  jobs.delete(msg.id);
-  if(msg.type==='result')job.resolve({text:msg.text,mode:msg.mode});
-  else job.reject(Error(msg.error||'Calcul local indisponible.'));
- };
- w.onerror=()=>{
-  const error=Error('Échec du chargement du moteur IA local. Vérifiez votre navigateur et votre connexion pour le premier téléchargement.');
+ const onFailure=()=>{
+  const error=fallbackError('Le Web Worker du navigateur ne parvient pas à lancer l’IA locale.');
   for(const j of jobs.values())j.reject(error);
   jobs.clear();w.terminate();if(worker===w)worker=null;
  };
+ w.onmessage=e=>{
+  const msg=e.data||{};
+  if(msg.type==='ready')return;
+  const job=jobs.get(msg.id);if(!job)return;
+  if(msg.type==='progress'){job.progress?.(String(msg.text||'Chargement du modèle…'),msg.progress);return}
+  jobs.delete(msg.id);
+  if(msg.type==='result')job.resolve({text:msg.text,mode:msg.mode});
+  else if(msg.type==='error'){
+   const err=Error(String(msg.error||'Calcul local indisponible.'));
+   err.fallback=msg.stage==='import'||/WebGPU non disponible dans ce contexte/.test(err.message);
+   job.reject(err);
+  }else job.reject(Error('Réponse inattendue du moteur local.'));
+ };
+ w.onerror=onFailure;
+ w.onmessageerror=onFailure;
  worker=w;return w;
 }
 function parseJSON(text){
@@ -68,13 +89,27 @@ function validateSearch(payload,catalog){
  return out;
 }
 function any(values){return values.some(Boolean)}
-function inference(payload,onProgress){
- if(!supported())return Promise.reject(Error(status().reason));
- return new Promise((resolve,reject)=>{
-  const id=++nextId;jobs.set(id,{resolve,reject,progress:onProgress});
-  try{ensureWorker().postMessage({id,payload})}
-  catch(e){jobs.delete(id);reject(e)}
- });
+async function inference(payload,onProgress){
+ if(!supported())throw Error(status().reason);
+ if(!workerUnavailable){
+  try{
+   return await new Promise((resolve,reject)=>{
+    const id=++nextId;jobs.set(id,{resolve,reject,progress:onProgress});
+    try{ensureWorker().postMessage({id,payload})}
+    catch(e){jobs.delete(id);reject(fallbackError('Le navigateur refuse d’ouvrir le Worker : '+(e?.message||e)))}
+   });
+  }catch(e){
+   if(!e.fallback)throw e;
+   workerUnavailable=true;
+   if(worker){worker.terminate();worker=null}
+   onProgress?.('Le moteur isolé ne peut pas démarrer. Deuxième méthode locale en cours…',0);
+   try{return await mainThreadInference(payload,onProgress)}
+   catch(second){
+    throw Error('Le modèle IA ne peut pas être chargé sur ce navigateur. Worker : '+e.message+' / Page : '+(second?.message||second));
+   }
+  }
+ }
+ return mainThreadInference(payload,onProgress);
 }
 async function send({role,catalog,messages,mode='reply',onProgress}){
  if(!['reply','draft','search'].includes(mode))throw Error('Action inconnue');
