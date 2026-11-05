@@ -2,11 +2,11 @@
 (function(root){
 'use strict';
 function create(hooks){
- let state=null,ui=null;
+ let state=null,ui=null,localConsent=false;
  const el=hooks.el,button=hooks.button,get=()=>hooks.context();
  const valid=s=>state===s&&s.actor===get().actor&&s.session===get().session;
- function sync(){if(state&&!valid(state)){hooks.local.reset();state=null;ui=null;hooks.close()}}
- function clear(){hooks.local.reset();state=null;ui=null}
+ function sync(){if(state&&!valid(state)){hooks.local.reset();state=null;ui=null;localConsent=false;hooks.close()}}
+ function clear(){hooks.local.reset();state=null;ui=null;localConsent=false}
  function open(){
   sync();
   const c=get();
@@ -16,7 +16,7 @@ function create(hooks){
    if(!state.busy)ui.querySelector('textarea')?.focus();
    return;
   }
-  const s={actor:c.actor,session:c.session,role:c.role,messages:[],pending:null,busy:false,consent:false};
+  const s={actor:c.actor,session:c.session,role:c.role,messages:[],pending:null,busy:false,consent:localConsent};
   state=s;
   const model=hooks.local.status();
   const isRequester=s.role==='requester';
@@ -36,7 +36,7 @@ function create(hooks){
   const draft=button('Préparer mon annonce avec l’IA',()=>invoke('draft'),'ai-action');
   const search=button('Configurer ma recherche avec l’IA',()=>invoke('search'),'ai-action');
   const actions=el('div',{class:'ai-actions'},isRequester?draft:search);
-  const newChat=button('Nouvelle conversation',()=>{
+  const newChat=button('Nouveau chat',()=>{
    if(!valid(s)||s.busy)return;
    state=null;ui=null;open();
   },'ai-new-chat');
@@ -183,7 +183,7 @@ function create(hooks){
   textarea.addEventListener('keydown',e=>{
    if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();invoke('reply',textarea.value)}
   });
-  acknowledge.addEventListener('change',()=>{s.consent=acknowledge.checked;allowed()});
+  acknowledge.addEventListener('change',()=>{s.consent=acknowledge.checked;localConsent=s.consent;allowed()});
   hooks.show(ui);
   allowed();
   if(!model.configured)status.textContent=model.reason||'Ce navigateur ne prend pas en charge le modèle local.';
