@@ -33,14 +33,14 @@ def test_budget_edits_merge_omitted_fields_and_allow_explicit_null_or_zero(setup
     v=setup;call=v['call']
     pid=call(v['requester'],v['rcsrf'],'post','/api/projects',json=BASE|{'budget_min':1000,'budget_max':3000}).json()['id']
     path=f'/api/projects/{pid}'
-    assert call(v['requester'],v['rcsrf'],'put',path,json=BASE).status_code==200
+    assert call(v['requester'],v['rcsrf'],'put',path,json=BASE|{'content_version':0}).status_code==200
     detail=v['requester'].get(f'/api/v4/projects/{pid}').json();assert (detail['budget_min'],detail['budget_max'])==(1000,3000)
-    assert call(v['requester'],v['rcsrf'],'put',path,json=BASE|{'title':'Titre non applicable','budget_max':500}).status_code==422
+    assert call(v['requester'],v['rcsrf'],'put',path,json=BASE|{'content_version':1,'title':'Titre non applicable','budget_max':500}).status_code==422
     assert v['requester'].get(f'/api/v4/projects/{pid}').json()['title']==BASE['title']
-    assert call(v['requester'],v['rcsrf'],'put',path,json=BASE|{'budget_min':None,'budget_max':0}).status_code==200
+    assert call(v['requester'],v['rcsrf'],'put',path,json=BASE|{'content_version':1,'budget_min':None,'budget_max':0}).status_code==200
     detail=v['requester'].get(f'/api/v4/projects/{pid}').json();assert detail['budget_min'] is None and detail['budget_max']==0
     exported=v['requester'].get('/api/account/export').json()['own_projects'][0];assert exported['budget_max']==0
-    assert call(v['other'],v['ocsrf'],'put',path,json=BASE|{'budget_min':0,'budget_max':100}).status_code==403
+    assert call(v['other'],v['ocsrf'],'put',path,json=BASE|{'content_version':2,'budget_min':0,'budget_max':100}).status_code==403
 
 
 def test_budget_filter_uses_overlap_and_never_converts_unknown_to_zero(setup):
@@ -62,7 +62,7 @@ def test_budget_filter_uses_overlap_and_never_converts_unknown_to_zero(setup):
 def test_budget_cannot_change_after_a_candidate_applies(setup):
     v=setup;approve(v);call=v['call'];pid=call(v['requester'],v['rcsrf'],'post','/api/projects',json=BASE|{'budget_min':100,'budget_max':400}).json()['id']
     assert call(v['pro'],v['pcsrf'],'post',f'/api/projects/{pid}/apply').status_code==201
-    assert call(v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=BASE|{'budget_min':200,'budget_max':300}).status_code==409
+    assert call(v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=BASE|{'content_version':0,'budget_min':200,'budget_max':300}).status_code==409
     item=v['requester'].get(f'/api/v4/projects/{pid}').json();assert (item['budget_min'],item['budget_max'])==(100,400)
 
 

@@ -152,13 +152,27 @@ def test_public_host_rejected(env):
     assert evil.get('/api/health').status_code==403
     assert evil.get('/').status_code==403
 
-def test_refresh_session_csrf_rotation(setup):
+def test_opening_another_tab_keeps_session_csrf_valid_and_scoped(setup):
     v=setup;c=v['requester']
-    me=c.get('/api/session')
-    assert me.status_code==200
-    assert me.json()['csrf']!=v['rcsrf']
-    assert v['call'](c,v['rcsrf'],'post','/api/projects',json={'title':'Un projet fictif','description':'Demande de peinture pour une pièce imaginaire','town':'Toulouse','trade':'peinture'}).status_code==403
-    assert v['call'](c,me.json()['csrf'],'post','/api/projects',json={'title':'Un projet fictif','description':'Demande de peinture pour une pièce imaginaire','town':'Toulouse','trade':'peinture'}).status_code==201
+    with TestClient(v['mod'].app) as tab:
+        tab.cookies.update(c.cookies)
+        me=tab.get('/api/session')
+        assert me.status_code==200
+        assert me.json()['csrf']==v['rcsrf']
+        assert me.json()['csrf']!=c.cookies['ucp_lab_sid']
+    body={'title':'Un projet fictif','description':'Demande de peinture pour une pièce imaginaire','town':'Toulouse','trade':'peinture'}
+    assert v['call'](c,v['ocsrf'],'post','/api/projects',json=body).status_code==403
+    assert v['call'](c,v['rcsrf'],'post','/api/projects',json=body).status_code==201
+
+
+def test_legacy_session_can_still_write_after_another_tab_reads_it(setup):
+    v=setup;c=v['requester'];legacy_token='previous-release-fictional-csrf'
+    with v['mod'].connect() as db:
+        db.execute('UPDATE sessions SET csrf_hash=? WHERE user_id=?',(v['mod'].hash_token(legacy_token),v['rid']))
+    current=c.get('/api/session').json()['csrf']
+    assert current!=legacy_token and c.get('/api/session').json()['csrf']==current
+    assert v['call'](c,legacy_token,'put','/api/v4/account',json={'name':'Ancienne fenêtre'}).status_code==200
+    assert v['call'](c,current,'put','/api/v4/account',json={'name':'Fenêtre actuelle'}).status_code==200
 
 def test_wrong_trade_must_not_apply_even_if_approved(setup):
     v=setup;pid=project(v,'plomberie')
@@ -333,7 +347,7 @@ def test_change_secondary_trades_resets_approval_and_test_subscription(setup):
 # v3.3: operational changes must not bypass ownership, state, or chat permissions.
 def test_owner_can_edit_open_project_before_applications(setup):
     v=setup; pid=project(v)
-    data={'title':'Peinture fictive à Toulouse','description':'Peinture intérieure dans un projet de démonstration uniquement.','trade':'peinture','town':'Toulouse'}
+    data={'title':'Peinture fictive à Toulouse','description':'Peinture intérieure dans un projet de démonstration uniquement.','trade':'peinture','town':'Toulouse','content_version':0}
     r=v['call'](v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=data)
     assert r.status_code==200,r.text
     owned=v['requester'].get('/api/projects').json()['items'][0]
@@ -346,7 +360,7 @@ def test_edit_prevented_once_pro_has_applied(setup):
     v=setup;pid=project(v);approve(v)
     assert v['call'](v['pro'],v['pcsrf'],'post',f'/api/projects/{pid}/apply').status_code==201
     attempt=v['call'](v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json={
-        'title':'Projet modifié fictif','description':'On change la description pour tromper le professionnel.','trade':'plomberie','town':'Toulouse'})
+        'title':'Projet modifié fictif','description':'On change la description pour tromper le professionnel.','trade':'plomberie','town':'Toulouse','content_version':0})
     assert attempt.status_code==409
 
 
@@ -721,7 +735,7 @@ def test_project_blocks_contact_disclosure_before_selection(setup,payload_field,
 def test_edit_project_revalidates_contact_and_preserves_original(setup):
     v=setup;pid=project(v)
     data={'title':'Une fuite plomberie', 'description':'Appelez-moi au +33 6 12 34 56 78 pour une visite.',
-          'town':'Toulouse','trade':'plomberie'}
+          'town':'Toulouse','trade':'plomberie','content_version':0}
     result=v['call'](v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=data)
     assert result.status_code==422
     items=v['requester'].get('/api/projects').json()['items']

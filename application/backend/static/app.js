@@ -45,7 +45,7 @@ async function api(path,o={}){
    stopDraft();appState.projectFilters=null;appState.user=null;appState.csrf=null;
    await render();text='Votre session a expiré. Reconnectez-vous.';
   }
-  throw Object.assign(Error(text),{status:res.status,retryable:res.status>=500||res.status===408||res.status===429});
+  throw Object.assign(Error(text.message||text),{code:data.detail?.code,status:res.status,retryable:res.status>=500||res.status===408||res.status===429});
  }
  return data;
 }
@@ -424,7 +424,73 @@ function renderCandidateCards(box,apps,projectId=null){
   }
   update();
 }
-function editProject(d){const f=el('form',{},field('Titre','title','text',{value:d.title,minlength:5,maxlength:120}),field('Commune','town','text',{value:d.town,maxlength:90}),field('Description','description','textarea',{value:d.description,minlength:20}),el('div',{class:'budget-fields'},amountField('Budget minimum facultatif (€)','budget_min',d.budget_min),amountField('Budget maximum facultatif (€)','budget_max',d.budget_max)),el('p',{class:'hint',text:'Les métiers restent identiques. Les modifications sont bloquées après la première candidature.'}),el('button',{class:'primary',type:'submit',text:'Enregistrer les modifications'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/projects/'+d.id,{method:'PUT',body:{...formValue(f),trade:d.trade,budget_min:amountValue(formValue(f).budget_min),budget_max:amountValue(formValue(f).budget_max)}}),'Projet modifié.');if(r){$('#dialog').close();render()}});showDialog('Modifier votre demande',f)}
+function editProject(d){
+ let base=d;
+ const fields={title:'Titre',town:'Commune',description:'Description',budget_min:'Budget minimum',budget_max:'Budget maximum'};
+ const status=el('p',{class:'status-note',role:'status',hidden:true});
+ const published=el('section',{class:'status-note',hidden:true});
+ const save=el('button',{class:'primary',type:'submit',text:'Enregistrer les modifications'});
+ const reload=button('Charger la version actuelle',async()=>{
+  if(acting||!active())return;
+  await action(async()=>{
+   try{
+    const latest=await api('/v4/projects/'+d.id);
+    if(!active())return;
+    for(const key of Object.keys(fields)){
+     const input=f.elements.namedItem(key);
+     if(input.value===String(base[key]??''))input.value=latest[key]??'';
+    }
+    base=latest;
+    published.replaceChildren(el('h4',{text:'Version actuellement publiée'}),
+     ...Object.entries(fields).map(([key,label])=>el('p',{},el('strong',{text:label+' · '}),String(latest[key]??'Non renseigné'))),
+     el('p',{text:'Métiers · '+tradeNames(latest)}));
+    published.hidden=false;
+    reload.hidden=true;
+    save.disabled=latest.content_editable===false||latest.status!=='open';
+    feedback(save.disabled?'Cette annonce est désormais fermée aux modifications.':'Version actuelle chargée. Vos modifications sont conservées. Comparez les deux versions avant d’enregistrer.');
+    status.focus();
+   }catch(e){if(active()&&!e.stale)feedback(e.message)}
+  });
+ });
+ reload.hidden=true;
+ const f=el('form',{},field(fields.title,'title','text',{value:d.title,minlength:5,maxlength:120}),
+  field(fields.town,'town','text',{value:d.town,maxlength:90}),
+  field(fields.description,'description','textarea',{value:d.description,minlength:20}),
+  el('div',{class:'budget-fields'},amountField(fields.budget_min+' facultatif (€)','budget_min',d.budget_min),amountField(fields.budget_max+' facultatif (€)','budget_max',d.budget_max)),
+  el('p',{class:'hint',text:'Les métiers restent identiques. Les modifications sont bloquées après la première candidature.'}),
+  status,reload,published,save);
+ const inputs=Object.keys(fields).map(key=>f.elements.namedItem(key));
+ function feedback(text){status.textContent=text;status.hidden=!text}
+ status.tabIndex=-1;
+ showDialog('Modifier votre demande',f);
+ const token=dialogEpoch,view=renderEpoch;
+ function active(){return token===dialogEpoch&&view===renderEpoch&&$('#dialog').open}
+ f.addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(acting||save.disabled||!active())return;
+  const values=formValue(f);
+  save.disabled=true;
+  for(const input of inputs)input.readOnly=true;
+  const result=await action(async()=>{
+   try{
+    return await api('/projects/'+d.id,{method:'PUT',body:{...values,trade:base.trade,content_version:base.content_version,
+     budget_min:amountValue(values.budget_min),budget_max:amountValue(values.budget_max)}});
+   }catch(e){
+    if(active()&&!e.stale){
+     feedback(e.message);
+     reload.hidden=e.code!=='project_content_conflict';
+     published.hidden=true;
+     if(reload.hidden)status.focus();else reload.focus();
+    }
+    return null;
+   }
+  });
+  if(!active())return;
+  for(const input of inputs)input.readOnly=false;
+  if(result){$('#dialog').close();msg('Projet modifié.','success');await render()}
+  else save.disabled=!reload.hidden;
+ });
+}
 function startWizard(d=null){clearTimeout(draftSaveTimer);currentDraft=d?structuredClone(d):{title:'',description:'',town:'Toulouse',trades:[],timing:'flexible',budget_min:null,budget_max:null,version:0,photos:[]};wizardStep=1;draftState(currentDraft);UCPAnalytics.track('project_started',{step:1});wizard();document.title='Décrire mon projet · Un Coup de Pouce';focusPageHeading()}
 function tradePicker(selected,onChange,professional=false){const wrapper=el('div'),search=el('input',{type:'search',placeholder:'Ex. fuite, électricité, toiture…','aria-label':'Rechercher un métier'}),chosen=el('div',{class:'selected-trades'}),list=el('div',{class:'category-browser'});function draw(){clear(chosen);clear(list);for(const id of selected)chosen.append(button((trades[id]||id)+' ×',()=>{selected.splice(selected.indexOf(id),1);onChange([...selected]);draw()}));const q=normalize(search.value);const filtered=catalog.filter(t=>(!professional||t.id!=='inconnu')&&normalize([t.label,t.group,...t.synonyms].join(' ')).includes(q));for(const group of [...new Set(filtered.map(t=>t.group))]){const details=el('details',{},el('summary',{text:group}));details.open=!!q;const items=el('div',{class:'category-items'});for(const t of filtered.filter(t=>t.group===group)){const input=el('input',{type:'checkbox',value:t.id,checked:selected.includes(t.id),onChange:e=>{if(e.target.checked){if(selected.length>=12){e.target.checked=false;msg('Vous pouvez choisir jusqu’à 12 métiers.','error');return}if(t.id==='inconnu')selected.splice(0);else if(selected.includes('inconnu'))selected.splice(selected.indexOf('inconnu'),1);selected.push(t.id)}else selected.splice(selected.indexOf(t.id),1);onChange([...selected]);draw();const active=[...list.querySelectorAll('input')].find(x=>x.value===t.id);if(active){active.closest('details').open=true;active.focus()}}});items.append(el('label',{},input,t.label))}details.append(items);list.append(details)}if(!filtered.length)list.append(el('p',{class:'status-note',text:'Aucun métier trouvé. Choisissez « Je ne sais pas quel professionnel contacter ».'}))}search.addEventListener('input',draw);wrapper.append(search,chosen,list);draw();return wrapper}
 function draftContent(d){return {title:d.title,description:d.description,town:d.town,trades:[...d.trades],timing:d.timing,budget_min:d.budget_min??null,budget_max:d.budget_max??null}}
