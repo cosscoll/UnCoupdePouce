@@ -233,8 +233,9 @@ def install(m):
             row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version')};row['trades']=list(m.project_trades(r))
             if r['requester_id']==user['id']:
                 row['content_version']=r['content_version']
-                row['content_editable']=r['status']=='open' and not c.execute(
-                    'SELECT 1 FROM applications WHERE project_id=?',(id,)).fetchone()
+                applications=m.project_edit_applications(c,id)
+                row['content_editable']=m.project_content_editable(r,applications)
+                row['content_scope_locked']=bool(applications)
             draft=c.execute('SELECT payload FROM drafts WHERE project_id=?',(id,)).fetchone()
             row['timing']=json.loads(draft['payload']).get('timing','flexible') if draft else 'flexible'
             row['photos']=photos if user['role'] in ('requester','admin') or c.execute("SELECT 1 FROM applications WHERE project_id=? AND professional_id=? AND status='accepted'",(id,user['id'])).fetchone() else []
