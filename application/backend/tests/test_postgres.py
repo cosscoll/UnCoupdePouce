@@ -411,3 +411,8 @@ def test_postgres_project_content_edit_is_versioned_and_serialized_with_applicat
     second = owner.post('/api/projects', json=EDIT)
     assert second.status_code == 201, second.text
     exercise_concurrent_application(pg, owner, candidate, second.json()['id'])
+
+
+def test_postgres_password_change_revokes_sessions_and_recovery(pg):
+    from test_password_change import exercise_password_change
+    exercise_password_change(pg)

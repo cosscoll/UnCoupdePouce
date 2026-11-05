@@ -880,6 +880,36 @@ async function renderEnterprise(target){
   target.append(profiles);
 }
 
+function passwordPanel(available){
+ const box=panel('Mot de passe',available?'Enregistrez votre nouveau mot de passe, puis reconnectez-vous. Toutes les sessions seront fermées.':'Le mot de passe de ce compte de démonstration est géré par l’opérateur.');
+ if(!available)return box;
+ const current=el('input',{name:'current_password',type:'password',autocomplete:'current-password',maxlength:128,required:true});
+ const next=el('input',{name:'new_password',type:'password',autocomplete:'new-password',minlength:12,maxlength:128,required:true});
+ const confirm=el('input',{type:'password',autocomplete:'new-password',required:true});
+ const form=el('form',{},el('label',{},'Mot de passe actuel',current),el('label',{},'Nouveau mot de passe (12 caractères minimum)',next),
+  el('label',{},'Confirmer le nouveau mot de passe',confirm),el('button',{type:'submit',class:'primary',text:'Changer mon mot de passe'}));
+ const resetValidity=()=>confirm.setCustomValidity('');
+ next.addEventListener('input',resetValidity);
+ confirm.addEventListener('input',resetValidity);
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(acting)return;
+  if(next.value!==confirm.value){
+   confirm.setCustomValidity('Les deux nouveaux mots de passe doivent être identiques.');
+   confirm.reportValidity();
+   return;
+  }
+  const result=await action(()=>api('/account/password',{method:'POST',body:formValue(form)}));
+  form.reset();
+  if(!result)return;
+  await clearAccountSession();
+  authTab(false);
+  msg('Mot de passe modifié. Reconnectez-vous avec le nouveau mot de passe.','success');
+ });
+ box.append(form);
+ return box;
+}
+
 async function renderPersonalData(target){
   const box=panel('Mes données de laboratoire','Toutes les données affichées proviennent exclusivement de votre compte fictif. Aucun transfert externe.');
   const data=await api('/account/export');
@@ -897,13 +927,12 @@ async function renderPersonalData(target){
   const log=panel('Mes actions de démonstration','Journal limité à vos 50 événements les plus récents ; aucune activité d’un autre compte.');
   if(!activity.items.length)log.append(el('p',{class:'empty',text:'Pas encore d’événement suivi.'}));
   for(const event of activity.items)log.append(el('p',{class:'mini',text:`${event.created_at} — ${event.action} — ${event.target_type} #${event.target_id}`}));
-  box.append(log);
   box.append(button('Télécharger mon export JSON local',()=>{
     const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob);const a=el('a',{href:url,download:'ucp-lab-donnees-fictives.json'});
     document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
   }));
-  target.append(box);
+  target.append(box,passwordPanel(sessions.password_change_available),log);
 }
 async function loadCatalog(){catalog=(await api('/catalog')).items;for(const t of catalog)trades[t.id]=t.label}
 let entrySpace='requester';
@@ -931,7 +960,14 @@ function authTab(register){$('#tab-login').classList.toggle('selected',!register
 $('#tab-login').addEventListener('click',()=>authTab(false));$('#tab-register').addEventListener('click',()=>authTab(true));
 $('#login-form').addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/login',{method:'POST',body:formValue(e.currentTarget)}));if(r){$('#login-form [name=password]').value='';appState.user={id:r.user_id,name:r.name,role:r.role};appState.projectFilters=null;appState.csrf=r.csrf;appState.view=null;const token=renderEpoch+1;await render();if(token===renderEpoch)focusPageHeading()}});
 $('#register-form').addEventListener('submit',async e=>{e.preventDefault();const d=formValue(e.currentTarget);const r=await action(()=>api('/register',{method:'POST',body:d}));if(r){$('#register-form [name=password]').value='';UCPAnalytics.track('account_created',{role:d.role});authTab(false);$('#login-form [name=email]').value=d.email;$('#login-form [name=password]').focus();msg('Votre compte de test est créé. Connectez-vous pour commencer.','success')}});
-$('#logout').addEventListener('click',async()=>{const r=await action(()=>api('/logout',{method:'POST'}));if(r){$('#login-form').reset();$('#register-form').reset();selectEntrySpace(entrySpace);$('#dialog').close();clear($('#dialog-content'));clear($('#view'));appState.user=null;appState.csrf=null;appState.view=null;appState.projectFilters=null;stopDraft();UCPAnalytics.reset();render()}});
+function clearAccountSession(){
+ $('#login-form').reset();$('#register-form').reset();selectEntrySpace(entrySpace);
+ $('#dialog').close();clear($('#dialog-content'));clear($('#view'));
+ appState.user=null;appState.csrf=null;appState.view=null;appState.projectFilters=null;
+ stopDraft();UCPAnalytics.reset();
+ return render();
+}
+$('#logout').addEventListener('click',async()=>{const r=await action(()=>api('/logout',{method:'POST'}));if(r)await clearAccountSession()});
 $('#navigation-toggle').addEventListener('click',()=>setNavigationOpen($('#navigation-toggle').getAttribute('aria-expanded')!=='true'));
 $('.sidebar').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#navigation-toggle').getAttribute('aria-expanded')==='true'){e.preventDefault();setNavigationOpen(false);$('#navigation-toggle').focus()}});
 $('#dialog').addEventListener('close',()=>{if($('#dialog').open)return;const previous=dialogReturnFocus;dialogReturnFocus=null;if(previous?.isConnected&&!previous.disabled&&!previous.closest('[hidden],dialog:not([open])'))previous.focus();else focusPageHeading()});
