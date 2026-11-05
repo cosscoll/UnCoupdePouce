@@ -16,6 +16,7 @@ function create(hooks){
   const log=el('div',{class:'helper-log',role:'log','aria-label':'Conversation IA locale UCP','aria-live':'polite','aria-relevant':'additions text'});
   const proposals=el('div',{class:'helper-options ai-options'});
   const status=el('p',{class:'hint',role:'status'});
+  const retry=button('Réessayer de générer la réponse',()=>invoke('reply',null),'outline');retry.hidden=true;
   const textarea=el('textarea',{rows:3,maxlength:1200,required:true,'aria-label':'Votre message pour le chatbot IA',
     placeholder:s.role==='requester'?'Ex. Je souhaite refaire ma salle de bains à Toulouse. Aide-moi à rédiger mon annonce.':'Ex. Je suis plombier et recherche des chantiers à Toulouse.'});
   const submit=el('button',{class:'primary',type:'submit',text:'Envoyer',disabled:true});
@@ -34,14 +35,14 @@ function create(hooks){
   const actions=el('div',{class:'helper-options ai-actions'},s.role==='requester'?draft:search);
   ui.append(
    el('p',{class:'ai-intro',text:'Posez votre question, décrivez vos travaux ou demandez une aide pour trouver un chantier. Réponses générées par une IA gratuite directement sur votre appareil.'}),
-   log,proposals,status,agreement,form,
+   log,proposals,status,retry,agreement,form,
    el('p',{class:'hint',text:'Après quelques messages, l’IA peut aussi préparer une proposition à vérifier :'}),actions,
    el('div',{class:'ai-tools'},newChat),
    el('details',{class:'ai-technical-details'},el('summary',{text:'Fonctionnement et confidentialité'}),
     el('p',{class:'hint',text:'Aucune API IA payante. Il faut un navigateur compatible WebGPU. La première utilisation télécharge un modèle volumineux (plusieurs centaines de Mo) depuis des hébergeurs publics ; il peut ensuite être mis en cache. Les messages restent sur cet appareil, mais l’hébergeur du modèle voit les demandes de téléchargement. N’utilisez que des données fictives en préproduction.'})),
    el('p',{class:'hint',text:'Navigation directe'}),shortcuts);
   const model=hooks.local.status();
-  function allowed(){const active=!!model.configured&&acknowledge.checked&&!s.busy;submit.disabled=!active;textarea.disabled=s.busy;draft.disabled=!active||s.messages.length===0;search.disabled=!active||s.messages.length===0;newChat.disabled=s.busy}
+  function allowed(){const active=!!model.configured&&acknowledge.checked&&!s.busy;submit.disabled=!active;textarea.disabled=s.busy;draft.disabled=!active||s.messages.length===0;search.disabled=!active||s.messages.length===0;newChat.disabled=s.busy;retry.disabled=!active||!s.messages.some(m=>m.role==='user')}
   function say(role,text){
    s.messages.push({role,text});s.messages=s.messages.slice(-20);
    log.append(el('div',{class:'helper-message '+(role==='user'?'from-user':''),'data-role':role},
@@ -82,13 +83,13 @@ function create(hooks){
   async function invoke(mode,message=null){
    if(!valid(s)||s.busy||!acknowledge.checked||!model.configured)return;
    if(mode==='reply'){
-    if(!message||message.trim().length<2||message.length>1200)return;
-    say('user',message.trim());textarea.value='';
+    if(message!==null){if(!message||message.trim().length<2||message.length>1200)return;
+     say('user',message.trim());textarea.value='';}
    }
    if(!s.messages.some(m=>m.role==='user')){
     status.textContent='Décrivez d’abord votre besoin dans la conversation.';return;
    }
-   s.busy=true;s.pending=null;showPending();allowed();
+   s.busy=true;retry.hidden=true;s.pending=null;showPending();allowed();
    status.textContent='Chargement ou calcul du modèle IA sur votre appareil…';
    const messages=s.messages.slice(-12).map(m=>({role:m.role,content:m.text}));
    try{
@@ -104,7 +105,7 @@ function create(hooks){
     s.pending={draft:output.draft||null,search:output.search||null};showPending();
     status.textContent=s.pending.draft||s.pending.search?'Proposition prête à vérifier.':'Réponse produite localement.';
    }catch(e){
-    if(valid(s)&&ui?.closest('dialog')?.open)status.textContent=e?.message||'Le modèle local est indisponible. Réessayez.';
+    if(valid(s)&&ui?.closest('dialog')?.open){status.textContent=e?.message||'Le modèle local est indisponible. Réessayez.';retry.hidden=false;}
    }finally{if(valid(s)){s.busy=false;allowed();if(ui?.closest('dialog')?.open)textarea.focus()}}
   }
   async function propose(mode){await invoke(mode)}
