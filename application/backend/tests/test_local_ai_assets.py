@@ -5,7 +5,7 @@ from test_lab_api import env
 def test_browser_assets_and_csp_are_available_locally(env):
     mod,*_=env
     c=TestClient(mod.app)
-    for name in ('assistant-ai.js','local-ai.js','local-ai-worker.js'):
+    for name in ('assistant-ai.js','local-ai.js','local-ai-worker.js','local-ai-engine.js'):
         res=c.get('/assets/'+name)
         assert res.status_code==200,(name,res.status_code)
     html=c.get('/')
