@@ -47,6 +47,50 @@ def test_search_explains_linked_scope_without_mixing_profiles(setup):
     assert v['pro'].get('/api/projects',params={'trade':'electricite'}).json()['items']==[]
 
 
+def test_multi_trade_detail_exposes_only_eligible_profiles_and_keeps_one_application(setup):
+    v = setup
+    approve(v)
+    pro, requester = v['pro'], v['requester']
+
+    def write(path, **body):
+        return v['call'](pro, v['pcsrf'], 'post', path, **({'json': body} if body else {}))
+
+    assert write('/api/enterprise', label='Atelier fictif').status_code == 201
+
+    def linked(alias, trade, town='Toulouse'):
+        response = write('/api/enterprise/artisans', alias=alias, trades=[trade], zones=[town])
+        assert response.status_code == 201, response.text
+        return response.json()['id']
+
+    electrical = linked('Équipe électrique', 'electricite')
+    painting = linked('Équipe peinture', 'peinture')
+    wrong_town = linked('Autre zone', 'electricite', 'Paris')
+    inactive = linked('Équipe inactive', 'electricite')
+    assert write(f'/api/enterprise/artisans/{inactive}/set-active', active=False).status_code == 200
+    pid = publish(v, draft(v, trades=['plomberie','electricite','peinture']))
+    path = f'/api/v4/projects/{pid}'
+    assert 'application_profiles' not in requester.get(path).json()
+    assert v['intruder'].get(path).status_code == 404
+    assert pro.get('/api/projects').json()['items'][0]['matching_profile_count'] == 3
+    assert pro.get(path).json()['application_profiles'] == [
+        {'profile':'individual','linked_profile_id':None,'alias':None,'trades':['plomberie']},
+        {'profile':'linked','linked_profile_id':electrical,'alias':'Équipe électrique','trades':['electricite']},
+        {'profile':'linked','linked_profile_id':painting,'alias':'Équipe peinture','trades':['peinture']},
+    ]
+    assert write(f'/api/projects/{pid}/apply-linked/{wrong_town}').status_code == 403
+    created = write(f'/api/projects/{pid}/apply-linked/{electrical}')
+    assert created.status_code == 201
+    assert write(f'/api/projects/{pid}/apply-linked/{painting}').status_code == 409
+    assert write(f'/api/projects/{pid}/apply').status_code == 409
+    detail = pro.get(path).json()
+    assert detail['own_application']['id'] == created.json()['id']
+    assert detail['application_profiles'] == []
+    received = requester.get(f'/api/projects/{pid}/applications').json()['items']
+    assert [item['linked_artisan_alias'] for item in received] == ['Équipe électrique']
+    notices = requester.get('/api/notifications').json()['items']
+    assert [item['entity_id'] for item in notices if item['event_type'] == 'new_application'] == [created.json()['id']]
+
+
 def test_search_never_returns_hidden_suspended_or_unapproved_projects(setup):
     v=setup;pid=project(v)
     assert v['pro'].get('/api/projects').json()['search_scope']=='pending_review'

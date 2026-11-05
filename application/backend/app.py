@@ -846,6 +846,34 @@ def close_project(project_id:int,user=Depends(require('requester'))):
         c.execute('COMMIT')
     return {'ok':True,'status':'closed','chat_access':False}
 
+def linked_application_profiles(c, professional_id):
+    return c.execute("""SELECT a.id,a.alias,a.service_trades,a.service_areas FROM enterprise_artisans a
+        JOIN enterprise_accounts e ON e.id=a.enterprise_id
+        WHERE e.owner_id=? AND a.is_active=1 ORDER BY a.id""", (professional_id,)).fetchall()
+
+
+def project_profile_matches(project, profile, members):
+    if not profile or not profile['approved'] or project['status']!='open' or project['hidden'] or project['applications_paused']:
+        return []
+    try:
+        precontact_safe(' '.join(str(project[key]) for key in ('title','description','town')))
+    except ValueError:
+        return []
+
+    scope = project_trades(project)
+    town = project['town'].casefold()
+    matches = []
+    individual_trades = scope & {profile['trade'], *json.loads(profile['service_trades'] or '[]')}
+    individual_zones = {profile['town'].casefold(), *(zone.casefold() for zone in json.loads(profile['service_areas'] or '[]'))}
+    if individual_trades and town in individual_zones:
+        matches.append(dict(profile='individual', linked_profile_id=None, alias=None, trades=sorted(individual_trades)))
+    for member in members:
+        linked_trades = scope & set(json.loads(member['service_trades']))
+        if linked_trades and town in {zone.casefold() for zone in json.loads(member['service_areas'])}:
+            matches.append(dict(profile='linked', linked_profile_id=member['id'], alias=member['alias'], trades=sorted(linked_trades)))
+    return matches
+
+
 def discover_projects(c,user):
     """Authorized project discovery, reused by lists and private favorites."""
     from project_search import decorate
@@ -860,28 +888,17 @@ def discover_projects(c,user):
         # Authorization precedes all filters. No requester identity or outside counts.
         possible=c.execute('SELECT '+columns+''' FROM projects p JOIN users u ON u.id=p.requester_id
             WHERE p.status=? AND p.hidden=0 AND p.applications_paused=0 AND u.suspended=0 ORDER BY p.id DESC''',('open',)).fetchall() if p and p['approved'] else []
-        eligible={zone.casefold() for zone in json.loads(p['service_areas'] or '[]')} if p else set()
-        valid_trades={p['trade'],*json.loads(p['service_trades'] or '[]')} if p else set()
-        if p:eligible.add(p['town'].casefold())
-        members=c.execute('''SELECT a.id,a.alias,a.service_trades,a.service_areas FROM enterprise_artisans a
-            JOIN enterprise_accounts e ON e.id=a.enterprise_id WHERE e.owner_id=? AND a.is_active=1 ORDER BY a.id''',
-            (user['id'],)).fetchall() if p and p['approved'] else []
+        members = linked_application_profiles(c, user['id']) if possible else []
         rs=[]
         for pr in possible:
-            try:precontact_safe(' '.join(str(pr[key]) for key in ('title','description','town')))
-            except ValueError:continue
-            scope=project_trades(pr)
-            owner_match=bool(scope & valid_trades) and pr['town'].casefold() in eligible
-            linked=next((r for r in members if bool(scope & set(json.loads(r['service_trades']))) and
-                         pr['town'].casefold() in {t.casefold() for t in json.loads(r['service_areas'])}),None)
-            if owner_match or linked:
-                row=decorate(pr)
-                row['matching_linked_profile_id']=linked['id'] if linked else None
-                row['matching_individual_profile']=bool(owner_match)
-                row['match']={'profile':'individual' if owner_match else 'linked',
-                              'alias':None if owner_match else linked['alias'],
-                              'trades':sorted(scope & (valid_trades if owner_match else set(json.loads(linked['service_trades'])))),
-                              'town':pr['town']}
+            matches = project_profile_matches(pr, p, members)
+            if matches:
+                first = matches[0]
+                row = decorate(pr)
+                row['matching_linked_profile_id'] = next((match['linked_profile_id'] for match in matches if match['profile']=='linked'), None)
+                row['matching_individual_profile'] = first['profile']=='individual'
+                row['match'] = dict(profile=first['profile'], alias=first['alias'], trades=first['trades'], town=pr['town'])
+                row['matching_profile_count'] = len(matches)
                 rs.append(row)
     else:rs=[]
     return rs,discovery
