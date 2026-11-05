@@ -1049,7 +1049,7 @@ async function prepareHelpProposal(x){
 
 test('requester chatbot prepares a proposal without writing or publishing before confirmation',async()=>{
  const x=await boot();try{
-  const before=x.calls.length;assert.equal(x.w.document.querySelector('#guided-help-open').hidden,false);await prepareHelpProposal(x);
+  const before=x.calls.length;assert.equal(x.w.document.querySelector('#chatbot-launcher').hidden,false);await prepareHelpProposal(x);
   assert.match(x.w.document.querySelector('.helper-proposal').textContent,/Remplacer un évier/);assert.equal(x.calls.length,before);
   helpButton(x,'Utiliser cette proposition').click();await tick();assert.equal(x.w.document.querySelector('#dialog').open,false);
   assert.match(x.w.document.querySelector('#view').textContent,/De quoi avez-vous besoin/);assert.equal(x.w.document.querySelector('#view [name=title]').value,'Remplacer un évier et réparer une fuite dans la cuisine');
@@ -1083,7 +1083,7 @@ test('professional chatbot gives role-specific guidance and only navigates on ex
 test('chatbot conversation is reset on logout and never stored in browser persistence',async()=>{
  const x=await boot({'POST /api/logout':{ok:true}});try{
   x.w.openGuidedHelp();await helpSend(x,'Une question privée de recette');x.w.document.querySelector('#logout').click();await tick();
-  assert.equal(x.w.document.querySelector('#guided-help-open').hidden,true);assert.equal(x.w.document.querySelector('.guided-helper'),null);assert.equal(x.w.localStorage.length,0);assert.equal(x.w.sessionStorage.length,0);
+  assert.equal(x.w.document.querySelector('#chatbot-launcher').hidden,true);assert.equal(x.w.document.querySelector('.guided-helper'),null);assert.equal(x.w.localStorage.length,0);assert.equal(x.w.sessionStorage.length,0);
   x.w.openGuidedHelp();assert.equal(x.w.document.querySelector('.guided-helper'),null);
  }finally{x.close()}
 });
@@ -1286,7 +1286,7 @@ test('selected or closed projects never offer intake pause or reopening',async()
  }
 });
 
-test('floating assistant entry is visible and opens the same assistant as the header',async()=>{
+test('floating assistant entry remains accessible without a header button',async()=>{
  const x=await boot();
  try{
   const launcher=x.w.document.querySelector('#chatbot-launcher');
@@ -1313,4 +1313,25 @@ test('Yahya displays Assistant IA below its name in launcher and chat header',as
   assert.equal(heading?.firstChild?.textContent,'Yahya');
   assert.equal(heading?.querySelector('.ai-chat-subtitle')?.textContent,'Assistant IA');
  }finally{x.close()}
+});
+
+test('header is minimal and account actions appear only in Mon compte for all roles',async()=>{
+ for(const role of ['requester','professional','admin']){
+  const x=await boot({'/api/session':{id:role==='requester'?1:role==='professional'?2:3,name:'Compte test',role,csrf:'csrf-test'},
+    '/api/account/export':{user:{name:'Compte test',email:'compte@ucp.test',role},own_projects:[],own_applications:[],own_messages:[]},
+    '/api/account/sessions':{active_sessions:1,password_change_available:false},
+    '/api/account/activity':{items:[]}});
+  try{
+   const header=x.w.document.querySelector('header.header');
+   assert.equal(header.querySelectorAll('button').length,0,'no installation, logout or Yahya header buttons');
+   assert.equal(x.w.document.querySelector('#account-actions').hidden,true);
+   assert.ok(x.w.document.querySelector('#chatbot-launcher'));
+   await x.w.go('personal-data');await tick();
+   assert.equal(x.w.document.querySelector('#account-actions').hidden,false,'account actions visible in Mon compte');
+   assert.equal(x.w.document.querySelector('#account-actions #install-app').textContent,'Installer UCP');
+   assert.equal(x.w.document.querySelector('#account-actions #logout').textContent,'Se déconnecter');
+   await x.w.go('support');await tick();
+   assert.equal(x.w.document.querySelector('#account-actions').hidden,true,'actions not shown elsewhere');
+  }finally{x.close()}
+ }
 });
