@@ -387,6 +387,44 @@ test('project edit conflict keeps the form and rebases only after the owner load
  }finally{x.close()}
 });
 
+test('a new candidature freezes the town without losing the rest of a stale form',async()=>{
+ const original={id:18,title:'Titre initial fictif',description:'Description initiale du projet fictif.',trade:'plomberie',town:'Toulouse',content_version:0,status:'open'};
+ const latest={...original,content_editable:true,content_scope_locked:true};
+ const x=await boot({
+  '/api/v4/projects/18':latest,
+  'PUT /api/projects/18':call=>call.body.town==='Balma'
+   ?{status:409,data:{detail:{code:'project_scope_locked',message:'Une candidature a été reçue.'}}}
+   :{ok:true,notified:1},
+ });try{
+  x.w.editProject(original);
+  input(x.w,'#dialog [name=town]','Balma');
+  input(x.w,'#dialog [name=description]','Ma nouvelle description du chantier.');
+  submit(x.w,'#dialog form');await tick();
+  const form=x.w.document.querySelector('#dialog form');
+  assert.equal(form.elements.town.value,'Balma');
+  savedButton(x.w,'Charger la version actuelle','#dialog').click();await tick();
+  assert.equal(form.elements.town.value,'Toulouse');
+  assert.equal(form.elements.town.readOnly,true);
+  assert.equal(form.elements.description.value,'Ma nouvelle description du chantier.');
+  assert.match(form.textContent,/les candidats en attente seront avertis/);
+  submit(x.w,'#dialog form');await tick();
+  assert.match(x.w.document.querySelector('#alert').textContent,/1 candidature/);
+ }finally{x.close()}
+});
+
+test('the project update notification takes a professional to the corresponding candidature',async()=>{
+ const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},
+  '/api/notifications':{items:[{id:9,entity_id:82,event_type:'project_updated',message:'Une annonce a été modifiée.',created_at:'2026-11-05T12:00:00Z',read_at:null}],unread:1,next_before_id:null},
+  '/api/my-applications':{items:[{id:81,title:'Autre chantier',trade:'plomberie',town:'Toulouse',status:'pending',project_status:'open'},
+   {id:82,title:'Chantier modifié',trade:'plomberie',town:'Toulouse',status:'pending',project_status:'open'}]}});
+ try{
+  await x.w.go('notifications');await tick();
+  savedButton(x.w,'Voir ma candidature','#view').click();await tick();
+  assert.equal(x.w.document.activeElement.id,'application-82');
+  assert.match(x.w.document.activeElement.textContent,/Chantier modifié/);
+ }finally{x.close()}
+});
+
 
 test('previous wizard step refuses an invalid budget without discarding the entered value',async()=>{
  const x=await boot({'POST /api/v4/drafts':{id:61,version:1},'PUT /api/v4/drafts/61':{id:61,version:2}});

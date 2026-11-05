@@ -238,6 +238,7 @@ NOTIFICATION_TYPES = {
     'application_rejected': 'Une de vos candidatures de test a été refusée.',
     'application_withdrawn': 'Une candidature sur votre projet a été retirée.',
     'project_closed': 'Un projet auquel vous avez candidaté a été clôturé.',
+    'project_updated': 'Une annonce pour laquelle vous avez une candidature en attente a été modifiée.',
     'project_intake_paused': 'Le demandeur a mis les nouvelles candidatures en pause. Votre candidature est conservée ; les échanges restent soumis aux droits en cours.',
     'project_intake_resumed': 'Le demandeur reçoit de nouveau des candidatures. Votre candidature conserve son état ; les échanges restent soumis aux droits en cours.',
     'new_message': 'Un nouveau message fictif vous attend dans une conversation.',
@@ -784,29 +785,48 @@ def create_project(body:Project,user=Depends(require('requester'))):
         c.execute('COMMIT')
     return {'id':cur.lastrowid,'status':'open'}
 
+def project_edit_applications(c, project_id):
+    return c.execute('SELECT id,professional_id,status FROM applications WHERE project_id=?',(project_id,)).fetchall()
+
+
+def project_content_editable(project, applications):
+    return project['status']=='open' and not any(a['status']=='accepted' for a in applications)
+
+
 @app.put('/api/projects/{project_id}')
 def edit_project(project_id:int,body:EditProject,user=Depends(require('requester'))):
-    # Do not allow changing an advertised job after any professional applied.
     with authenticated_db(user,write=True) as c:
-        project=c.execute('SELECT requester_id,status,trade,trades_json,budget_min,budget_max,content_version FROM projects WHERE id=?',(project_id,)).fetchone()
+        project=c.execute('SELECT * FROM projects WHERE id=?',(project_id,)).fetchone()
         if not project:error(404,'Projet inconnu')
         if project['requester_id']!=user['id']:error(403,'Projet appartenant à un autre demandeur')
-        if project['status']!='open' or c.execute('SELECT 1 FROM applications WHERE project_id=?',(project_id,)).fetchone():
-            error(409,'Projet non modifiable après une candidature ou sa fermeture')
+        applications=project_edit_applications(c,project_id)
+        if not project_content_editable(project,applications):
+            error(409,'Projet non modifiable après sélection d’un professionnel ou clôture')
         if body.content_version != project['content_version']:
             error(409, {'code': 'project_content_conflict', 'message': 'Cette annonce a été modifiée ailleurs. Votre saisie est conservée.'})
-        if not active_trade(body.trade,c):error(422,'Métier inconnu ou désactivé')
-        if body.trade!=project['trade'] and len(project_trades(project))>1:error(409,'Les métiers d’un projet multi-métiers ne peuvent être modifiés ici')
+        trade_changed=body.trade!=project['trade']
+        town_changed=body.town!=project['town']
+        if applications and (trade_changed or town_changed):
+            error(409, {'code': 'project_scope_locked', 'message': 'Une candidature a été reçue. La commune et les métiers sont figés. Rechargez l’annonce pour continuer.'})
+        if trade_changed:
+            if not active_trade(body.trade,c):error(422,'Métier inconnu ou désactivé')
+            if len(project_trades(project))>1:error(409,'Les métiers d’un projet multi-métiers ne peuvent être modifiés ici')
         values={k:getattr(body,k) if k in body.model_fields_set else project[k] for k in ('budget_min','budget_max')}
         try:Budget.model_validate(values)
         except ValueError:error(422,'Le budget minimum ne peut pas dépasser le maximum')
-        if body.trade!=project['trade']:c.execute('UPDATE projects SET trades_json=? WHERE id=?',(json.dumps([body.trade]),project_id))
+        changed=any(value!=project[key] for key,value in {'title':body.title,'description':body.description,**values}.items())
+        if not (changed or trade_changed or town_changed):
+            return {'ok':True,'status':'open','content_version':body.content_version,'notified':0,'changed':False}
+        if trade_changed:c.execute('UPDATE projects SET trades_json=? WHERE id=?',(json.dumps([body.trade]),project_id))
         c.execute('UPDATE projects SET title=?,description=?,trade=?,town=?,budget_min=?,budget_max=?,content_version=content_version+1 WHERE id=?',
-                  (body.title.strip(),body.description.strip(),body.trade,body.town.strip(),values['budget_min'],values['budget_max'],project_id))
+                  (body.title,body.description,body.trade,body.town,values['budget_min'],values['budget_max'],project_id))
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                   (user['id'],'edit_project','project',project_id,now()))
+        pending=[a for a in applications if a['status']=='pending']
+        for a in pending:
+            queue_notice(c,a['professional_id'],'project_updated',a['id'])
         c.execute('COMMIT')
-    return {'ok':True,'status':'open','content_version':body.content_version+1}
+    return {'ok':True,'status':'open','content_version':body.content_version+1,'notified':len(pending),'changed':True}
 
 @app.post('/api/projects/{project_id}/close')
 def close_project(project_id:int,user=Depends(require('requester'))):

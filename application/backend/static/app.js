@@ -316,7 +316,7 @@ function renderSavedSearches(n,searchForm,load,valid){
 }
 const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 async function projectDetail(p){if(acting)return;const epoch=++renderEpoch,actor=appState.user,sourceView=appState.view;await action(async()=>{const d=await api('/v4/projects/'+p.id);if(epoch!==renderEpoch||actor!==appState.user)return false;const n=el('div'),req=actor.role==='requester';n.append(button(sourceView==='professional-home'?'← Vue d’ensemble':sourceView==='favorites'?'← Mes favoris':actor.role==='professional'?'← Trouver des projets':'← Mes projets',()=>go(sourceView),'link'),heading(d.title,d.town+' · '+tradeNames(d)),badge(d.status),intakeBadge(d),el('section',{class:'panel'},el('h3',{text:'Le projet en quelques mots'}),el('p',{text:d.description}),el('p',{class:'small muted',text:'Début souhaité : '+({flexible:'flexible',month:'dans le mois',quarter:'dans les trois mois',urgent:'dès que possible'}[d.timing]||'flexible')})));n.append(el('p',{class:'hint',text:'Budget indicatif : '+budgetText(d)+'. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.'}));if(!req&&p.match)n.append(matchExplanation(p));if(d.photos.length)n.append(el('div',{class:'photos'},...d.photos.map(id=>el('a',{href:'/api/v4/photos/'+id,target:'_blank',rel:'noopener'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de test du projet',width:160,height:120})))));
-if(req){const apps=(await api('/projects/'+p.id+'/applications')).items;const box=panel('Les professionnels intéressés','Comparez les profils déclarés avant de choisir. Une candidature ne constitue pas un devis. Dans cette préproduction, le chat nécessite une sélection et des droits de test actifs.');if(!apps.length)box.append(empty('Pas encore de candidature',d.applications_paused?'Les nouvelles candidatures sont en pause. Vous pouvez les rouvrir quand vous êtes prêt.':'Votre demande reste disponible pour les professionnels éligibles.'));renderCandidateCards(box,apps,d.id);n.append(box);if(d.status==='open')n.append(button(d.applications_paused?'Rouvrir les candidatures':'Mettre les candidatures en pause',()=>ask(d.applications_paused?'Rouvrir les candidatures ?':'Mettre les candidatures en pause ?',d.applications_paused?'Votre annonce pourra de nouveau apparaître aux professionnels éligibles. Les candidats en attente seront informés ; leur candidature conserve son état.':'Votre annonce disparaîtra de la recherche et refusera les nouvelles candidatures. Les candidatures reçues restent conservées et vous pouvez encore les examiner. Les professionnels concernés seront informés. Les droits des échanges existants restent inchangés.',()=>api('/projects/'+d.id+'/application-intake',{method:'POST',body:{paused:!d.applications_paused,version:d.intake_version??0}}))));if(d.status!=='closed')n.append(button('Clôturer le projet',()=>ask('Clôturer votre projet ?','Les candidatures en attente seront refusées et les échanges seront fermés. Cette clôture est définitive dans cette version.',()=>api('/projects/'+d.id+'/close',{method:'POST'}))));if(!apps.length&&d.status==='open')n.append(button('Modifier la demande',()=>editProject(d)))}else if(d.own_application){n.append(el('section',{class:'status-note'},badge(d.own_application.status),el('p',{text:'Votre candidature est déjà enregistrée pour ce projet. Retrouvez son suivi dans Mes candidatures.'}),button('Voir ma candidature',()=>go('applications'))))}else if(d.status==='open')n.append(button('Proposer ma candidature',async()=>{const r=await action(()=>api('/projects/'+p.id+(p.matching_individual_profile===false&&p.matching_linked_profile_id?'/apply-linked/'+p.matching_linked_profile_id:'/apply'),{method:'POST'}),'Votre candidature est enregistrée.');if(r){UCPAnalytics.track('application_submitted');go('applications')}},'primary'));else n.append(el('p',{class:'status-note',text:'Les candidatures sont fermées pour ce projet.'}));n.append(button('Signaler un problème',()=>report('project',p.id),'link'));if(epoch!==renderEpoch||actor!==appState.user)return false;$('#view').replaceChildren(...n.childNodes);focusPageHeading();UCPAnalytics.track('project_viewed');return true})}
+if(req){const apps=(await api('/projects/'+p.id+'/applications')).items;const box=panel('Les professionnels intéressés','Comparez les profils déclarés avant de choisir. Une candidature ne constitue pas un devis. Dans cette préproduction, le chat nécessite une sélection et des droits de test actifs.');if(!apps.length)box.append(empty('Pas encore de candidature',d.applications_paused?'Les nouvelles candidatures sont en pause. Vous pouvez les rouvrir quand vous êtes prêt.':'Votre demande reste disponible pour les professionnels éligibles.'));renderCandidateCards(box,apps,d.id);n.append(box);if(d.status==='open')n.append(button(d.applications_paused?'Rouvrir les candidatures':'Mettre les candidatures en pause',()=>ask(d.applications_paused?'Rouvrir les candidatures ?':'Mettre les candidatures en pause ?',d.applications_paused?'Votre annonce pourra de nouveau apparaître aux professionnels éligibles. Les candidats en attente seront informés ; leur candidature conserve son état.':'Votre annonce disparaîtra de la recherche et refusera les nouvelles candidatures. Les candidatures reçues restent conservées et vous pouvez encore les examiner. Les professionnels concernés seront informés. Les droits des échanges existants restent inchangés.',()=>api('/projects/'+d.id+'/application-intake',{method:'POST',body:{paused:!d.applications_paused,version:d.intake_version??0}}))));if(d.status!=='closed')n.append(button('Clôturer le projet',()=>ask('Clôturer votre projet ?','Les candidatures en attente seront refusées et les échanges seront fermés. Cette clôture est définitive dans cette version.',()=>api('/projects/'+d.id+'/close',{method:'POST'}))));if(d.content_editable??(!apps.length&&d.status==='open'))n.append(button('Modifier la demande',()=>editProject(d)))}else if(d.own_application){n.append(el('section',{class:'status-note'},badge(d.own_application.status),el('p',{text:'Votre candidature est déjà enregistrée pour ce projet. Retrouvez son suivi dans Mes candidatures.'}),button('Voir ma candidature',()=>go('applications'))))}else if(d.status==='open')n.append(button('Proposer ma candidature',async()=>{const r=await action(()=>api('/projects/'+p.id+(p.matching_individual_profile===false&&p.matching_linked_profile_id?'/apply-linked/'+p.matching_linked_profile_id:'/apply'),{method:'POST'}),'Votre candidature est enregistrée.');if(r){UCPAnalytics.track('application_submitted');go('applications')}},'primary'));else n.append(el('p',{class:'status-note',text:'Les candidatures sont fermées pour ce projet.'}));n.append(button('Signaler un problème',()=>report('project',p.id),'link'));if(epoch!==renderEpoch||actor!==appState.user)return false;$('#view').replaceChildren(...n.childNodes);focusPageHeading();UCPAnalytics.track('project_viewed');return true})}
 
 function showcaseContent(data){
  const n=el('section',{class:'showcase-content'});
@@ -429,6 +429,7 @@ function editProject(d){
  const fields={title:'Titre',town:'Commune',description:'Description',budget_min:'Budget minimum',budget_max:'Budget maximum'};
  const status=el('p',{class:'status-note',role:'status',hidden:true});
  const published=el('section',{class:'status-note',hidden:true});
+ const guidance=el('p',{class:'hint'});
  const save=el('button',{class:'primary',type:'submit',text:'Enregistrer les modifications'});
  const reload=button('Charger la version actuelle',async()=>{
   if(acting||!active())return;
@@ -438,16 +439,17 @@ function editProject(d){
     if(!active())return;
     for(const key of Object.keys(fields)){
      const input=f.elements.namedItem(key);
-     if(input.value===String(base[key]??''))input.value=latest[key]??'';
+     if((key==='town'&&latest.content_scope_locked)||input.value===String(base[key]??''))input.value=latest[key]??'';
     }
     base=latest;
+    setScope();
     published.replaceChildren(el('h4',{text:'Version actuellement publiée'}),
      ...Object.entries(fields).map(([key,label])=>el('p',{},el('strong',{text:label+' · '}),String(latest[key]??'Non renseigné'))),
      el('p',{text:'Métiers · '+tradeNames(latest)}));
     published.hidden=false;
     reload.hidden=true;
     save.disabled=latest.content_editable===false||latest.status!=='open';
-    feedback(save.disabled?'Cette annonce est désormais fermée aux modifications.':'Version actuelle chargée. Vos modifications sont conservées. Comparez les deux versions avant d’enregistrer.');
+    feedback(save.disabled?'Cette annonce est désormais fermée aux modifications.':'Version actuelle chargée. Comparez-la à votre saisie avant d’enregistrer.');
     status.focus();
    }catch(e){if(active()&&!e.stale)feedback(e.message)}
   });
@@ -457,9 +459,13 @@ function editProject(d){
   field(fields.town,'town','text',{value:d.town,maxlength:90}),
   field(fields.description,'description','textarea',{value:d.description,minlength:20}),
   el('div',{class:'budget-fields'},amountField(fields.budget_min+' facultatif (€)','budget_min',d.budget_min),amountField(fields.budget_max+' facultatif (€)','budget_max',d.budget_max)),
-  el('p',{class:'hint',text:'Les métiers restent identiques. Les modifications sont bloquées après la première candidature.'}),
-  status,reload,published,save);
+  guidance,status,reload,published,save);
  const inputs=Object.keys(fields).map(key=>f.elements.namedItem(key));
+ function setScope(){
+  f.elements.namedItem('town').readOnly=!!base.content_scope_locked;
+  guidance.textContent=(base.content_scope_locked?'La commune et les métiers sont figés depuis la première candidature. ':'Les métiers restent identiques. ')+'Si le titre, la description ou le budget change, les candidats en attente seront avertis.';
+ }
+ setScope();
  function feedback(text){status.textContent=text;status.hidden=!text}
  status.tabIndex=-1;
  showDialog('Modifier votre demande',f);
@@ -478,7 +484,7 @@ function editProject(d){
    }catch(e){
     if(active()&&!e.stale){
      feedback(e.message);
-     reload.hidden=e.code!=='project_content_conflict';
+     reload.hidden=!['project_content_conflict','project_scope_locked'].includes(e.code);
      published.hidden=true;
      if(reload.hidden)status.focus();else reload.focus();
     }
@@ -487,7 +493,13 @@ function editProject(d){
   });
   if(!active())return;
   for(const input of inputs)input.readOnly=false;
-  if(result){$('#dialog').close();msg('Projet modifié.','success');await render()}
+  setScope();
+  if(result){
+   $('#dialog').close();
+   const count=result.notified||0;
+   msg(result.changed===false?'Aucune modification à enregistrer.':count?`Projet modifié. ${count} candidature(s) en attente avertie(s).`:'Projet modifié.','success');
+   await render();
+  }
   else save.disabled=!reload.hidden;
  });
 }
@@ -586,7 +598,9 @@ async function renderApplications(n){
   if(!visible.length){list.append(el('p',{class:'status-note',text:'Aucune candidature pour ce filtre.'}));return}
   for(const a of visible){
    const state=a.conversation_state||(a.status==='accepted'?'unavailable':'not_selected');
-   const card=panel(a.title);card.append(el('p',{class:'muted',text:(trades[a.trade]||a.trade)+' · '+a.town}),badge(a.status));
+   const card=panel(a.title);
+   card.id='application-'+a.id;card.tabIndex=-1;
+   card.append(el('p',{class:'muted',text:(trades[a.trade]||a.trade)+' · '+a.town}),badge(a.status));
    if(a.project_status==='closed')card.append(el('span',{class:'chip',text:'Projet clôturé'}));
    if(a.project_paused&&a.project_status==='open')card.append(el('p',{class:'status-note',text:'Le demandeur a mis les nouvelles candidatures en pause. Votre candidature est conservée ; vous pouvez encore la retirer si elle est en attente.'}));
    if(a.linked_artisan_alias)card.append(el('p',{class:'small',text:'Candidature pour le profil lié « '+a.linked_artisan_alias+' »'}));
@@ -736,7 +750,7 @@ function reviewReport(report){
   showDialog('Examiner le signalement #'+report.id,form);
 }
 async function renderNotifications(n){
- const epoch=renderEpoch,valid=()=>epoch===renderEpoch;
+ const epoch=renderEpoch,actor=appState.user,valid=()=>epoch===renderEpoch;
  n.append(heading('Votre actualité UCP.','Retrouvez les candidatures, sélections, messages et réponses de l’assistance.'));
  const count=el('p',{class:'status-note','aria-live':'polite',text:'Chargement du compteur…'});
  const filter=field('Afficher les notifications','notification_filter','select',{required:false,options:{all:'Toutes',unread:'Non lues'}}),select=filter.querySelector('select');
@@ -750,6 +764,12 @@ async function renderNotifications(n){
   if(readers.has(note.id))return;
   const flag=el('span',{class:'chip '+(!note.read_at?'violet':''),text:note.read_at?'Lue':'Non lue'});
   const card=el('article',{class:'item'},el('p',{text:note.message}),el('time',{class:'small muted',text:new Date(note.created_at).toLocaleString('fr-FR')}),flag);
+  if(note.event_type==='project_updated'&&actor.role==='professional'){
+   card.append(button('Voir ma candidature',async()=>{
+    await go('applications');
+    if(appState.user===actor&&appState.view==='applications')document.getElementById('application-'+note.entity_id)?.focus();
+   }));
+  }
   let done=!!note.read_at;const read=button('Marquer comme lue',async()=>{
    if(done||!valid())return;
    const result=await action(()=>api('/notifications/'+note.id+'/read',{method:'POST'}));

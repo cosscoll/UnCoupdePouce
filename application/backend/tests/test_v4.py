@@ -125,7 +125,7 @@ def test_multi_trade_matching_timing_and_legacy_edit_preserves_categories(setup)
     for cl in [v['pro'],v['intruder']]:assert pid in [r['id'] for r in cl.get('/api/projects').json()['items']]
     d=v['pro'].get(f'/api/v4/projects/{pid}').json();assert set(d['trades'])==set(PAYLOAD['trades']);assert d['timing']=='month'
     edit={k:PAYLOAD[k] for k in ['title','description','town']}|{'trade':'plomberie','content_version':0}
-    assert v['call'](v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=edit).status_code==200
+    assert v['call'](v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=edit|{'title':'Révision fictive de l’annonce'}).status_code==200
     assert set(v['requester'].get(f'/api/v4/projects/{pid}').json()['trades'])==set(PAYLOAD['trades'])
     denied=v['call'](v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json=edit|{'trade':'chauffage','content_version':1})
     assert denied.status_code==409 and 'multi-métiers' in denied.json()['detail']

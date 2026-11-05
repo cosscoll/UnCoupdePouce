@@ -356,9 +356,11 @@ def test_owner_can_edit_open_project_before_applications(setup):
     assert v['call'](v['pro'],v['pcsrf'],'put',f'/api/projects/{pid}',json=data).status_code==403
 
 
-def test_edit_prevented_once_pro_has_applied(setup):
+def test_edit_prevented_once_pro_is_selected(setup):
     v=setup;pid=project(v);approve(v)
-    assert v['call'](v['pro'],v['pcsrf'],'post',f'/api/projects/{pid}/apply').status_code==201
+    applied=v['call'](v['pro'],v['pcsrf'],'post',f'/api/projects/{pid}/apply')
+    assert applied.status_code==201
+    assert v['call'](v['requester'],v['rcsrf'],'post',f"/api/applications/{applied.json()['id']}/accept").status_code==200
     attempt=v['call'](v['requester'],v['rcsrf'],'put',f'/api/projects/{pid}',json={
         'title':'Projet modifié fictif','description':'On change la description pour tromper le professionnel.','trade':'plomberie','town':'Toulouse','content_version':0})
     assert attempt.status_code==409
