@@ -41,3 +41,18 @@ input::placeholder,textarea::placeholder{color:var(--muted);opacity:1}dialog{max
 .chatbot-launcher[hidden]{display:none!important}
 @media(max-width:680px){.chatbot-launcher{right:max(12px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));padding:12px 16px;font-size:13px;min-height:52px}.chatbot-launcher svg{width:23px;height:23px}}
 body:has(#dialog[open]) .chatbot-launcher{visibility:hidden}
+
+/* Local AI: keep the conversation usable without scrolling past technical disclaimers. */
+#dialog:has(.ucp-ai){width:min(740px,calc(100vw - 24px));max-width:740px;max-height:90dvh}
+.ucp-ai .ai-intro{font-size:14px;line-height:1.6;color:var(--ink);margin:6px 0 10px}
+.ucp-ai .helper-log:empty{display:none}
+.ucp-ai .helper-log{max-height:31dvh;min-height:0;margin:10px 0}
+.ucp-ai .ai-consent{margin:7px 0;padding:8px 0;font-weight:500}
+.ucp-ai .ai-technical-details{padding:10px 0;margin:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.ucp-ai .ai-technical-details summary{font-size:12px;font-weight:700;cursor:pointer}
+.ucp-ai .ai-technical-details p{margin-top:8px}
+.ucp-ai .ai-actions{margin:8px 0}
+.ucp-ai form{gap:8px;margin:9px 0}
+.ucp-ai form textarea{min-height:82px}
+.ucp-ai form button{justify-content:center}
+@media(max-width:680px){#dialog:has(.ucp-ai){width:calc(100vw - 14px);max-height:95dvh}.ucp-ai .helper-log{max-height:27dvh}.ucp-ai .ai-intro{font-size:12px}}

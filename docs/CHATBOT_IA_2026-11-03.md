@@ -34,6 +34,21 @@ Les tests automatisés simulent la génération et vérifient les droits/confirm
 
 En préproduction UCP, saisissez uniquement des données fictives. Les hébergeurs publics voient les requêtes de téléchargement d'assets (par exemple IP/agent utilisateur), même si les messages de discussion n'y sont pas envoyés.
 
+## Correctif du 5 novembre 2026 — chargement du modèle
+
+Un utilisateur a constaté que la fenêtre s'ouvrait mais qu'une erreur générique « Échec du chargement du moteur IA local » apparaissait à l'envoi du premier message. Cette erreur provenait de `Worker.onerror` : un chargement du script Worker avait échoué avant le traitement. Le message ne donnait pas la cause réseau/CSP exacte.
+
+Pour éviter une dépendance bloquante au démarrage du Worker :
+- Le Worker charge désormais **uniquement du JavaScript UCP local** au démarrage, puis le moteur WebLLM par `import()` dynamique, avec deux CDN distincts et des erreurs explicites.
+- En cas d'échec d'ouverture du Worker ou d'import de la bibliothèque dans celui-ci, UCP **réessaie automatiquement la même IA locale dans la page**. Il ne bascule sur aucune API de génération hébergée et n'envoie aucun message de conversation à un fournisseur.
+- L'interface affiche la progression réelle, ou la cause diagnostiquée, et propose **« Réessayer de générer la réponse »** sans ressaisir le message.
+- Les longs avertissements techniques sont dans une section repliée afin que la zone de conversation reste visible.
+- Le fichier partagé `application/backend/static/local-ai-engine.js` centralise modèle, instructions, validation de génération et rechargement des bibliothèques.
+- Le modèle Qwen quantifié **q4f16** est utilisé lorsque le GPU prend en charge `shader-f16`; sinon le moteur sélectionne la variante **q4f32**, un peu plus gourmande en mémoire (environ 1,06 Go de VRAM recommandés au lieu de 0,94 Go). Les deux variantes sont dans le catalogue officiel WebLLM.
+- Tests à répéter après publication : Chromium + WebGPU, connexion requise et 1er téléchargement, réponse textuelle réelle, génération d'annonce, filtres de recherche, scénario CDN inaccessible et navigateur incompatible.
+
+Ce correctif **n'établit pas encore** la réussite d'une génération réelle sur le matériel utilisateur. Un environnement de test sans WebGPU GPU exploitable ne peut pas remplacer ce test.
+
 ## Contrainte budgétaire
 
 **Aucun coût de génération par message, aucune consommation d'API IA payante.** Cela n'affirme pas que l'hébergement web, la bande passante CDN, les limites gratuites de Vercel, les appareils ou l'accès Internet resteront toujours gratuits et illimités. Aucun nouveau service payant, abonnement, quota limité d'agent/Work/Codex ou automatisation ChatGPT n'a été activé.
