@@ -1411,7 +1411,7 @@ test('UX audit: requester home prioritizes an unfinished draft but keeps activit
   assert.equal(d.querySelector('.home-overview').open,false);
   assert.equal(d.querySelectorAll('.requester-overview>.panel').length,4);
   d.querySelector('.home-priority .primary').click();
-  assert.equal(d.querySelector('.wizard [name=title').value,draft.title);
+  assert.equal(d.querySelector('.wizard [name=title]').value,draft.title);
  }finally{x.close()}
 });
 test('UX audit: professional home gives a first-time artisan a profile action before searching',async()=>{
