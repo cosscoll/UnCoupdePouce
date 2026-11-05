@@ -101,6 +101,29 @@ export function buildPrompt(mode,payload={}){
  return safety+catalog+'\nGénère UNIQUEMENT les filtres JSON de recherche à partir des informations explicitement données. q: mots-clés ou chaîne vide ; trade: identifiant du catalogue ou chaîne vide ; town: commune connue ou vide ; timing: flexible,month,quarter,urgent ou vide ; published_within: 0,1,7,30 ; budget_from, budget_to: nombres entiers positifs ou 0 ; sort: newest. N’invente ni montant, ni ville ni métier. Aucune recherche exécutée.';
 }
 
+/* Guard against repetitive, generic continuation without using prerecorded answers. */
+function shingles(value){
+ const words=String(value||'').toLocaleLowerCase('fr').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+  .replace(/[^a-z0-9]+/g,' ').split(' ').filter(Boolean);
+ const grams=new Set();
+ for(let i=0;i+2<words.length;i++)grams.add(words.slice(i,i+3).join(' '));
+ return grams;
+}
+export function isRepeatedReply(text,messages=[]){
+ const previous=(Array.isArray(messages)?messages:[]).filter(m=>m?.role==='assistant'&&typeof m.content==='string').at(-1)?.content;
+ if(!previous||String(text||'').length<50)return false;
+ const a=shingles(previous),b=shingles(text);
+ if(a.size<5||b.size<5)return false;
+ let shared=0;for(const n of a)if(b.has(n))shared++;
+ return (2*shared)/(a.size+b.size)>=0.58;
+}
+function isGenericNonanswer(text,messages=[]){
+ const last=(Array.isArray(messages)?messages:[]).filter(m=>m?.role==='user'&&typeof m.content==='string').at(-1)?.content||'';
+ if(!/(tu peux|vous pouvez|que peux|quoi faire|à quoi|quelles fonctions|capacités|ça sert à quoi)/i.test(last))return false;
+ return /(plus de détails|en dire plus|préciser votre demande|ce qu.il y a à faire)/i.test(text)&&
+  !/(annonce|chantier|artisan|métier|recherche|filtre|travaux|candidature|projet)/i.test(text);
+}
+
 export async function generate(payload={},onProgress=()=>{}){
  const mode=['reply','draft','search'].includes(payload?.mode)?payload.mode:'reply';
  const messages=[{role:'system',content:buildPrompt(mode,payload)},...recent(payload.messages)];
@@ -108,8 +131,21 @@ export async function generate(payload={},onProgress=()=>{}){
  const active=await ensureEngine(onProgress,payload.modelTier);
  const req={messages,temperature:mode==='reply'?0.55:0.15,top_p:0.9,max_tokens:mode==='reply'?400:420,stream:false};
  if(mode!=='reply')req.response_format={type:'json_object',schema:JSON.stringify(mode==='draft'?DRAFT_SCHEMA:SEARCH_SCHEMA)};
- const result=await active.chat.completions.create(req);
- const text=result?.choices?.[0]?.message?.content;
+ let result=await active.chat.completions.create(req);
+ let text=result?.choices?.[0]?.message?.content;
  if(typeof text!=='string'||!text.trim())throw Error('Le modèle n’a pas produit de réponse exploitable.');
+ if(mode==='reply'&&(isRepeatedReply(text,payload.messages)||isGenericNonanswer(text,payload.messages))){
+  /* One additional generation from the SAME on-device model, never remote inference. */
+  const retry={
+   ...req,temperature:0.7,
+   messages:[{role:'system',content:buildPrompt(mode,payload)+
+    '\\nTa réponse précédente était trop répétitive ou générique. Réponds maintenant avec des éléments précis et pertinents. Utilise les faits déjà donnés. Pose au maximum UNE question ciblée. Ne répète pas ta réponse précédente.'},...recent(payload.messages)]
+  };
+  try{
+   const another=await active.chat.completions.create(retry);
+   const candidate=another?.choices?.[0]?.message?.content;
+   if(typeof candidate==='string'&&candidate.trim()&&!isRepeatedReply(candidate,payload.messages))text=candidate;
+  }catch{/* Keep the first generated answer if the local revision fails. */}
+ }
  return {text:text.trim(),mode};
 }
