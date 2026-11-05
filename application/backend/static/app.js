@@ -305,7 +305,7 @@ async function renderProfessionalHome(n){
 }
 async function renderProjects(n){
   const req=appState.user.role==='requester',epoch=renderEpoch,owner=appState.user.id;
-  n.append(heading(req?'Vos projets, en bonne voie.':'Le prochain projet est ici.',req?'Retrouvez vos demandes et choisissez avec qui échanger.':'Seules les missions autorisées pour vos profils et vos communes sont affichées.',req?'+ Décrire mon projet':null,()=>startWizard()));
+  n.append(heading(req?'Mes projets de travaux':'Trouver un chantier',req?'Retrouvez vos annonces, brouillons et candidatures.':'Explorez les projets qui correspondent à vos métiers et à vos communes.',req?'Créer une annonce':null,()=>startWizard()));
   const initial=await api('/projects'),items=initial.items;
   if(req){const ds=(await api('/v4/drafts')).items;if(ds.length){const box=panel('À reprendre','Vos brouillons sont enregistrés dans votre compte.');for(const d of ds)box.append(el('div',{class:'item line'},el('strong',{text:d.title||'Nouveau projet'}),button('Continuer',()=>startWizard(d)),button('Supprimer',()=>ask('Supprimer ce brouillon ?','La demande n’a pas été publiée. Ses photos seront également supprimées.',()=>api('/v4/drafts/'+d.id,{method:'DELETE'})))));n.append(box)}}
   if(!req&&initial.search_scope!=='ready'&&initial.search_scope){
@@ -314,23 +314,27 @@ async function renderProjects(n){
   }
   const saved=appState.projectFilters?.owner===owner?appState.projectFilters.values:{};
   const form=el('form',{class:'project-search',role:'search','aria-label':'Rechercher les projets'});
-  const q=field('Rechercher','q','search',{value:saved.q||'',maxlength:120,required:false,placeholder:'Mots-clés, métier, commune…'});
+  const q=field(req?'Rechercher dans mes annonces':'Mots-clés','q','search',{value:saved.q||'',maxlength:120,required:false,placeholder:req?'Ex. Ma salle de bains':'Ex. Carrelage, rénovation, salle de bains…'});
   const select=(label,name,options)=>{const node=field(label,name,'select',{options,required:false});node.querySelector('select').value=saved[name]||'';return node};
   const towns=[...new Set([...items.map(p=>p.town),...(saved.town?[saved.town]:[])])].sort((a,b)=>a.localeCompare(b,'fr'));
   const groups=[...new Set(catalog.map(t=>t.group))].sort((a,b)=>a.localeCompare(b,'fr'));
-  const advanced=el('details',{},el('summary',{text:'Affiner la recherche'}),el('div',{class:'search-grid'},
-    select('Métier','trade',{'':'Tous les métiers',...Object.fromEntries(catalog.map(t=>[t.id,t.label]))}),
-    select('Commune','town',{'':'Toutes les communes disponibles',...Object.fromEntries(towns.map(t=>[t,t]))}),
-    select('Catégorie','category',{'':'Toutes les catégories',...Object.fromEntries(groups.map(t=>[t,t]))}),
-    select('Début souhaité','timing',{'':'Tous les délais',...timingNames}),
-    select('Publication','published_within',{'':'Toutes les dates','1':'Dernières 24 heures','7':'Sept derniers jours','30':'Trente derniers jours'}),
-    amountField('Budget recherché · minimum (€)','budget_from',saved.budget_from),amountField('Budget recherché · maximum (€)','budget_to',saved.budget_to),
-    el('p',{class:'hint budget-filter-note',text:'Le budget annoncé doit recouper votre plage. Les projets sans budget sont exclus uniquement lorsque vous utilisez ce filtre.'}),
-    req?select('Statut','status',{'':'Tous les projets',open:'Ouverts',selected:'Professionnel sélectionné',closed:'Terminés',cancelled:'Annulés',suspended:'Suspendus'}):null));
-  advanced.open=Object.entries(saved).some(([k,v])=>v&&!['q','sort'].includes(k));
+  const trade=select('Métier','trade',{'':'Tous mes métiers',...Object.fromEntries(catalog.map(t=>[t.id,t.label]))});
+  const town=select('Commune','town',{'':'Toutes les communes',...Object.fromEntries(towns.map(t=>[t,t]))});
+  const advanced=el('details',{class:'search-advanced'},
+   el('summary',{text:req?'Filtrer mes projets par statut':'Filtres avancés'}),
+   el('div',{class:'search-grid'},
+    req?select('Statut','status',{'':'Tous mes projets',open:'Ouverts',selected:'Professionnel sélectionné',closed:'Terminés',cancelled:'Annulés',suspended:'Suspendus'}):null,
+    !req?select('Catégorie','category',{'':'Toutes les catégories',...Object.fromEntries(groups.map(t=>[t,t]))}):null,
+    !req?select('Début souhaité','timing',{'':'Tous les délais',...timingNames}):null,
+    !req?select('Publication','published_within',{'':'Toutes les dates','1':'Dernières 24 heures','7':'Sept derniers jours','30':'Trente derniers jours'}):null,
+    !req?amountField('Budget recherché · minimum (€)','budget_from',saved.budget_from):null,
+    !req?amountField('Budget recherché · maximum (€)','budget_to',saved.budget_to):null,
+    !req?el('p',{class:'hint budget-filter-note',text:'Le budget annoncé doit recouper votre plage. Les projets sans budget sont exclus lorsque ce filtre est actif.'}):null));
+  advanced.open=Object.entries(saved).some(([k,v])=>v&&(req?k==='status':!['q','sort','trade','town'].includes(k)));
   const order=select('Trier','sort',{newest:'Plus récents',oldest:'Plus anciens'});order.querySelector('select').value=saved.sort||'newest';
   const reset=button('Effacer les filtres',()=>{for(const c of form.querySelectorAll('input,select'))c.value=c.name==='sort'?'newest':'';action(()=>load())});
-  form.append(q,advanced,el('div',{class:'search-actions'},order,el('button',{type:'submit',class:'primary',text:'Rechercher'}),reset));
+  const core=el('div',{class:'search-core'},q,...(req?[]:[trade,town]));
+  form.append(core,advanced,el('div',{class:'search-actions'},order,el('button',{type:'submit',class:'primary',text:req?'Filtrer':'Rechercher les chantiers'}),reset));
   const list=el('div',{class:'project-list'}),count=el('p',{class:'count',role:'status','aria-live':'polite'});
   n.append(form,count,list);
   if(!req)n.append(el('p',{class:'hint',text:'La commune correspond aux zones déclarées de votre profil ou d’un profil lié actif. Aucun rayon ni temps de trajet n’est calculé.'}));
@@ -343,7 +347,8 @@ async function renderProjects(n){
         el('div',{class:'row-actions'},button(req?'Voir les candidatures →':'Voir le projet →',()=>projectDetail(p)),!req?favoriteButton(p,()=>epoch===renderEpoch&&appState.user?.id===owner):null)));
     }
     if(!rows.length)list.append(empty(req?'Aucun projet ne correspond.':'Aucune mission ne correspond.',
-      'Effacez les filtres ou vérifiez vos métiers et vos communes. Les droits d’accès restent appliqués.',req?'Créer une demande':'Vérifier mon profil',()=>req?startWizard():go('profile')));
+      req?'Essayez d’autres mots-clés ou affichez tous vos projets.':'Élargissez les critères pour trouver davantage de missions disponibles.',
+      'Effacer les filtres',()=>reset.click()));
   }
   let seq=0;
   async function load(){
