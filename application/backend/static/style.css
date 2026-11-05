@@ -310,3 +310,13 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
  .candidate-card .row button{flex:1 1 130px}
 }
 @media(prefers-reduced-motion:reduce){.project-list>.project-row{transition:none}}
+
+.wizard-trade-picker{border:1px solid var(--line);border-radius:11px;margin-top:15px;background:#fff;overflow:hidden}
+.wizard-trade-picker>summary{font-weight:700;font-size:13px;padding:14px 16px;min-height:48px;background:#f8f9fc;color:#3c466f}
+.wizard-trade-picker[open]>summary{border-bottom:1px solid var(--line)}
+.wizard-trade-picker>div{padding:12px}
+.wizard-trade-picker .category-browser{max-height:300px}
+.account-history{margin:20px 0;padding:0;border:1px solid var(--line);border-radius:12px;background:#fff}
+.account-history>summary{font-size:13px;min-height:48px;padding:13px 18px;color:#4a4f63}
+.account-history>.panel{border:0;box-shadow:none;margin:0}
+@media(max-width:680px){.wizard-trade-picker>div{padding:10px}.account-history>.panel{padding:16px}}
