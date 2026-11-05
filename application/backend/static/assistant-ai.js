@@ -2,11 +2,20 @@
 (function(root){
 'use strict';
 function create(hooks){
+ const CONSENT_KEY='ucp.ai.local-model-consent.v1';
  let state=null,ui=null,localConsent=false;
+ function consentStore(){try{return hooks.storage||root.localStorage}catch{return null}}
+ function readConsent(){try{return consentStore()?.getItem(CONSENT_KEY)==='accepted'}catch{return false}}
+ function persistConsent(value){
+  try{
+   if(value)consentStore()?.setItem(CONSENT_KEY,'accepted');
+   else consentStore()?.removeItem(CONSENT_KEY);
+  }catch{/* Storage unavailable: consent will last only for the current page. */}
+ }
  const el=hooks.el,button=hooks.button,get=()=>hooks.context();
  const valid=s=>state===s&&s.actor===get().actor&&s.session===get().session;
- function sync(){if(state&&!valid(state)){hooks.local.reset();state=null;ui=null;localConsent=false;hooks.close()}}
- function clear(){hooks.local.reset();state=null;ui=null;localConsent=false}
+ function sync(){if(state&&!valid(state)){hooks.local.reset();state=null;ui=null;localConsent=readConsent();hooks.close()}}
+ function clear(){hooks.local.reset();state=null;ui=null;localConsent=readConsent()}
  function open(){
   sync();
   const c=get();
@@ -16,6 +25,7 @@ function create(hooks){
    if(!state.busy)ui.querySelector('textarea')?.focus();
    return;
   }
+  localConsent=localConsent||readConsent();
   const s={actor:c.actor,session:c.session,role:c.role,messages:[],pending:null,busy:false,consent:localConsent};
   state=s;
   const model=hooks.local.status();
@@ -32,7 +42,8 @@ function create(hooks){
   const submit=el('button',{class:'ai-send',type:'submit',text:'Envoyer',disabled:true,'aria-label':'Envoyer le message'});
   const form=el('form',{class:'ai-compose-form'},el('div',{class:'ai-input-row'},textarea,submit));
   const acknowledge=el('input',{type:'checkbox',checked:s.consent});
-  const agreement=el('label',{class:'ai-consent'},acknowledge,el('span',{text:'Autoriser le téléchargement de l’IA gratuite sur cet appareil'}));
+  const agreement=el('label',{class:'ai-consent'},acknowledge,el('span',{text:'J’autorise le téléchargement du modèle IA gratuit dans ce navigateur (une seule fois).'}));
+  agreement.hidden=s.consent;
   const draft=button('Préparer mon annonce avec l’IA',()=>invoke('draft'),'ai-action');
   const search=button('Configurer ma recherche avec l’IA',()=>invoke('search'),'ai-action');
   const actions=el('div',{class:'ai-actions'},isRequester?draft:search);
@@ -65,9 +76,15 @@ function create(hooks){
    el('h4',{text:'Bonjour !'}),
    el('p',{text:isRequester?'Je peux vous aider à présenter vos travaux et à créer une annonce.':'Je peux vous aider à rechercher des chantiers et à préciser vos critères.'}),
    suggestions);
+  const revoke=button('Retirer mon autorisation sur ce navigateur',()=>{
+   if(!valid(s)||s.busy)return;
+   s.consent=false;localConsent=false;acknowledge.checked=false;
+   persistConsent(false);agreement.hidden=false;revoke.hidden=true;allowed();
+  },'ai-revoke');
+  revoke.hidden=!s.consent;
   const info=el('details',{class:'ai-technical-details'},
    el('summary',{text:'À propos de cette IA'}),
-   el('p',{text:'Le modèle fonctionne sur votre appareil avec WebGPU : aucune API IA facturée. Un téléchargement important est nécessaire au premier usage. Les messages ne sont pas envoyés à un service de génération. Pour cette préproduction, utilisez des données fictives.'}));
+   el('p',{text:'Le modèle fonctionne dans votre navigateur avec WebGPU, sans API IA facturée. Un téléchargement important est nécessaire au premier usage. Les messages ne sont pas envoyés à un service de génération. L’autorisation est conservée uniquement dans ce navigateur. En navigation privée ou après suppression des données du site, elle sera redemandée. Utilisez uniquement des données fictives en préproduction.'}),revoke);
   const composer=el('div',{class:'ai-composer'},actions,form,agreement,info);
   conversation.append(welcome,log,proposals,status,retry);
   ui.append(headerActions,conversation,composer);
@@ -183,7 +200,13 @@ function create(hooks){
   textarea.addEventListener('keydown',e=>{
    if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();invoke('reply',textarea.value)}
   });
-  acknowledge.addEventListener('change',()=>{s.consent=acknowledge.checked;localConsent=s.consent;allowed()});
+  acknowledge.addEventListener('change',()=>{
+   s.consent=acknowledge.checked;localConsent=s.consent;
+   persistConsent(s.consent);
+   agreement.hidden=s.consent;
+   revoke.hidden=!s.consent;
+   allowed();
+  });
   hooks.show(ui);
   allowed();
   if(!model.configured)status.textContent=model.reason||'Ce navigateur ne prend pas en charge le modèle local.';

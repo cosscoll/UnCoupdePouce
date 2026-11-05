@@ -2,9 +2,9 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const {JSDOM}=require('jsdom');
 const assistant=require('../backend/static/assistant-ai.js');
-function harness(role='requester',configured=true){
- const dom=new JSDOM('<!doctype html><html><body><dialog open></dialog></body></html>');
- const doc=dom.window.document,dialog=doc.querySelector('dialog');
+function harness(role='requester',configured=true,sharedStorage=null){
+ const dom=new JSDOM('<!doctype html><html><body><dialog open></dialog></body></html>',{url:'https://ucp.test'});
+ const doc=dom.window.document,dialog=doc.querySelector('dialog'),storage=sharedStorage||dom.window.localStorage;
  let actor={id:123,role},session='csrf-demo',applied=null,searched=null,resetCount=0;
  const calls=[];
  const el=(tag,attrs={},...children)=>{const n=doc.createElement(tag);
@@ -21,12 +21,12 @@ function harness(role='requester',configured=true){
   send:async payload=>{calls.push(payload);if(response instanceof Error)throw response;return response},
   reset:()=>{resetCount++}
  };
- const ai=assistant.create({el,button,local,
+ const ai=assistant.create({el,button,local,storage,
   context:()=>({actor,session,role,catalog:[{id:'plomberie',label:'Plomberie'}],wizardStep:null}),
   show:node=>{dialog.replaceChildren(node);dialog.open=true},close:()=>{dialog.open=false},
   navigate:()=>{},apply:async d=>{applied=d;return true},search:async s=>{searched=s;return true}
  });
- return {ai,doc,calls,local,set response(v){response=v},get applied(){return applied},get searched(){return searched},
+ return {ai,doc,calls,local,storage,set response(v){response=v},get applied(){return applied},get searched(){return searched},
   get resets(){return resetCount},sessionChange(){actor={id:999,role};session='csrf-new';ai.sync()}};
 }
 const settle=async()=>{await Promise.resolve();await new Promise(resolve=>setImmediate(resolve))};
@@ -137,4 +137,59 @@ test('professional assistant starts with trade-search suggestions rather than re
  assert.ok(btn(h.doc,'Trouver des chantiers'));
  assert.ok(btn(h.doc,'Configurer ma recherche avec l’IA'));
  assert.equal(btn(h.doc,'Rédiger une annonce'),undefined);
+});
+
+test('model download consent is remembered after a reload of the same browser',async()=>{
+ const first=harness();
+ first.ai.open();
+ assert.equal(first.doc.querySelector('input[type=checkbox]').checked,false);
+ assert.equal(first.doc.querySelector('.ai-consent').hidden,false);
+ first.doc.querySelector('input[type=checkbox]').click();
+ assert.equal(first.doc.querySelector('.ai-consent').hidden,true);
+ assert.equal(first.storage.length,1,'only a boolean-style consent flag is stored');
+ assert.equal(first.storage.key(0),'ucp.ai.local-model-consent.v1');
+ assert.equal(first.storage.getItem('ucp.ai.local-model-consent.v1'),'accepted');
+ const second=harness('requester',true,first.storage);
+ second.ai.open();
+ assert.equal(second.doc.querySelector('input[type=checkbox]').checked,true);
+ assert.equal(second.doc.querySelector('.ai-consent').hidden,true);
+ assert.equal(btn(second.doc,'Envoyer').disabled,false);
+ await say(second,'J’ai besoin d’aide pour des travaux.');
+ assert.equal(second.calls.length,1);
+ assert.equal(first.storage.length,1,'neither messages nor account IDs are saved');
+});
+test('one browser authorization works for requester and professional but not another browser',()=>{
+ const first=harness();
+ first.ai.open();first.doc.querySelector('input[type=checkbox]').click();
+ const professional=harness('professional',true,first.storage);
+ professional.ai.open();
+ assert.equal(professional.doc.querySelector('input[type=checkbox]').checked,true);
+ assert.equal(professional.doc.querySelector('.ai-consent').hidden,true);
+ const otherDevice=harness('professional');
+ otherDevice.ai.open();
+ assert.equal(otherDevice.doc.querySelector('input[type=checkbox]').checked,false);
+ assert.equal(otherDevice.doc.querySelector('.ai-consent').hidden,false);
+});
+test('the user can revoke browser authorization in assistant details',()=>{
+ const first=harness();
+ first.ai.open();first.doc.querySelector('input[type=checkbox]').click();
+ btn(first.doc,'Retirer mon autorisation sur ce navigateur').click();
+ assert.equal(first.storage.getItem('ucp.ai.local-model-consent.v1'),null);
+ assert.equal(first.doc.querySelector('.ai-consent').hidden,false);
+ assert.equal(first.doc.querySelector('input[type=checkbox]').checked,false);
+ assert.equal(btn(first.doc,'Envoyer').disabled,true);
+ const later=harness('requester',true,first.storage);
+ later.ai.open();
+ assert.equal(later.doc.querySelector('.ai-consent').hidden,false);
+});
+test('restricted browser storage does not prevent in-session consent',()=>{
+ const denied={getItem(){throw Error('storage blocked')},setItem(){throw Error('storage blocked')},removeItem(){throw Error('storage blocked')}};
+ const first=harness('requester',true,denied);
+ first.ai.open();first.doc.querySelector('input[type=checkbox]').click();
+ assert.equal(first.doc.querySelector('.ai-consent').hidden,true);
+ btn(first.doc,'Nouveau chat').click();
+ assert.equal(first.doc.querySelector('.ai-consent').hidden,true);
+ const nextPage=harness('requester',true,denied);
+ nextPage.ai.open();
+ assert.equal(nextPage.doc.querySelector('.ai-consent').hidden,false);
 });
