@@ -956,7 +956,7 @@ const guidedHelp=(window.UCPAssistantAI||window.UCPGuidedHelp)?.create({
    draftContext:role==='requester'&&currentDraft?draftContent(currentDraft):null,
    searchContext:role==='professional'&&appState.projectFilters?.owner===actor.id?{...appState.projectFilters.values}:null};
  },
- show:content=>showDialog('Assistant UCP',content),close:()=>$('#dialog').close(),
+ show:content=>showDialog('Yahya',content),close:()=>$('#dialog').close(),
  navigate:async view=>{const allowed=appState.user?.role==='professional'?['profile','projects','favorites','applications','conversations','support']:['projects','conversations','support'];if(!allowed.includes(view))return;$('#dialog').close();await go(view)},
  apply:async proposal=>{
   const actor=appState.user,session=appState.csrf,previous=currentDraft,dialogToken=dialogEpoch;

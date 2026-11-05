@@ -1,4 +1,4 @@
-/* Assistant UCP : conversation simple, génération locale sans API facturée. */
+/* Yahya, assistant UCP : conversation simple, génération locale sans API facturée. */
 (function(root){
 'use strict';
 function create(hooks){
@@ -38,7 +38,7 @@ function create(hooks){
   const model=hooks.local.status();
   let modelTier=savedModelTier();
   const isRequester=s.role==='requester';
-  ui=el('section',{class:'guided-helper ucp-ai ai-chat',role:'region','aria-label':'Discussion avec l’assistant UCP'});
+  ui=el('section',{class:'guided-helper ucp-ai ai-chat',role:'region','aria-label':'Discussion avec Yahya, l’assistant UCP'});
   const conversation=el('div',{class:'ai-conversation'});
   const log=el('div',{class:'helper-log ai-messages',role:'log','aria-label':'Messages de la conversation','aria-live':'polite','aria-relevant':'additions text'});
   const proposals=el('div',{class:'ai-options'});
@@ -88,8 +88,8 @@ function create(hooks){
    );
   }
   const welcome=el('div',{class:'ai-welcome'},
-   el('span',{class:'ai-avatar','aria-hidden':'true',text:'UCP'}),
-   el('h4',{text:'Bonjour !'}),
+   el('span',{class:'ai-avatar','aria-hidden':'true',text:'Y'}),
+   el('h4',{text:'Bonjour, je suis Yahya.'}),
    el('p',{text:isRequester?'Je peux vous aider à présenter vos travaux et à créer une annonce.':'Je peux vous aider à rechercher des chantiers et à préciser vos critères.'}),
    suggestions);
   const revoke=button('Retirer mon autorisation sur ce navigateur',()=>{
@@ -129,7 +129,7 @@ function create(hooks){
   }
   function renderMessage(role,text){
    const message=el('div',{class:'helper-message ai-message '+(role==='user'?'from-user':'from-assistant'),'data-role':role},
-    el('strong',{text:role==='user'?'Vous':'Assistant UCP'}),el('p',{text}));
+    el('strong',{text:role==='user'?'Vous':'Yahya'}),el('p',{text}));
    log.append(message);
    if(log.childElementCount>20)log.firstElementChild.remove();
    scrollBottom();
