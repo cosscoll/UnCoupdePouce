@@ -421,3 +421,8 @@ def test_postgres_password_change_revokes_sessions_and_recovery(pg):
 def test_postgres_cancellation_lifecycle_and_visibility(pg):
     from test_project_cancellation import exercise_cancellation
     exercise_cancellation(pg,*project_intake_setup(pg))
+
+
+def test_postgres_suspension_lifecycle_and_visibility(pg):
+    from test_project_suspension import exercise_suspension
+    exercise_suspension(*project_intake_setup(pg))

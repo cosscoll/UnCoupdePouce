@@ -487,6 +487,28 @@ test('requester cancellation requires confirmation and labels the archived proje
  }finally{x.close()}
 });
 
+test('suspended project shows its resume action and hides intake and candidate decisions',async()=>{
+ const project={id:42,title:'Chantier fictif',description:'Une description de test',trade:'plomberie',town:'Toulouse',status:'open',photos:[],suspended:1,intake_version:2};
+ const x=await boot({
+  '/api/projects':{items:[project]},
+  '/api/v4/projects/42':project,
+  '/api/projects/42/applications':{items:[{id:81,professional_name:'Atelier fictif',status:'pending',trades:['plomberie'],service_zones:['Toulouse']}]},
+  'POST /api/projects/42/suspension':{suspended:false,version:3},
+ });
+ try{
+  await x.w.projectDetail(project);
+  const findButton=name=>[...x.w.document.querySelectorAll('button')].find(b=>b.textContent===name);
+  assert.ok(!findButton('Choisir ce professionnel'));
+  assert.ok(!findButton('Ne pas retenir'));
+  assert.ok(!findButton('Mettre les candidatures en pause'));
+  findButton('Reprendre le projet').click();
+  assert.match(x.w.document.querySelector('#dialog').textContent,/réglage précédent/);
+  findButton('Confirmer').click();await tick();
+  const writes=x.calls.filter(call=>call.method==='POST'&&call.url.endsWith('/suspension'));
+  assert.deepEqual(writes.map(call=>call.body),[{suspended:false,version:2}]);
+ }finally{x.close()}
+});
+
 test('cancellation notice opens the matching application and shows why the chat closed',async()=>{
  const x=await boot({
   '/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},
