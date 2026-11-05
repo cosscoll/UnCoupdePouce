@@ -250,3 +250,15 @@ test('if the GPU falls back to light mode, the user is informed and the next mes
  await say(h,'Peux-tu préparer les questions sur la douche ?');
  assert.equal(h.calls.at(-1).modelTier,'light');
 });
+
+test('the assistant presents itself as Yahya in the welcome panel and messages',async()=>{
+ const h=harness();
+ h.ai.open();
+ assert.match(h.doc.querySelector('.ai-welcome h4').textContent,/Yahya/);
+ assert.match(h.doc.querySelector('.ai-chat').getAttribute('aria-label'),/Yahya/);
+ assert.equal(h.doc.querySelector('.ai-avatar').textContent,'Y');
+ h.doc.querySelector('input[type=checkbox]').click();
+ await say(h,'Comment peux-tu me guider ?');
+ const assistantMessage=h.doc.querySelector('.ai-message.from-assistant strong');
+ assert.equal(assistantMessage?.textContent,'Yahya');
+});
