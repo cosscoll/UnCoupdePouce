@@ -213,3 +213,16 @@ body:has(#dialog[open]) .chatbot-launcher{visibility:hidden}
 .ai-chat .ai-technical-details .ai-quality-setting{display:grid;gap:6px;padding:10px 2px 6px;font-size:11px;font-weight:600;color:#4c526f}
 .ai-chat .ai-technical-details .ai-quality-select{width:100%;min-height:43px;max-width:100%;padding:9px 10px;border:1px solid #dfe1eb;border-radius:9px;background:#fff;font-size:12px;color:#2d324b;font-weight:500}
 .ai-chat .ai-technical-details .ai-revoke{display:block;margin:8px 2px 3px}
+
+/* Yahya: subtitle legible under the name, without adding another banner. */
+.chatbot-launcher .chatbot-label-stack{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left}
+.chatbot-launcher .chatbot-label-stack strong{font:inherit;font-weight:700;line-height:1.15}
+.chatbot-launcher .chatbot-label-stack small{font-size:10px;font-weight:500;line-height:1.15;opacity:.9}
+#dialog:has(.ai-chat) #dialog-content>h3{padding-top:13px;padding-bottom:10px}
+#dialog:has(.ai-chat) #dialog-content>h3 .ai-chat-subtitle{
+ display:block;margin-top:2px;color:#70768a;
+ font-size:11px;font-weight:500;line-height:1.35;white-space:nowrap
+}
+@media(max-width:600px){
+ #dialog:has(.ai-chat) #dialog-content>h3{padding-top:11px;padding-bottom:8px}
+}
