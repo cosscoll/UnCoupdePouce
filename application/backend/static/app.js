@@ -4,7 +4,7 @@ const appState={user:null,csrf:null,view:null},trades={};
 let catalog=[],renderEpoch=0,currentDraft=null,wizardStep=1,chatTimer=null,chatEpoch=0,dialogEpoch=0;
 const draftSaveStates=new WeakMap();let draftSaveTimer=null,dialogReturnFocus=null;
 const labels={open:'Ouvert aux candidatures',selected:'Professionnel sélectionné',closed:'Clôturé',cancelled:'Annulé',suspended:'Suspendu',pending:'En attente',accepted:'Sélectionnée',rejected:'Non retenue',withdrawn:'Retirée'};
-const icons={projects:'M4 7h16v14H4z M8 7V3h8v4 M4 12h16',messages:'M4 4h16v13H9l-5 4z',profile:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M4 21v-2a7 7 0 0 1 14 0v2',new:'M12 4v16 M4 12h16',arrow:'M5 12h14 M13 6l6 6-6 6',check:'m5 12 4 4L19 6',settings:'M4 6h16 M4 12h16 M4 18h16',bell:'M6 16V9a6 6 0 0 1 12 0v7l2 2H4z M10 21h4'};
+const icons={home:'M3 10.5 12 3l9 7.5V21H5a2 2 0 0 1-2-2z M9 21v-7h6v7',search:'m20 20-4-4 M10.8 17a6.2 6.2 0 1 0 0-12.4 6.2 6.2 0 0 0 0 12.4',heart:'M20.8 9.4 12 18l-8.8-8.6a4.9 4.9 0 0 1 6.9-6.9L12 4.3l1.9-1.8a4.9 4.9 0 0 1 6.9 6.9z',briefcase:'M3 7h18v13H3z M8 7V4h8v3 M3 13h18',help:'M9 9a3 3 0 1 1 4 2.7c-.9.4-1 1-1 2 M12 18h.01 M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20',people:'M5 19v-1a5 5 0 0 1 10 0v1 M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M17 8a3 3 0 1 1 0 6 M16 17a4 4 0 0 1 5 4',shield:'M12 2 4 5v6c0 5 3.3 8.2 8 11 4.7-2.8 8-6 8-11V5z M8 12l3 3 5-6',projects:'M4 7h16v14H4z M8 7V3h8v4 M4 12h16',messages:'M4 4h16v13H9l-5 4z',profile:'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8 M4 21v-2a7 7 0 0 1 14 0v2',new:'M12 4v16 M4 12h16',arrow:'M5 12h14 M13 6l6 6-6 6',check:'m5 12 4 4L19 6',settings:'M4 6h16 M4 12h16 M4 18h16',bell:'M6 16V9a6 6 0 0 1 12 0v7l2 2H4z M10 21h4'};
 function icon(name){const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.6');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');const p=document.createElementNS(svg.namespaceURI,'path');p.setAttribute('d',icons[name]||icons.projects);svg.append(p);return svg}
 function el(tag,attrs={},...children){const n=document.createElement(tag);for(const[k,v]of Object.entries(attrs)){if(k.startsWith('on'))n.addEventListener(k.slice(2).toLowerCase(),v);else if(k==='text')n.textContent=v;else if(['value','checked','hidden','disabled','required','selected'].includes(k))n[k]=v;else if(k==='class')n.className=v;else if(k==='htmlFor')n.htmlFor=v;else n.setAttribute(k,v)}for(const c of children.flat(Infinity))if(c!=null)n.append(c.nodeType?c:document.createTextNode(String(c)));return n}
 function clear(n){n.replaceChildren();return n}function formValue(f){return Object.fromEntries(new FormData(f))}
@@ -85,15 +85,22 @@ async function restoreHistoryNavigation(){
  if(destination===appState.view&&!currentDraft)return;
  await go(destination,{fromHistory:true});
 }
-window.addEventListener('popstate',()=>{restoreHistoryNavigation().catch(()=>{})});
-window.addEventListener('hashchange',()=>{restoreHistoryNavigation().catch(()=>{})});
+let historyRestoreInProgress=false;
+async function onHistoryChange(){
+ if(historyRestoreInProgress)return;
+ historyRestoreInProgress=true;
+ try{await restoreHistoryNavigation()}catch{}
+ finally{historyRestoreInProgress=false}
+}
+window.addEventListener('popstate',onHistoryChange);
+window.addEventListener('hashchange',onHistoryChange);
 function focusPageHeading(){const target=$('#view h2')||$('#view h3')||$('#main');target.setAttribute('tabindex','-1');target.focus()}
 function setNavigationOpen(open){const toggle=$('#navigation-toggle');$('.sidebar').dataset.navigationOpen=String(open);toggle.setAttribute('aria-expanded',String(open))}
 function showDialog(title,content){++dialogEpoch;const dialog=$('#dialog'),wasOpen=dialog.open;if(!wasOpen)dialogReturnFocus=document.activeElement;const n=clear($('#dialog-content')),heading=el('h3',{id:'dialog-title',tabindex:'-1',text:title});n.append(heading,content);dialog.setAttribute('aria-labelledby','dialog-title');dialog.showModal();(wasOpen?heading:n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')||$('#dialog-close')).focus()}
 function ask(title,desc,fn,success){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const dialogToken=dialogEpoch;const r=await action(fn,success);if(r){if(dialogToken===dialogEpoch&&$('#dialog').open)$('#dialog').close();const token=renderEpoch+1;await render();if(token===renderEpoch&&!$('#dialog').open)focusPageHeading()}},'primary'));showDialog(title,body)}
 function roleNavigation(role){
- const items=role==='requester'?[['requester-home','Mon accueil','settings'],['projects','Mes projets','projects'],['conversations','Messages','messages']]:role==='professional'?[['professional-home','Vue d’ensemble','settings'],['projects','Trouver des projets','projects'],['favorites','Mes favoris','check'],['applications','Mes candidatures','check'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','settings']]:[['admin','Vue d’ensemble','settings'],['moderation','Modération','projects'],['catalog','Métiers du bâtiment','settings']];
- return [...items,['support','Assistance','messages'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']];
+ const items=role==='requester'?[['requester-home','Mon accueil','home'],['projects','Mes projets','projects'],['conversations','Messages','messages']]:role==='professional'?[['professional-home','Vue d’ensemble','home'],['projects','Trouver des projets','search'],['favorites','Mes favoris','heart'],['applications','Mes candidatures','briefcase'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','people']]:[['admin','Vue d’ensemble','home'],['moderation','Modération','shield'],['catalog','Métiers du bâtiment','settings']];
+ return [...items,['support','Assistance','help'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']];
 }
 function initialView(role){
  const requested=location.hash.slice(1);
@@ -1089,7 +1096,8 @@ function passwordPanel(available){
 }
 
 async function renderPersonalData(target){
-  const box=panel('Mes données de laboratoire','Toutes les données affichées proviennent exclusivement de votre compte fictif. Aucun transfert externe.');
+  target.append(heading('Mon compte','Retrouvez vos informations personnelles, les réglages de votre session et vos données.'));
+  const box=panel('Mes informations','Données fictives uniquement dans cette préproduction privée.');
   const data=await api('/account/export');
   const form=el('form',{},field('Votre nom affiché','name','text',{value:data.user.name,minlength:2,maxlength:100}),el('button',{type:'submit',text:'Enregistrer mon nom',class:'outline'}));form.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/account',{method:'PUT',body:formValue(form)}),'Nom enregistré.');if(r){appState.user.name=r.name;render()}});box.append(form);
   box.append(el('p',{text:`Compte : ${data.user.name} · ${data.user.email} · rôle ${data.user.role}`}));
@@ -1110,7 +1118,8 @@ async function renderPersonalData(target){
     const url=URL.createObjectURL(blob);const a=el('a',{href:url,download:'ucp-lab-donnees-fictives.json'});
     document.body.append(a);a.click();a.remove();URL.revokeObjectURL(url);
   }));
-  target.append(box,passwordPanel(sessions.password_change_available),log);
+  const history=el('details',{class:'account-history'},el('summary',{text:'Afficher mon historique d’activité'}),log);
+  target.append(box,passwordPanel(sessions.password_change_available),history);
 }
 async function loadCatalog(){catalog=(await api('/catalog')).items;for(const t of catalog)trades[t.id]=t.label}
 let entrySpace='requester';
