@@ -363,7 +363,7 @@ test('wizard preserves optional budget, distinguishes explicit zero and refuses 
  }
 });
 test('budget search sends explicit zero bounds and explains missing budgets',async()=>{
- const x=await boot({'/api/projects?budget_from=0&budget_to=0&sort=newest':{items:[]}});try{
+ const x=await boot({'/api/session':{id:2,name:'Artisan',role:'professional',csrf:'pro-token'},'/api/projects':{items:[],search_scope:'ready'},'/api/projects?budget_from=0&budget_to=0&sort=newest':{items:[]}});try{
   input(x.w,'.project-search [name=budget_from]','0');input(x.w,'.project-search [name=budget_to]','0');submit(x.w,'.project-search');await tick();
   assert.ok(x.calls.some(c=>c.url==='/api/projects?budget_from=0&budget_to=0&sort=newest'));
   assert.match(x.w.document.querySelector('.budget-filter-note').textContent,/sans budget sont exclus/);
