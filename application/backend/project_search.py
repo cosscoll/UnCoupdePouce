@@ -26,7 +26,9 @@ def filter_projects(items,taxonomy,*,q='',trade='',town='',category='',timing=No
         if town and normalize(p['town'])!=normalize(town.strip()):return False
         if category and not any(normalize(catalog.get(t,{}).get('group_name',''))==normalize(category) for t in scope):return False
         if timing and p['timing']!=timing:return False
-        if status and p['status']!=status:return False
+        if status=='cancelled':
+            if not p.get('cancelled'):return False
+        elif status and p['status']!=status:return False
         if cutoff:
             try:stamp=datetime.fromisoformat(p['created_at'])
             except (ValueError,TypeError):return False

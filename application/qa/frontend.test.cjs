@@ -463,6 +463,47 @@ test('previous wizard step refuses an invalid budget without discarding the ente
  }finally{x.close()}
 });
 
+test('requester cancellation requires confirmation and labels the archived project',async()=>{
+ let cancelled=false;
+ const project={id:42,title:'Chantier fictif',description:'Une description de test',trade:'plomberie',town:'Toulouse',status:'open',photos:[]};
+ const x=await boot({
+  '/api/projects':()=>({items:[{...project,status:cancelled?'closed':'open',cancelled}]}),
+  '/api/v4/projects/42':project,
+  '/api/projects/42/applications':{items:[]},
+  'POST /api/projects/42/cancel':()=>{cancelled=true;return {ok:true,status:'closed',cancelled:true};},
+ });
+ try{
+  await x.w.projectDetail(project);
+  const findButton=name=>[...x.w.document.querySelectorAll('button')].find(b=>b.textContent===name);
+  findButton('Annuler le projet').click();
+  assert.match(x.w.document.querySelector('#dialog').textContent,/candidatures en attente prendront fin/);
+  assert.ok(!x.calls.some(call=>call.url.endsWith('/cancel')));
+  findButton('Fermer').click();
+  assert.ok(!x.calls.some(call=>call.url.endsWith('/cancel')));
+  findButton('Annuler le projet').click();findButton('Confirmer').click();await tick();
+  assert.equal(x.calls.filter(call=>call.url.endsWith('/cancel')).length,1);
+  assert.match(x.w.document.querySelector('.project-row').textContent,/Annulé/);
+  assert.match(x.w.document.querySelector('#alert').textContent,/projet a été annulé/);
+ }finally{x.close()}
+});
+
+test('cancellation notice opens the matching application and shows why the chat closed',async()=>{
+ const x=await boot({
+  '/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},
+  '/api/notifications':{unread:1,items:[{id:3,event_type:'project_cancelled',entity_id:42,message:'Le demandeur a annulé le chantier.',created_at:'2026-11-05T13:30:00Z'}]},
+  '/api/my-applications':{items:[{id:42,title:'Chantier annulé',trade:'plomberie',town:'Toulouse',status:'accepted',project_status:'closed',project_cancelled:1,conversation_state:'closed'}]},
+ });
+ try{
+  await x.w.go('notifications');
+  [...x.w.document.querySelectorAll('button')].find(b=>b.textContent==='Voir ma candidature').click();
+  await tick();
+  const card=x.w.document.querySelector('#application-42');
+  assert.equal(x.w.document.activeElement,card);
+  assert.match(card.textContent,/Projet annulé par le demandeur/);
+  assert.equal(card.querySelector('button'),null);
+ }finally{x.close()}
+});
+
 test('application tracking distinguishes closed projects and filters without suggesting inaccessible messages',async()=>{
  const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/my-applications':{items:[
   {id:31,title:'Projet fermé',trade:'plomberie',town:'Toulouse',status:'accepted',project_status:'closed',conversation_state:'closed'},

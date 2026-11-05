@@ -233,7 +233,7 @@ def install(m):
         with m.authenticated_db(user,write=False) as c:
             r,matches=visible_project(c,id,user)
             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
-            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version')};row['trades']=list(m.project_trades(r))
+            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version','cancelled')};row['trades']=list(m.project_trades(r))
             if r['requester_id']==user['id']:
                 row['content_version']=r['content_version']
                 applications=m.project_edit_applications(c,id)
