@@ -18,7 +18,7 @@ function harness(role='requester',configured=true){
  let response={reply:'Je peux vous aider à préciser votre besoin.',draft:null,search:null};
  const local={
   status:()=>({configured,reason:'WebGPU indisponible sur cet appareil.'}),
-  send:async payload=>{calls.push(payload);return response},
+  send:async payload=>{calls.push(payload);if(response instanceof Error)throw response;return response},
   reset:()=>{resetCount++}
  };
  const ai=assistant.create({el,button,local,
@@ -78,4 +78,19 @@ test('unsupported device never fakes an AI reply',async()=>{
 test('session change stops the local AI worker and clears conversation',async()=>{
  const h=harness();h.ai.open();h.sessionChange();
  assert.equal(h.resets,1);
+});
+
+test('a failed local model import offers retry without duplicating the user prompt',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ h.response=Error('Chargement CDN refusé');
+ await say(h,'Peux-tu m’aider pour une fuite ?');
+ const retry=btn(h.doc,'Réessayer de générer la réponse');
+ assert.equal(retry.hidden,false);
+ assert.match(h.doc.body.textContent,/Chargement CDN refusé/);
+ h.response={reply:'Précisez la pièce et la nature de la fuite.',draft:null,search:null};
+ retry.click();await settle();
+ assert.equal(h.calls.length,2);
+ assert.deepEqual(h.calls[0].messages,h.calls[1].messages);
+ assert.equal(retry.hidden,true);
+ assert.match(h.doc.body.textContent,/Précisez la pièce/);
 });
