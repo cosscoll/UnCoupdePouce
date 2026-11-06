@@ -70,6 +70,7 @@ function create(hooks){
    if(!valid(s)||s.busy)return;
    state=null;ui=null;open();
   },'ai-new-chat');
+  newChat.hidden=!model.configured;
   const headerActions=el('div',{class:'ai-header-actions'},newChat);
   const suggestions=el('div',{class:'ai-suggestions'});
   function prefill(text){
@@ -99,6 +100,7 @@ function create(hooks){
     button('Utiliser UCP',()=>prefill('Explique-moi comment fonctionne Un Coup de Pouce pour les professionnels.'),'ai-suggestion')
    );
   }
+  suggestions.hidden=!model.configured;
   const welcome=el('div',{class:'ai-welcome'},
    el('span',{class:'ai-avatar','aria-hidden':'true',text:'Y'}),
    el('h4',{text:'Bonjour, je suis Yahya.'}),
@@ -125,6 +127,7 @@ function create(hooks){
   const info=el('details',{class:'ai-technical-details'},
    el('summary',{text:'À propos de cette IA'}),
    el('p',{text:'Qwen 3B offre des réponses généralement plus pertinentes que l’ancien modèle 0,5B, mais nécessite davantage de mémoire et un téléchargement initial important. Si votre appareil ne le charge pas, passez en mode léger (1,5B). L’IA fonctionne sur votre GPU avec WebGPU, sans API payante. Les messages ne quittent pas votre appareil. L’autorisation est conservée dans le navigateur, sauf navigation privée ou effacement des données. Utilisez des informations fictives en préproduction.'}),qualitySetting,revoke);
+  form.hidden=!model.configured;
   const composer=el('div',{class:'ai-composer'},actions,form,agreement,info);
   const unavailable=el('section',{class:'ai-unavailable',role:'region','aria-label':'Utiliser UCP sans modèle IA'},
    el('h4',{text:'Continuer sans l’IA'}),
