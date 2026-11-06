@@ -69,6 +69,7 @@ async function go(v,options={}){
   stopDraft();
  }
  setNavigationOpen(false);
+ if(v==='applications')appState.applicationFilter=['pending','accepted','closed'].includes(options.applicationFilter)?options.applicationFilter:'all';
  appState.view=v;
  if(!fromHistory)history.pushState({ucpView:v},'','#'+v);
  const token=renderEpoch+1;
@@ -272,7 +273,28 @@ async function renderProfessionalHome(n){
  priority.append(el('p',{class:'muted small',text:'Chargement de votre prochaine étape…'}));
  const grid=el('div',{class:'overview-grid'});
  n.append(priority,el('details',{class:'home-overview'},el('summary',{text:'Voir le détail de mon activité'}),grid));
- const snapshot={};
+ const snapshot={},quickErrors=new Set();
+ const quick=el('section',{class:'pro-quick-overview',role:'region','aria-label':'Raccourcis de suivi professionnel'});
+ const quickMetrics=[
+  {key:'projects',title:'Chantiers disponibles',view:'projects',label:'Voir les chantiers',count:()=>snapshot.projects.items.filter(p=>p.status==='open').length},
+  {key:'applications',title:'Candidatures en attente',view:'applications',filter:'pending',label:'Suivre',count:()=>snapshot.applications.items.filter(a=>a.status==='pending'&&a.project_status!=='closed').length},
+  {key:'applications',title:'Candidatures sélectionnées',view:'applications',filter:'accepted',label:'Suivre',count:()=>snapshot.applications.items.filter(a=>a.status==='accepted'&&a.project_status!=='closed').length},
+  {key:'conversations',title:'Conversations accessibles',view:'conversations',label:'Voir les messages',count:()=>snapshot.conversations.items.filter(c=>!!c.subscription_active&&(!c.linked_profile_id||c.linked_active)).length}
+ ];
+ for(const metric of quickMetrics){
+  metric.value=el('strong',{class:'pro-quick-count',text:'—'});
+  metric.help=el('span',{class:'pro-quick-help',text:'Chargement…'});
+  quick.append(el('div',{class:'pro-quick-card'},el('span',{class:'pro-quick-title',text:metric.title}),metric.value,metric.help,
+   button(metric.label,()=>go(metric.view,metric.filter?{applicationFilter:metric.filter}:{}),'outline')));
+ }
+ priority.insertAdjacentElement('afterend',quick);
+ function refreshQuick(){
+  for(const metric of quickMetrics){
+   const ready=!!snapshot[metric.key],broken=quickErrors.has(metric.key);
+   metric.value.textContent=ready?String(metric.count()):'—';
+   metric.help.textContent=ready?'Données de votre compte':broken?'Indisponible · consultez la rubrique':'Chargement…';
+  }
+ }
  function updatePriority(){
   if(epoch!==renderEpoch)return;
   const profile=snapshot.profile?.profile,missions=snapshot.projects?.items||[],
@@ -337,9 +359,12 @@ async function renderProfessionalHome(n){
  });
  async function load(target,path){
   try{
-   const data=await api(path);if(epoch!==renderEpoch)return false;snapshot[path.split('?')[0].replace('/my-','/').slice(1)]=data;clear(target.content);target.draw(data,target.content);updatePriority();return {ok:true};
+   const data=await api(path);if(epoch!==renderEpoch)return false;
+   const key=path.split('?')[0].replace('/my-','/').slice(1);snapshot[key]=data;quickErrors.delete(key);
+   clear(target.content);target.draw(data,target.content);refreshQuick();updatePriority();return {ok:true};
   }catch(e){
    if(e.stale||e.status===401||epoch!==renderEpoch)return false;
+   const key=path.split('?')[0].replace('/my-','/').slice(1);quickErrors.add(key);refreshQuick();
    clear(target.content);target.content.append(el('p',{class:'status-note',text:'Information indisponible. Les autres rubriques restent utilisables.'}),button('Réessayer cette rubrique',()=>action(()=>load(target,path))));return false;
   }
  }
