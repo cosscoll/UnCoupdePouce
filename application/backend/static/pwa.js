@@ -2,9 +2,13 @@
 (function(){
   'use strict';
   let promptEvent=null,installed=false;
-  const trigger=document.querySelector('#install-app'),help=document.querySelector('#install-help');
+  const trigger=document.querySelector('#install-app'),mobileTrigger=document.querySelector('#install-mobile'),help=document.querySelector('#install-help');
   const standalone=()=>navigator.standalone===true||window.matchMedia?.('(display-mode: standalone)').matches===true;
-  const update=()=>{trigger.hidden=installed||standalone();};
+  const update=()=>{
+    const unavailable=installed||standalone();
+    trigger.hidden=unavailable;
+    if(mobileTrigger)mobileTrigger.hidden=unavailable;
+  };
   function instructions(){
     const box=el('div',{},el('p',{text:'Ajoutez UCP à votre écran d’accueil depuis un navigateur compatible. Il s’agit d’une application web, sans téléchargement depuis un store.'}),
       el('h4',{text:'Android · Chrome ou navigateur compatible'}),el('p',{text:'Ouvrez le menu du navigateur, puis « Installer l’application » ou « Ajouter à l’écran d’accueil », selon les options proposées.'}),
@@ -22,13 +26,21 @@
     },'primary'));
     showDialog('Installer UCP sur cet appareil',box);
   }
-  trigger.addEventListener('click',instructions);help.addEventListener('click',instructions);
+  trigger.addEventListener('click',instructions);mobileTrigger?.addEventListener('click',instructions);help.addEventListener('click',instructions);
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();promptEvent=event;update();});
-  window.addEventListener('appinstalled',()=>{promptEvent=null;installed=true;trigger.hidden=true;msg('Installation confirmée par le navigateur.','success');});
+  window.addEventListener('appinstalled',()=>{promptEvent=null;installed=true;update();msg('Installation confirmée par le navigateur.','success');});
   const display=window.matchMedia?.('(display-mode: standalone)');display?.addEventListener?.('change',update);update();
   const status=document.querySelector('#connection-status');
-  window.addEventListener('offline',()=>{status.textContent='Vous êtes hors connexion. Vos saisies restent dans cette page. Rien ne sera envoyé automatiquement.';status.hidden=false;});
-  window.addEventListener('online',()=>{status.textContent='Connexion détectée. Vous pouvez réessayer vos actions ; rien n’a été envoyé automatiquement.';status.hidden=false;});
+  function showNetworkNotice(text){
+    const dismiss=document.createElement('button');
+    dismiss.type='button';dismiss.className='connection-dismiss';dismiss.textContent='Masquer';
+    dismiss.setAttribute('aria-label','Masquer le message de connexion');
+    dismiss.addEventListener('click',()=>{status.hidden=true});
+    status.replaceChildren(document.createTextNode(text+' '),dismiss);
+    status.hidden=false;
+  }
+  window.addEventListener('offline',()=>showNetworkNotice('Vous êtes hors connexion. Vos saisies restent dans cette page. Rien ne sera envoyé automatiquement.'));
+  window.addEventListener('online',()=>showNetworkNotice('Connexion détectée. Vous pouvez réessayer vos actions ; rien n’a été envoyé automatiquement.'));
   if(navigator.onLine===false)window.dispatchEvent(new Event('offline'));
   if(window.isSecureContext&&'serviceWorker' in navigator){
     navigator.serviceWorker.register('/ucp-sw.js',{scope:'/',updateViaCache:'none'}).catch(()=>{
