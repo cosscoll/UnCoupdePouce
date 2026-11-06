@@ -1262,7 +1262,8 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Menu professionnel : quatre rubriques principales ; favoris, entreprise, compte et autres fonctions dans « Mon activité et réglages ».'}),
    el('li',{text:'Recherche : filtres particuliers et professionnels séparés ; métier et commune visibles en premier pour les professionnels.'}),
    el('li',{text:'Artisans : spécialités et zones plus lisibles ; informations détaillées repliables et vérifications non réalisées clairement signalées.'}),
-   el('li',{text:'Navigation : le retour et l’avancement du navigateur fonctionnent entre les rubriques avec sauvegarde du brouillon avant de quitter.'})
+   el('li',{text:'Navigation : le retour et l’avancement du navigateur fonctionnent entre les rubriques avec sauvegarde du brouillon avant de quitter.'}),
+   el('li',{text:'Annonce de chantier : renseignez une surface, une longueur, une largeur ou une hauteur dans l’étape « Les détails ». Ces mesures facultatives sont enregistrées avec le brouillon, visibles dans le projet et modifiables avant sélection.'})
   ),
   el('p',{class:'small muted',text:'Version 2026.11.06. Les modifications concernent les espaces connectés. Une partie des informations est accessible après ouverture des sections repliables.'})
  );
