@@ -33,7 +33,7 @@ function create(hooks){
    return;
   }
   localConsent=localConsent||readConsent();
-  const s={actor:c.actor,session:c.session,role:c.role,messages:[],pending:null,busy:false,consent:localConsent};
+  const s={actor:c.actor,session:c.session,role:c.role,messages:[],pending:null,busy:false,runId:0,consent:localConsent};
   state=s;
   const model=hooks.local.status();
   let modelTier=savedModelTier();
@@ -56,6 +56,19 @@ function create(hooks){
    invoke('reply',null);
   },'ai-light-recovery');
   lightRecovery.hidden=true;
+  const cancel=button('Arrêter cette réponse',()=>{
+   if(!valid(s)||!s.busy)return;
+   s.runId++;
+   hooks.local.reset();
+   s.busy=false;
+   status.classList.remove('is-loading');
+   status.textContent='Réponse arrêtée. Votre question reste dans la conversation ; vous pouvez réessayer.';
+   retry.hidden=false;
+   lightRecovery.hidden=modelTier!=='quality';
+   allowed();
+   textarea.focus();
+  },'ai-cancel');
+  cancel.hidden=true;
   const textarea=el('textarea',{rows:2,maxlength:1200,required:true,'aria-label':'Votre message pour le chatbot IA',
    placeholder:'Écrivez votre message…'});
   const submit=el('button',{class:'ai-send',type:'submit',text:'Envoyer',disabled:true,'aria-label':'Envoyer le message'});
@@ -138,7 +151,7 @@ function create(hooks){
      :[['Chercher des chantiers','projects'],['Suivre mes candidatures','applications'],['Contacter l’assistance','support']]
     ).map(([label,view])=>button(label,()=>{if(valid(s))hooks.navigate?.(view)},'outline'))));
   unavailable.hidden=!!model.configured;
-  conversation.append(welcome,unavailable,log,proposals,status,retry,lightRecovery);
+  conversation.append(welcome,unavailable,log,proposals,status,cancel,retry,lightRecovery);
   ui.append(headerActions,conversation,composer);
   function scrollBottom(){conversation.scrollTop=conversation.scrollHeight}
   function allowed(){
@@ -148,6 +161,7 @@ function create(hooks){
    draft.disabled=!active||!s.messages.some(m=>m.role==='user');
    search.disabled=!active||!s.messages.some(m=>m.role==='user');
    newChat.disabled=s.busy;
+   cancel.hidden=!s.busy;
    retry.disabled=!active||!s.messages.some(m=>m.role==='user');
    actions.hidden=!s.messages.some(m=>m.role==='user');
   }
@@ -223,6 +237,7 @@ function create(hooks){
    if(!s.messages.some(m=>m.role==='user')){
     status.textContent='Décrivez d’abord votre besoin.';return;
    }
+   const run=++s.runId;
    s.busy=true;s.pending=null;retry.hidden=true;lightRecovery.hidden=true;showPending();allowed();
    status.classList.add('is-loading');
    status.textContent='L’assistant prépare sa réponse…';
@@ -233,13 +248,13 @@ function create(hooks){
     const output=await hooks.local.send({mode,role:s.role,catalog:appContext.catalog,messages,modelTier,
      draftContext:appContext.draftContext,searchContext:appContext.searchContext,
      onProgress:(label,pct)=>{
-      if(valid(s)&&ui?.closest('dialog')?.open){
+      if(valid(s)&&run===s.runId&&ui?.closest('dialog')?.open){
        const percentage=Number.isFinite(pct)&&pct>0?' ('+Math.min(100,Math.round(pct*100))+' %)':'';
        status.textContent=label+percentage;
        scrollBottom();
       }
      }});
-    if(!valid(s)||!ui?.closest('dialog')?.open)return;
+    if(!valid(s)||run!==s.runId||!ui?.closest('dialog')?.open)return;
     say('assistant',output.reply);
     s.pending=output.draft||output.search?{draft:output.draft||null,search:output.search||null}:null;
     showPending();
@@ -248,7 +263,7 @@ function create(hooks){
      status.textContent='Le modèle léger (1,5B) a été chargé automatiquement : votre appareil manquait de mémoire pour le modèle 3B.';
     }else status.textContent='';
    }catch(e){
-    if(valid(s)&&ui?.closest('dialog')?.open){
+    if(valid(s)&&run===s.runId&&ui?.closest('dialog')?.open){
      status.textContent=(e?.message||'Le modèle local est indisponible. Réessayez.')+
       (modelTier==='quality'?' Si le modèle ne démarre pas, essayez le mode léger dans « À propos de cette IA ».':'');
      retry.hidden=false;
@@ -256,7 +271,7 @@ function create(hooks){
      scrollBottom();
     }
    }finally{
-    if(valid(s)){s.busy=false;status.classList.remove('is-loading');allowed();if(ui?.closest('dialog')?.open)textarea.focus()}
+    if(valid(s)&&run===s.runId){s.busy=false;status.classList.remove('is-loading');allowed();if(ui?.closest('dialog')?.open)textarea.focus()}
    }
   }
   textarea.addEventListener('input',allowed);
