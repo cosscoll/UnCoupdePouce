@@ -352,3 +352,21 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 .feedback-form .primary{min-height:45px;justify-self:start}
 .feedback-rating{font-size:17px;font-weight:700;color:var(--violet)}
 @media(max-width:680px){.project-feedback{padding:18px}.feedback-form .primary{width:100%}}
+
+/* F11: optional measurements, deliberately separate from price or verified metrics. */
+.measurements-panel{margin:15px 0 22px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.measurements-panel>summary{padding:14px 18px;min-height:48px;background:#f8f9fc;color:#36426b;
+ font-size:13px;font-weight:700;cursor:pointer}
+.measurements-panel[open]>summary{border-bottom:1px solid var(--line)}
+.measurements-panel>.hint{padding:13px 18px 0;margin:0;line-height:1.6;font-size:12px}
+.measurements-grid{padding:14px 18px 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.measurements-grid label{display:grid;gap:7px;min-width:0;font-weight:600;font-size:13px;color:var(--ink)}
+.measurements-grid input{width:100%;min-width:0;padding:11px;font-size:14px;min-height:43px;
+ border:1px solid #acb1bf;border-radius:9px;background:#fff;color:var(--ink)}
+.measurements-grid input:focus-visible{outline:3px solid #505dc1;outline-offset:2px}
+.project-measurements{margin:16px 0;padding:20px;border-left:3px solid var(--violet)}
+.project-measurements h3{margin:0 0 10px;font-size:16px}
+.project-measurements p{line-height:1.65;font-size:13px}
+.project-measurements .hint{font-size:12px}
+@media(max-width:620px){.measurements-grid{grid-template-columns:1fr;padding:12px 15px 15px}
+.measurements-panel>.hint{padding:12px 15px 0}.project-measurements{padding:15px}}
