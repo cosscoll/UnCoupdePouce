@@ -157,7 +157,7 @@ test('model download consent is remembered after a reload of the same browser',a
  second.ai.open();
  assert.equal(second.doc.querySelector('input[type=checkbox]').checked,true);
  assert.equal(second.doc.querySelector('.ai-consent').hidden,true);
- assert.equal(btn(second.doc,'Envoyer').disabled,false);
+ assert.equal(btn(second.doc,'Envoyer').disabled,true,'consent persists, but an empty message cannot be sent');
  await say(second,'J’ai besoin d’aide pour des travaux.');
  assert.equal(second.calls.length,1);
  assert.equal(first.storage.length,1,'neither messages nor account IDs are saved');
