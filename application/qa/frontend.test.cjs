@@ -360,11 +360,13 @@ test('admin beta overview separates real profile authorization states without in
   await x.w.go('admin');
   assert.match(d.querySelector('#view').textContent,/Préparer les tests utilisateurs/);
   const metrics=[...d.querySelectorAll('.beta-admin-metric')].map(n=>n.textContent);
-  assert.equal(metrics.length,4);
+  assert.equal(metrics.length,5);
   assert.ok(metrics.some(x=>x.includes('1Profils à examiner')));
   assert.ok(metrics.some(x=>x.includes('1Accès à activer')));
   assert.ok(metrics.some(x=>x.includes('1Accès de test actifs')));
   assert.ok(metrics.some(x=>x.includes('3Comptes particuliers')));
+  assert.ok(metrics.some(x=>x.includes('2Sans profil déclaré')));
+  assert.ok([...d.querySelectorAll('.beta-admin-overview button')].some(b=>b.textContent==='Examiner les retours et signalements'));
   assert.match(d.querySelector('#view').textContent,/ne distinguent pas la prochaine cohorte/);
   assert.equal(d.querySelectorAll('.beta-admin-profile').length,3);
   assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
@@ -2034,6 +2036,35 @@ test('UX audit: account screen keeps install and logout after personal informati
  }finally{x.close()}
 });
 
+
+test('beta admin suspension is still available separately from reversible chat access',async()=>{
+ const x=await boot({
+  '/api/session':{id:99,name:'Admin test',role:'admin',csrf:'admin-token'},
+  '/api/admin/metrics':{counts:{professionals:1}},
+  '/api/admin/queue':{items:[{id:91,name:'Atelier actif',trade:'peinture',town:'Toulouse',approved:1,subscription_active:1}]},
+  '/api/admin/audit':{items:[]},
+  'POST /api/admin/professionals/91/suspend':{ok:true}
+ });
+ try{
+  await x.w.go('admin');
+  const d=x.w.document,actions=[...d.querySelectorAll('.beta-admin-profile-actions button')];
+  assert.ok(actions.some(b=>/Retirer l’accès aux conversations/.test(b.textContent)));
+  const suspend=actions.find(b=>b.textContent==='Suspendre le profil');
+  assert.ok(suspend);suspend.click();
+  assert.equal(d.querySelector('#dialog').open,true);
+  assert.match(d.querySelector('#dialog').textContent,/suspension désactive/);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+  d.querySelector('#dialog-close').click();
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+  suspend.click();
+  [...d.querySelectorAll('#dialog button')].find(b=>b.textContent==='Confirmer').click();
+  await tick();await tick();
+  const writes=x.calls.filter(c=>c.method==='POST');
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].url,'/api/admin/professionals/91/suspend');
+  assert.equal(writes[0].headers['x-ucp-csrf'],'admin-token');
+ }finally{x.close()}
+});
 
 test('beta admin dashboard displays grounded access counts and read-only filters',async()=>{
  const x=await boot({

@@ -610,3 +610,9 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 @media(max-width:1050px){.beta-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:540px){.beta-admin-metrics{gap:8px}.beta-admin-metric{padding:12px}.beta-admin-profile-actions button{width:100%}}
 @media(forced-colors:active){.beta-admin-filters button[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:-2px}}
+
+/* Keep the expanded beta access overview legible at zoom and on mobile. */
+.beta-admin-metrics{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.beta-admin-profile-actions button{white-space:normal}
+.beta-admin-overview>.outline{margin-top:15px}
+@media(max-width:480px){.beta-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}

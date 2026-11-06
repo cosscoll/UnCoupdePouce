@@ -1488,7 +1488,8 @@ function betaAdminOverview(m,queue){
   ['Comptes particuliers',m.requesters||0,'Tous les comptes existants, y compris historiques'],
   ['Profils à examiner',queue.filter(p=>betaProfileStatus(p)==='review').length,'Autorisation manuelle nécessaire'],
   ['Accès à activer',queue.filter(p=>betaProfileStatus(p)==='activation').length,'Profils approuvés, messagerie de test inactive'],
-  ['Accès de test actifs',queue.filter(p=>betaProfileStatus(p)==='active').length,'Ne prouve pas la présence d’un testeur réel']
+  ['Accès de test actifs',queue.filter(p=>betaProfileStatus(p)==='active').length,'Ne prouve pas la présence d’un testeur réel'],
+  ['Sans profil déclaré',Math.max(0,(m.professionals||0)-queue.length),'Comptes professionnels sans profil déclaré, accès non validé']
  ];
  const metrics=el('div',{class:'beta-admin-metrics'});
  for(const [label,value,hint] of stats)metrics.append(el('div',{class:'beta-admin-metric'},
@@ -1499,7 +1500,7 @@ function betaAdminOverview(m,queue){
   el('p',{text:'Accès externe Vercel et mot de passe Basic distribués séparément : non vérifié dans cette interface.'}),
   el('p',{text:'Paire de comptes distincts et parcours complet particulier → artisan : à revalider avec les futurs testeurs.'}),
   el('p',{text:'Sauvegarde Neon réelle et essai Android/iPhone physiques : restent à confirmer.'}));
- panelNode.append(steps);
+ panelNode.append(steps,button('Examiner les retours et signalements',()=>go('moderation'),'outline'));
  return panelNode;
 }
 function betaAdminQueue(queue){
@@ -1520,8 +1521,14 @@ function betaAdminQueue(queue){
    const name=el('h4',{text:p.name}),meta=el('p',{class:'small muted',text:(trades[p.trade]||p.trade)+' · '+p.town});
    const status=el('span',{class:'chip '+(state==='active'?'green':state==='activation'?'violet':'amber'),
     text:state==='active'?'Accès aux conversations actif':state==='activation'?'Profil autorisé · accès à activer':'Profil à examiner'});
+   const controls=[status,betaProfileReviewAction(p)];
+   if(p.approved)controls.push(button('Suspendre le profil',()=>ask(
+    'Suspendre ce profil professionnel ?',
+    'Cette suspension désactive l’autorisation professionnelle de test et les conversations de « '+p.name+' ». Les données existantes ne sont pas supprimées. Il faudra de nouveau autoriser le profil avant de réactiver son accès.',
+    ()=>api('/admin/professionals/'+p.id+'/suspend',{method:'POST'}),
+    'Profil suspendu en préproduction.'),'outline'));
    list.append(el('div',{class:'item beta-admin-profile'},name,meta,
-    el('div',{class:'beta-admin-profile-actions'},status,betaProfileReviewAction(p))));
+    el('div',{class:'beta-admin-profile-actions'},...controls)));
   }
  }
  for(const [key,label] of states){const control=button(label,()=>{selected=key;draw()},'outline');
@@ -1711,6 +1718,7 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Sur téléphone : les fenêtres s’ouvrent sans afficher immédiatement le clavier ; le menu se ferme au toucher extérieur, et les notifications de connexion disposent d’un bouton Masquer.'}),
    el('li',{text:'Accessibilité : navigation repliable aussi sur les fenêtres de 681 à 960 pixels CSS (dont le zoom à 200 % sur certains écrans), formulaires plus lisibles et états sélectionnés visibles en contraste renforcé.'}),
    el('li',{text:'Bêta privée : un guide de parcours distinct pour particuliers et professionnels et un formulaire de retour transmis à Assistance, sans paiement réel ni création automatique de compte.'}),
+   el('li',{text:'Administration bêta : états des profils et accès aux conversations calculés sur les comptes de test, filtres en lecture seule, retrait ciblé des échanges et suspension du profil avec confirmation.'}),
    el('li',{text:'Messagerie mobile : un seul défilement pour la liste de conversations, sélection tactile lisible et saisie de message plus confortable.'}),
    el('li',{text:'Messagerie : recherche locale par projet ou interlocuteur et ouverture du fil sur clic explicite. Les droits restent vérifiés par le serveur à chaque accès.'}),
    el('li',{text:'Envoi de message : le bouton exige un texte non vide, indique les envois non confirmés et propose un réessai avec le même identifiant pour éviter les doublons. Aucun renvoi automatique.'}),

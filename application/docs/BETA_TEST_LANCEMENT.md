@@ -148,3 +148,13 @@ l'autorisation du profil est conservée, les anciens messages ne sont pas effac�
 les décisions sont journalisées et le professionnel est notifié. Une réactivation
 recontrôle les droits comme avant. Il ne s'agit **pas** d'un système d'invitations
 Vercel ou de gestion d'une cohorte nominative.
+
+## Deux actions administrateur à distinguer
+
+**Retirer l'accès aux conversations** met uniquement fin aux permissions de
+messagerie de test et conserve l'autorisation du profil. **Suspendre le profil**
+désactive les deux autorisations et exige une nouvelle revue avant reprise.
+Les deux actions demandent confirmation. Le tableau affiche également les
+comptes professionnels sans profil déclaré et un accès direct à la modération
+des retours et signalements. Ces indicateurs restent distincts des invitations
+externes, que l'interface ne peut pas contrôler.
