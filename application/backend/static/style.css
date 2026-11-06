@@ -406,3 +406,22 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 .drafts-to-resume .item>div{flex:1;min-width:190px}
 @media(max-width:1000px){.project-status-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.project-status-overview{gap:9px}.project-status-card{padding:13px}.project-status-count{font-size:28px}.project-status-card>span{font-size:11px}.project-status-card>button{width:100%;padding:6px}.review-edit-actions button{width:100%}}
+
+/* F24–F33: clear and actionable professional tracking without guessed totals */
+.pro-quick-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:22px 0}
+.pro-quick-card{display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:19px 17px;border:1px solid var(--line);border-radius:13px;background:#fff;min-width:0}
+.pro-quick-title{font-weight:700;font-size:12px;line-height:1.5}
+.pro-quick-count{font-family:Anton,'Arial Narrow',sans-serif;font-size:34px;line-height:1.1;color:var(--violet);font-weight:400}
+.pro-quick-help{color:var(--muted);font-size:10px;line-height:1.5;min-height:16px}
+.pro-quick-card button{margin-top:auto;font-size:11px;min-height:43px;padding:8px 11px}
+.pro-search-shortcuts{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin:0 0 18px}
+.pro-search-shortcuts p{flex-basis:100%}
+.pro-search-shortcuts .pro-preset{min-height:41px;padding:8px 14px;border:1px solid #d6d8ea;border-radius:999px;background:#fff;color:var(--ink);font-size:12px;font-weight:600}
+.pro-search-shortcuts .pro-preset[aria-pressed="true"]{background:var(--violet);color:#fff;border-color:var(--violet)}
+.application-quick-filters{margin:18px 0}
+.application-filter-card{min-width:0;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;text-align:left;border:1px solid #dadcea;transition:border-color .15s ease,background-color .15s ease}
+.application-filter-card>span{font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.application-filter-card[aria-pressed="true"]{border-color:var(--violet);background:#ebedff;box-shadow:inset 0 0 0 1px var(--violet)}
+@media(max-width:1020px){.pro-quick-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.pro-quick-overview{gap:9px}.pro-quick-card{padding:13px 12px}.pro-quick-count{font-size:29px}.pro-quick-card button{width:100%;padding:8px 7px}.application-filter-card{padding:13px}.application-filter-card strong{font-size:27px}.pro-search-shortcuts .pro-preset{flex:1 1 auto}}
+@media(prefers-reduced-motion:reduce){.application-filter-card{transition:none}}
