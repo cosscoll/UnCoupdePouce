@@ -358,27 +358,27 @@ test('admin beta overview separates real profile authorization states without in
  try{
   const d=x.w.document;
   await x.w.go('admin');
-  assert.match(d.querySelector('#view').textContent,/Préparer les comptes artisans/);
+  assert.match(d.querySelector('#view').textContent,/Préparer les tests utilisateurs/);
   const metrics=[...d.querySelectorAll('.beta-admin-metric')].map(n=>n.textContent);
   assert.equal(metrics.length,4);
-  assert.ok(metrics.some(x=>x.includes('1À examiner')));
-  assert.ok(metrics.some(x=>x.includes('1Messagerie à activer')));
-  assert.ok(metrics.some(x=>x.includes('1Autorisés à échanger')));
-  assert.ok(metrics.some(x=>x.includes('2Sans profil déclaré')));
-  assert.match(d.querySelector('#view').textContent,/Aucune assurance/);
-  assert.equal(d.querySelectorAll('.beta-admin-record').length,3);
+  assert.ok(metrics.some(x=>x.includes('1Profils à examiner')));
+  assert.ok(metrics.some(x=>x.includes('1Accès à activer')));
+  assert.ok(metrics.some(x=>x.includes('1Accès de test actifs')));
+  assert.ok(metrics.some(x=>x.includes('3Comptes particuliers')));
+  assert.match(d.querySelector('#view').textContent,/ne distinguent pas la prochaine cohorte/);
+  assert.equal(d.querySelectorAll('.beta-admin-profile').length,3);
   assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
-  const awaiting=[...d.querySelectorAll('.beta-admin-filters button')].find(b=>b.textContent==='Messagerie à activer');
+  const awaiting=[...d.querySelectorAll('.beta-admin-filters button')].find(b=>b.textContent==='Accès à activer');
   awaiting.click();
   assert.equal(awaiting.getAttribute('aria-pressed'),'true');
-  assert.equal(d.querySelectorAll('.beta-admin-record').length,1);
-  assert.match(d.querySelector('.beta-admin-record').textContent,/Artisan validé/);
+  assert.equal(d.querySelectorAll('.beta-admin-profile').length,1);
+  assert.match(d.querySelector('.beta-admin-profile').textContent,/Artisan validé/);
   assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
-  const active=[...d.querySelectorAll('.beta-admin-filters button')].find(b=>b.textContent==='Accès de test actif');
+  const active=[...d.querySelectorAll('.beta-admin-filters button')].find(b=>b.textContent==='Accès actifs');
   active.click();
-  assert.equal(d.querySelectorAll('.beta-admin-record').length,1);
-  assert.match(d.querySelector('.beta-admin-record').textContent,/Artisan actif/);
-  assert.equal([...d.querySelectorAll('.beta-admin-record button')].some(b=>b.textContent.includes('Activer l’accès')),false);
+  assert.equal(d.querySelectorAll('.beta-admin-profile').length,1);
+  assert.match(d.querySelector('.beta-admin-profile').textContent,/Artisan actif/);
+  assert.equal([...d.querySelectorAll('.beta-admin-profile button')].some(b=>b.textContent.includes('Activer l’accès')),false);
  }finally{x.close()}
 });
 
@@ -394,8 +394,12 @@ test('admin beta grants messaging entitlement only after an explicit button with
   const d=x.w.document;
   await x.w.go('admin');
   assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
-  const act=[...d.querySelectorAll('.beta-admin-record button')].find(b=>b.textContent.includes('Activer l’accès messagerie'));
-  assert.ok(act);act.click();await tick();
+  const act=[...d.querySelectorAll('.beta-admin-profile button')].find(b=>b.textContent.includes('Activer les conversations'));
+  assert.ok(act);act.click();
+  assert.equal(d.querySelector('#dialog').open,true);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0,'a beta permission must be confirmed');
+  [...d.querySelectorAll('#dialog button')].find(b=>b.textContent==='Confirmer').click();
+  await tick();await tick();
   const writes=x.calls.filter(c=>c.method==='POST');
   assert.equal(writes.length,1);
   assert.equal(writes[0].url,'/api/admin/professionals/74/activate-test-subscription');
@@ -403,29 +407,32 @@ test('admin beta grants messaging entitlement only after an explicit button with
  }finally{x.close()}
 });
 
-test('admin beta suspension requires confirmation and never silently changes a profile',async()=>{
+test('admin beta access revocation is reversible, confirmed and not a profile suspension',async()=>{
  const x=await boot({
   '/api/session':{id:99,name:'Admin test',role:'admin',csrf:'admin-token'},
   '/api/admin/metrics':{counts:{professionals:1}},
   '/api/admin/queue':{items:[{id:91,name:'Artisan actif',trade:'peinture',town:'Toulouse',approved:1,subscription_active:1}]},
   '/api/admin/audit':{items:[]},
-  'POST /api/admin/professionals/91/suspend':{ok:true}
+  'POST /api/admin/professionals/91/revoke-test-subscription':{ok:true,profile_approved:true,test_access_active:false}
  });
  try{
   const d=x.w.document;
   await x.w.go('admin');
-  const action=[...d.querySelectorAll('.beta-admin-record button')].find(b=>b.textContent==='Suspendre le profil');
-  action.click();
+  const access=[...d.querySelectorAll('.beta-admin-profile button')].find(b=>b.textContent==='Retirer l’accès aux conversations');
+  assert.ok(access);
+  access.click();
   assert.equal(d.querySelector('#dialog').open,true);
-  assert.match(d.querySelector('#dialog').textContent,/suspension désactive/);
+  assert.match(d.querySelector('#dialog').textContent,/profil restera autorisé/);
   assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
   d.querySelector('#dialog-close').click();
   assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
-  const open=[...d.querySelectorAll('.beta-admin-record button')].find(b=>b.textContent==='Suspendre le profil');
-  open.click();
-  [...d.querySelectorAll('#dialog button')].find(b=>b.textContent==='Confirmer').click();await tick();
-  assert.equal(x.calls.filter(c=>c.method==='POST').length,1);
-  assert.equal(x.calls.find(c=>c.method==='POST').url,'/api/admin/professionals/91/suspend');
+  access.click();
+  [...d.querySelectorAll('#dialog button')].find(b=>b.textContent==='Confirmer').click();
+  await tick();await tick();
+  const writes=x.calls.filter(c=>c.method==='POST');
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].url,'/api/admin/professionals/91/revoke-test-subscription');
+  assert.equal(writes[0].headers['x-ucp-csrf'],'admin-token');
  }finally{x.close()}
 });
 
