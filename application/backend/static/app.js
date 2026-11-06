@@ -735,16 +735,12 @@ async function manageShowcasePhotos(linked){
    });
    card.append(el('label',{class:'showcase-photo-upload'},
     el('span',{text:work.photo_id?'Remplacer la photo':'Ajouter une photo'}),upload));
-   if(work.photo_id)card.append(button('Supprimer cette photo',async()=>{
-    const approved=await ask('Supprimer cette photo ?',
-     'La photo ne sera plus visible dans les présentations de ce profil.',async()=>{
-      const result=await action(()=>api('/v4/showcase/photos/'+index+query,
-       {method:'DELETE',body:{version:data.version}}),'Photo supprimée.');
-      if(result&&epoch===renderEpoch&&token===dialogEpoch&&$('#dialog').open)await action(updateFromServer);
-      return Boolean(result);
-     });
-    return approved;
-   }));
+   if(work.photo_id)card.append(button('Supprimer cette photo',()=>ask(
+    'Supprimer cette photo ?',
+    'Cette image ne sera plus visible sur la présentation du profil. Les textes restent enregistrés.',
+    ()=>api('/v4/showcase/photos/'+index+query,{method:'DELETE',body:{version:data.version}}),
+    'Photo supprimée.'
+   )));
    content.append(card);
   });
  }
