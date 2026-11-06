@@ -402,6 +402,89 @@ test('PWA registration is scoped, installation requires a user gesture and accep
   x.w.dispatchEvent(new x.w.Event('appinstalled'));assert.equal(x.w.document.querySelector('#install-app').hidden,true);
  }finally{x.close()}
 });
+test('F88 mobile install entry reuses the native prompt and hides only after browser confirmation',async()=>{
+ let prompts=0;
+ const x=await boot({},w=>{
+  w.matchMedia=query=>({matches:query==='(max-width:680px)',addEventListener(){}});
+ });
+ try{
+  loadPWA(x);
+  const d=x.w.document,mobile=d.querySelector('#install-mobile'),regular=d.querySelector('#install-app');
+  assert.ok(mobile,'a mobile entry is present in the logged-in workspace');
+  assert.equal(mobile.closest('.accountbar-meta')!==null,true);
+  assert.equal(mobile.hidden,false);
+  assert.equal(regular.hidden,false);
+  const e=new x.w.Event('beforeinstallprompt',{cancelable:true});
+  e.prompt=async()=>{prompts++};e.userChoice=Promise.resolve({outcome:'accepted'});
+  x.w.dispatchEvent(e);
+  assert.equal(prompts,0,'install is never invoked automatically');
+  mobile.focus();mobile.click();
+  assert.equal(d.querySelector('#dialog').open,true);
+  assert.match(d.querySelector('#dialog').textContent,/iPhone · Safari/);
+  assert.equal(d.activeElement,d.querySelector('#dialog-title'),'mobile dialog does not immediately summon a keyboard');
+  const install=[...d.querySelectorAll('#dialog button')].find(b=>b.textContent==='Lancer l’installation');
+  assert.ok(install);
+  install.click();install.click();await tick();
+  assert.equal(prompts,1,'a user gesture invokes the prompt only once');
+  assert.equal(mobile.hidden,false,'acceptance is not proof that the app was installed');
+  x.w.dispatchEvent(new x.w.Event('appinstalled'));
+  assert.equal(mobile.hidden,true);
+  assert.equal(regular.hidden,true);
+ }finally{x.close()}
+});
+
+test('mobile manual dialog avoids automatic input focus and returns focus to its opener',async()=>{
+ const x=await boot({},w=>{w.matchMedia=query=>({matches:query==='(max-width:680px)',addEventListener(){}})});
+ try{
+  const d=x.w.document,opener=d.querySelector('#install-help');
+  opener.focus();
+  const form=d.createElement('form'),input=d.createElement('input');
+  input.name='demo';form.append(input);
+  x.w.showDialog('Une étape sur mobile',form);
+  assert.equal(d.activeElement,d.querySelector('#dialog-title'));
+  assert.equal(input.value,'');
+  d.querySelector('#dialog-close').click();
+  assert.equal(d.activeElement,opener);
+  assert.equal(d.querySelector('#dialog').open,false);
+ }finally{x.close()}
+});
+
+test('the mobile navigation closes on outside touch without changing page or saving a draft',async()=>{
+ const x=await boot();
+ try{
+  const d=x.w.document,toggle=d.querySelector('#navigation-toggle'),initial=x.calls.length;
+  toggle.click();
+  assert.equal(toggle.getAttribute('aria-expanded'),'true');
+  d.querySelector('#view').dispatchEvent(new x.w.Event('pointerdown',{bubbles:true}));
+  assert.equal(toggle.getAttribute('aria-expanded'),'false');
+  assert.equal(d.querySelector('.sidebar').dataset.navigationOpen,'false');
+  assert.equal(x.calls.length,initial,'a dismissive gesture never calls the API');
+  toggle.click();
+  d.querySelector('#tabs button').dispatchEvent(new x.w.Event('pointerdown',{bubbles:true}));
+  assert.equal(toggle.getAttribute('aria-expanded'),'true','touching a menu item does not prematurely collapse it');
+ }finally{x.close()}
+});
+
+test('connection notices can be dismissed on a phone without replaying any writes',async()=>{
+ const x=await boot({'GET /api/conversations/12/messages':{items:[]}});
+ try{
+  loadPWA(x);
+  const status=x.w.document.querySelector('#connection-status');
+  x.w.dispatchEvent(new x.w.Event('offline'));
+  assert.equal(status.hidden,false);
+  assert.match(status.textContent,/hors connexion/);
+  const dismiss=status.querySelector('.connection-dismiss');
+  assert.ok(dismiss);
+  dismiss.click();
+  assert.equal(status.hidden,true);
+  x.w.dispatchEvent(new x.w.Event('online'));
+  assert.equal(status.hidden,false);
+  assert.match(status.textContent,/rien n’a été envoyé/);
+  assert.equal(status.querySelectorAll('button').length,1);
+  assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
+ }finally{x.close()}
+});
+
 test('manual installation help works without a service worker or install event',async()=>{
  const x=await boot();try{
   loadPWA(x);x.w.document.querySelector('#install-help').click();const text=x.w.document.querySelector('#dialog').textContent;
