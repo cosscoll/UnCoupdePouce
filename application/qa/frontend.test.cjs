@@ -50,6 +50,59 @@ test('chat retry preserves idempotency key after lost response',async()=>{
  }finally{x.close()}
 });
 
+test('F13 requester overview resumes a private draft and filters own projects by status',async()=>{
+ const projects=[
+  {id:11,title:'Salle de bains',status:'open',town:'Toulouse',trade:'plomberie',trades:['plomberie'],timing:'flexible'},
+  {id:12,title:'Cuisine sélectionnée',status:'selected',town:'Blagnac',trade:'plomberie',trades:['plomberie'],timing:'month'},
+  {id:13,title:'Projet terminé',status:'closed',town:'Toulouse',trade:'plomberie',trades:['plomberie'],timing:'quarter'}
+ ];
+ const drafts=[{id:23,version:1,title:'Réparer mon évier',description:'Je voudrais remplacer mon évier de cuisine.',town:'Blagnac',trades:['plomberie'],timing:'month',budget_min:null,budget_max:null,photos:[]}];
+ const x=await boot({
+  '/api/projects':{items:projects},'/api/v4/drafts':{items:drafts},
+  '/api/projects?status=open&sort=newest':{items:[projects[0]]}
+ });
+ try{
+  await x.w.go('projects');
+  const cards=[...x.w.document.querySelectorAll('.project-status-card')];
+  assert.equal(cards.length,4);
+  assert.deepEqual(cards.map(c=>c.querySelector('.project-status-count').textContent),['1','1','1','1']);
+  assert.ok(cards[0].textContent.includes('Brouillons'));
+  cards[1].querySelector('button').click();await tick();
+  assert.equal(x.w.document.querySelector('#view [name=status]').value,'open');
+  assert.equal(x.w.document.querySelector('#view .count').textContent,'1 projet selon vos critères');
+  assert.ok(x.calls.some(c=>c.url==='/api/projects?status=open&sort=newest'));
+  cards[0].querySelector('button').click();
+  assert.match(x.w.document.querySelector('.wizard [name=title]').value,/Réparer mon évier/);
+ }finally{x.close()}
+});
+
+test('F09 and F12 wizard explains required fields and allows corrections from review',async()=>{
+ let version=1;
+ const draft={id:51,version:1,title:'Refaire ma salle de bains',description:'Je souhaite remplacer la douche et refaire la faïence.',town:'Blagnac',trades:['plomberie'],timing:'month',budget_min:null,budget_max:null,photos:[]};
+ const x=await boot({'PUT /api/v4/drafts/51':()=>({id:51,version:++version})});
+ try{
+  x.w.startWizard(draft);
+  const ready=()=>[...x.w.document.querySelectorAll('.wizard-readiness .ready')].length;
+  assert.equal(ready(),3);
+  assert.match(x.w.document.querySelector('.wizard-step-status').textContent,/Étape 1 sur 3/);
+  input(x.w,'.wizard [name=title]','A');
+  assert.equal(ready(),2,'missing title is explained before submit');
+  input(x.w,'.wizard [name=title]','Refaire ma salle de bains');
+  assert.equal(ready(),3);
+  submit(x.w,'.wizard form');await tick();
+  assert.match(x.w.document.querySelector('.wizard-step-status').textContent,/Étape 2 sur 3/);
+  submit(x.w,'.wizard form');await tick();
+  assert.match(x.w.document.querySelector('.wizard-step-status').textContent,/Étape 3 sur 3/);
+  assert.ok([...x.w.document.querySelectorAll('.review-edit-actions button')].some(b=>b.textContent==='Modifier les détails'));
+  [...x.w.document.querySelectorAll('.review-edit-actions button')].find(b=>b.textContent==='Modifier les détails').click();
+  assert.match(x.w.document.querySelector('.wizard-step-status').textContent,/Étape 2 sur 3/);
+  input(x.w,'.wizard [name=town]','Tournefeuille');
+  submit(x.w,'.wizard form');await tick();
+  assert.match(x.w.document.querySelector('.review').textContent,/Tournefeuille/);
+  assert.ok(x.calls.some(c=>c.method==='PUT'&&c.body?.town==='Tournefeuille'),'change is saved with version before returning to review');
+ }finally{x.close()}
+});
+
 test('guided publication uses three steps, CSRF, version and one publish',async()=>{
  let version=0;
  const x=await boot({'POST /api/v4/drafts':()=>({id:5,version:++version}),'PUT /api/v4/drafts/5':()=>({id:5,version:++version}),'POST /api/v4/drafts/5/publish':{id:9,status:'open'}});const {w,calls}=x;
