@@ -436,16 +436,16 @@ test('a new candidature freezes the town without losing the rest of a stale form
  }finally{x.close()}
 });
 
-test('the project update notification takes a professional to the corresponding candidature',async()=>{
+test('the project update notification opens the professional candidature list without guessing an application ID',async()=>{
  const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},
   '/api/notifications':{items:[{id:9,entity_id:82,event_type:'project_updated',message:'Une annonce a été modifiée.',created_at:'2026-11-05T12:00:00Z',read_at:null}],unread:1,next_before_id:null},
   '/api/my-applications':{items:[{id:81,title:'Autre chantier',trade:'plomberie',town:'Toulouse',status:'pending',project_status:'open'},
    {id:82,title:'Chantier modifié',trade:'plomberie',town:'Toulouse',status:'pending',project_status:'open'}]}});
  try{
   await x.w.go('notifications');await tick();
-  savedButton(x.w,'Voir ma candidature','#view').click();await tick();
-  assert.equal(x.w.document.activeElement.id,'application-82');
-  assert.match(x.w.document.activeElement.textContent,/Chantier modifié/);
+  savedButton(x.w,'Voir mes candidatures','#view').click();await tick();
+  assert.equal(x.w.location.hash,'#applications');
+  assert.match(x.w.document.querySelector('#view').textContent,/Chantier modifié/);
  }finally{x.close()}
 });
 
@@ -509,7 +509,7 @@ test('suspended project shows its resume action and hides intake and candidate d
  }finally{x.close()}
 });
 
-test('cancellation notice opens the matching application and shows why the chat closed',async()=>{
+test('cancellation notice opens candidature tracking and shows why the chat closed',async()=>{
  const x=await boot({
   '/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},
   '/api/notifications':{unread:1,items:[{id:3,event_type:'project_cancelled',entity_id:42,message:'Le demandeur a annulé le chantier.',created_at:'2026-11-05T13:30:00Z'}]},
@@ -517,10 +517,10 @@ test('cancellation notice opens the matching application and shows why the chat 
  });
  try{
   await x.w.go('notifications');
-  [...x.w.document.querySelectorAll('button')].find(b=>b.textContent==='Voir ma candidature').click();
+  [...x.w.document.querySelectorAll('button')].find(b=>b.textContent==='Voir mes candidatures').click();
   await tick();
   const card=x.w.document.querySelector('#application-42');
-  assert.equal(x.w.document.activeElement,card);
+  assert.equal(x.w.location.hash,'#applications');
   assert.match(card.textContent,/Projet annulé par le demandeur/);
   assert.equal(card.querySelector('button'),null);
  }finally{x.close()}
