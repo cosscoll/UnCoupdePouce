@@ -40,6 +40,10 @@ test('local AI requires acknowledgement and sends to the on-device model only',a
  const h=harness();h.ai.open();
  assert.equal(btn(h.doc,'Envoyer').disabled,true);
  h.doc.querySelector('input[type=checkbox]').click();
+ assert.equal(btn(h.doc,'Envoyer').disabled,true,'empty messages cannot be submitted');
+ const compose=h.doc.querySelector('textarea');
+ compose.value='Je veux rénover ma salle de bains à Toulouse.';
+ compose.dispatchEvent(new h.doc.defaultView.Event('input',{bubbles:true}));
  assert.equal(btn(h.doc,'Envoyer').disabled,false);
  await say(h,'Je veux rénover ma salle de bains à Toulouse.');
  assert.equal(h.calls.length,1);
@@ -261,4 +265,24 @@ test('the assistant presents itself as Yahya in the welcome panel and messages',
  await say(h,'Comment peux-tu me guider ?');
  const assistantMessage=h.doc.querySelector('.ai-message.from-assistant strong');
  assert.equal(assistantMessage?.textContent,'Yahya');
+});
+
+test('Yahya enables Send only for meaningful text, including suggested prompts',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ const input=h.doc.querySelector('textarea'),send=btn(h.doc,'Envoyer');
+ assert.equal(send.disabled,true);
+ input.value=' ';
+ input.dispatchEvent(new h.doc.defaultView.Event('input',{bubbles:true}));
+ assert.equal(send.disabled,true);
+ input.value='ab';
+ input.dispatchEvent(new h.doc.defaultView.Event('input',{bubbles:true}));
+ assert.equal(send.disabled,false);
+ input.value='';
+ input.dispatchEvent(new h.doc.defaultView.Event('input',{bubbles:true}));
+ assert.equal(send.disabled,true);
+ btn(h.doc,'Rédiger une annonce').click();
+ assert.equal(send.disabled,false,'suggestion refreshes Send state');
+ await say(h,' ');
+ assert.equal(h.calls.length,0,'invalid submission never reaches the model');
+ assert.match(h.doc.body.textContent,/au moins deux caractères/);
 });
