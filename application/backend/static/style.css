@@ -320,3 +320,20 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 .account-history>summary{font-size:13px;min-height:48px;padding:13px 18px;color:#4a4f63}
 .account-history>.panel{border:0;box-shadow:none;margin:0}
 @media(max-width:680px){.wizard-trade-picker>div{padding:10px}.account-history>.panel{padding:16px}}
+
+/* Release visibility: an unobtrusive update link, shared by mobile and desktop. */
+.accountbar-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px}
+.release-notes-link{min-height:36px;border:1px solid #d7dbee;border-radius:8px;padding:7px 10px;
+ background:#f2f4fc;color:#38479a;font-size:11px;font-weight:700;line-height:1.45;text-align:left}
+.release-notes-link:hover{background:#e7eaf8}
+.release-notes-dialog{display:grid;gap:14px;max-width:700px}
+.release-notes-dialog>p{font-size:13px;line-height:1.6}
+.release-notes-dialog ul{display:grid;gap:11px;margin:0;padding-left:24px}
+.release-notes-dialog li{font-size:13px;line-height:1.6}
+@media(max-width:760px){
+ .accountbar{align-items:flex-start;flex-direction:column;gap:9px;margin-bottom:25px}
+ .accountbar-meta{justify-content:flex-start;gap:8px}
+ .release-notes-link{font-size:11px;min-height:42px}
+ .testbar{flex-wrap:wrap;gap:4px}
+ .testbar span{font-size:10px}
+}
