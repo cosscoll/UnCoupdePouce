@@ -1572,3 +1572,84 @@ test('F19: a saved private feedback is readable only on the requester project de
   assert.match(x.w.document.querySelector('.project-feedback').textContent,/Ce retour fictif est privé/);
  }finally{x.close()}
 });
+
+test('F11: guided three-step project wizard keeps optional measurements in saved draft and preview',async()=>{
+ let version=0;
+ const x=await boot({
+  'POST /api/v4/drafts':()=>({id:5,version:++version}),
+  'PUT /api/v4/drafts/5':()=>({id:5,version:++version}),
+ });
+ try{
+  const {w,calls}=x;
+  w.startWizard();
+  input(w,'.wizard [name=title]','Rénover une salle de bains fictive');
+  input(w,'.wizard [name=description]','Je souhaite refaire une petite salle de bains fictive.');
+  const trade=w.document.querySelector('.wizard input[value=plomberie]');
+  trade.checked=true;trade.dispatchEvent(new w.Event('change',{bubbles:true}));
+  submit(w,'.wizard form');await tick();
+  assert.ok(w.document.querySelector('.wizard [name=surface_m2]'));
+  assert.ok(w.document.querySelector('.wizard [name=length_m]'));
+  assert.ok(w.document.querySelector('.wizard [name=width_m]'));
+  assert.ok(w.document.querySelector('.wizard [name=height_m]'));
+  const d=w.document.querySelector('.measurements-panel');
+  assert.equal(d.open,false);
+  d.open=true;
+  input(w,'.wizard [name=surface_m2]','8.75');
+  input(w,'.wizard [name=length_m]','3.5');
+  input(w,'.wizard [name=width_m]','2.5');
+  submit(w,'.wizard form');await tick();
+  const saved=calls.filter(c=>c.method==='PUT'&&c.url==='/api/v4/drafts/5').at(-1);
+  assert.ok(saved);
+  assert.deepEqual(saved.body.dimensions,{surface_m2:8.75,length_m:3.5,width_m:2.5});
+  assert.match(w.document.querySelector('.wizard .review').textContent,/Surface estimée.*8,75 m²/);
+  assert.match(w.document.querySelector('.wizard .review').textContent,/Longueur.*3,5 m/);
+  assert.match(w.document.querySelector('.wizard .review').textContent,/Hauteur/);
+ }finally{x.close()}
+});
+
+test('F11: dimension inputs can be entirely omitted and the final review says so',async()=>{
+ const x=await boot({'POST /api/v4/drafts':{id:5,version:1},'PUT /api/v4/drafts/5':{id:5,version:2}});
+ try{
+  const w=x.w;
+  w.startWizard();
+  input(w,'.wizard [name=title]','Rénovation fictive du salon');
+  input(w,'.wizard [name=description]','Je souhaite aménager et remettre en état une pièce.');
+  const trade=w.document.querySelector('.wizard input[value=plomberie]');
+  trade.checked=true;trade.dispatchEvent(new w.Event('change',{bubbles:true}));
+  submit(w,'.wizard form');await tick();
+  assert.equal(w.document.querySelector('.measurements-panel').open,false);
+  submit(w,'.wizard form');await tick();
+  assert.match(w.document.querySelector('.wizard .review').textContent,/Dimensions indicatives.*Non renseignées/s);
+ }finally{x.close()}
+});
+
+test('F11: detail displays only stored dimensions, in the authorized project page',async()=>{
+ const project={id:61,title:'Chantier fictif',description:'Une rénovation de la salle de bains fictive.',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'open',photos:[],dimensions:{surface_m2:10.5,height_m:2.55}};
+ const x=await boot({'/api/v4/projects/61':project,'/api/projects/61/applications':{items:[]}});
+ try{
+  await x.w.projectDetail(project);
+  const panel=x.w.document.querySelector('.project-measurements');
+  assert.ok(panel);
+  assert.match(panel.textContent,/Surface estimée.*10,5 m²/);
+  assert.match(panel.textContent,/Hauteur.*2,55 m/);
+  assert.match(panel.textContent,/sans diagnostic ni validation technique/);
+ }finally{x.close()}
+});
+
+test('F11: the existing project editor submits structured dimensions',async()=>{
+ const project={id:61,title:'Rénovation fictive',description:'Description de travaux fictifs pour validation.',trade:'plomberie',town:'Toulouse',budget_min:null,budget_max:null,dimensions:{surface_m2:8.25},content_version:2,status:'open',content_scope_locked:false};
+ const x=await boot({'PUT /api/projects/61':{ok:true,content_version:3,changed:true,notified:0}});
+ try{
+  x.w.editProject(project);
+  const form=x.w.document.querySelector('#dialog form');
+  assert.ok(form);
+  assert.equal(form.elements.namedItem('surface_m2').value,'8.25');
+  assert.equal(form.elements.namedItem('height_m').value,'');
+  input(x.w,'#dialog [name=height_m]','2.4');
+  submit(x.w,'#dialog form');await tick();
+  const sent=x.calls.find(c=>c.method==='PUT'&&c.url==='/api/projects/61');
+  assert.ok(sent);
+  assert.deepEqual(sent.body.dimensions,{surface_m2:8.25,height_m:2.4});
+  assert.equal(sent.body.content_version,2);
+ }finally{x.close()}
+});
