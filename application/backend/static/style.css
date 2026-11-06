@@ -370,3 +370,21 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 .project-measurements .hint{font-size:12px}
 @media(max-width:620px){.measurements-grid{grid-template-columns:1fr;padding:12px 15px 15px}
 .measurements-panel>.hint{padding:12px 15px 0}.project-measurements{padding:15px}}
+
+/* F35: private, declared work images; never public proofs or certifications. */
+.showcase-work-image{display:block;width:100%;max-width:540px;height:auto;aspect-ratio:5/3;
+ object-fit:cover;background:#f1f2f7;border:1px solid #dedfe7;border-radius:11px;margin:12px 0}
+.showcase-photo-manager{display:grid;gap:18px;max-width:680px;min-width:0}
+.showcase-photo-manager>.hint{font-size:12px;line-height:1.65;margin:0}
+.showcase-photo-card{display:grid;gap:11px;padding:18px;background:#fff;
+ border:1px solid #dedfea;border-radius:12px;min-width:0}
+.showcase-photo-card h4{font-size:15px;line-height:1.4;margin:0;overflow-wrap:anywhere}
+.showcase-photo-card>.muted{margin:0}
+.showcase-photo-card>.hint{margin:3px 0;font-size:12px}
+.showcase-photo-upload{display:grid;gap:8px;font-size:13px;font-weight:700;color:#343b59}
+.showcase-photo-upload input[type=file]{display:block;width:100%;max-width:100%;min-width:0;
+ font-size:12px;padding:10px;border:1px solid #b9becd;border-radius:8px;background:#f8f9fc}
+.showcase-photo-upload input:focus-visible{outline:3px solid var(--violet);outline-offset:2px}
+.showcase-photo-card>button{justify-self:start;min-height:42px}
+@media(max-width:600px){.showcase-photo-card{padding:14px}.showcase-work-image{max-width:100%}
+ .showcase-photo-card>button{width:100%}}
