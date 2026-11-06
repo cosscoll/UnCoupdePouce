@@ -1497,3 +1497,23 @@ test('UX audit: account screen keeps install and logout after personal informati
   assert.ok(d.querySelector('#account-actions #logout'));
  }finally{x.close()}
 });
+
+test('UX release: clearly labelled 2026-11-06 version and versioned static assets are present',async()=>{
+ const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ assert.match(html,/Mise à jour UX · 6 novembre 2026/);
+ for(const name of ['style.css','analytics.js','local-ai.js','assistant-ai.js','app.js','pwa.js']){
+  assert.ok(html.includes('/assets/'+name+'?v=ux-20261106'),name+' should be release-versioned');
+ }
+ const x=await boot();
+ try{
+  const control=x.w.document.querySelector('#release-notes');
+  assert.ok(control);
+  assert.match(control.textContent,/Voir les changements/);
+  control.click();
+  assert.equal(x.w.document.querySelector('#dialog').open,true);
+  assert.match(x.w.document.querySelector('#dialog-title').textContent,/nouveautés UX\/UI/);
+  assert.match(x.w.document.querySelector('#dialog').textContent,/recherche/i);
+  assert.match(x.w.document.querySelector('#dialog').textContent,/menu professionnel/i);
+  assert.match(x.w.document.querySelector('#dialog').textContent,/2026\.11\.06/);
+ }finally{x.close()}
+});
