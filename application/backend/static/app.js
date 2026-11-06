@@ -1390,6 +1390,8 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Artisans : ajout d’une photo facultative par réalisation textuelle enregistrée, accessible depuis les candidatures autorisées et leur comparateur. Les photos restent déclaratives et non certifiées.'}),
    el('li',{text:'Notifications : chaque événement reconnu propose un accès direct à la rubrique concernée (projets, candidatures, messages, assistance ou compte), sans exposer de dossier privé.'}),
    el('li',{text:'Navigation : le retour et l’avancement du navigateur fonctionnent entre les rubriques avec sauvegarde du brouillon avant de quitter.'}),
+   el('li',{text:'Annonce de chantier : une liste des trois conditions nécessaires s’actualise pendant la saisie et le récapitulatif permet de revenir corriger les travaux ou les détails.'}),
+   el('li',{text:'Mes projets : un tableau de suivi affiche vos brouillons et les annonces ouvertes, sélectionnées ou terminées avec des raccourcis qui appliquent les filtres correspondants.'}),
    el('li',{text:'Annonce de chantier : renseignez une surface, une longueur, une largeur ou une hauteur dans l’étape « Les détails ». Ces mesures facultatives sont enregistrées avec le brouillon, visibles dans le projet et modifiables avant sélection.'})
   ),
   el('p',{class:'small muted',text:'Version 2026.11.06. Les modifications concernent les espaces connectés. Une partie des informations est accessible après ouverture des sections repliables.'})
