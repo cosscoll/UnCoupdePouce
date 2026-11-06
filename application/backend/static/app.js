@@ -741,11 +741,15 @@ function editProject(d){
      const input=f.elements.namedItem(key);
      if((key==='town'&&latest.content_scope_locked)||input.value===String(base[key]??''))input.value=latest[key]??'';
     }
+    for(const [key] of dimensionSpecs){
+     const input=f.elements.namedItem(key);
+     if(input.value===String(base.dimensions?.[key]??''))input.value=latest.dimensions?.[key]??'';
+    }
     base=latest;
     setScope();
     published.replaceChildren(el('h4',{text:'Version actuellement publiée'}),
      ...Object.entries(fields).map(([key,label])=>el('p',{},el('strong',{text:label+' · '}),String(latest[key]??'Non renseigné'))),
-     el('p',{text:'Métiers · '+tradeNames(latest)}));
+     el('p',{text:'Métiers · '+tradeNames(latest)}),el('p',{text:'Dimensions · '+dimensionsText(latest.dimensions)}));
     published.hidden=false;
     reload.hidden=true;
     save.disabled=latest.content_editable===false||latest.status!=='open';
@@ -759,11 +763,11 @@ function editProject(d){
   field(fields.town,'town','text',{value:d.town,maxlength:90}),
   field(fields.description,'description','textarea',{value:d.description,minlength:20}),
   el('div',{class:'budget-fields'},amountField(fields.budget_min+' facultatif (€)','budget_min',d.budget_min),amountField(fields.budget_max+' facultatif (€)','budget_max',d.budget_max)),
-  guidance,status,reload,published,save);
- const inputs=Object.keys(fields).map(key=>f.elements.namedItem(key));
+  measurementsPanel(d.dimensions),guidance,status,reload,published,save);
+ const inputs=[...Object.keys(fields),...dimensionSpecs.map(([key])=>key)].map(key=>f.elements.namedItem(key));
  function setScope(){
   f.elements.namedItem('town').readOnly=!!base.content_scope_locked;
-  guidance.textContent=(base.content_scope_locked?'La commune et les métiers sont figés depuis la première candidature. ':'Les métiers restent identiques. ')+'Si le titre, la description ou le budget change, les candidats en attente seront avertis.';
+  guidance.textContent=(base.content_scope_locked?'La commune et les métiers sont figés depuis la première candidature. ':'Les métiers restent identiques. ')+'Si le titre, la description, les dimensions ou le budget changent, les candidats en attente seront avertis.';
  }
  setScope();
  function feedback(text){status.textContent=text;status.hidden=!text}
@@ -780,7 +784,7 @@ function editProject(d){
   const result=await action(async()=>{
    try{
     return await api('/projects/'+d.id,{method:'PUT',body:{...values,trade:base.trade,content_version:base.content_version,
-     budget_min:amountValue(values.budget_min),budget_max:amountValue(values.budget_max)}});
+     budget_min:amountValue(values.budget_min),budget_max:amountValue(values.budget_max),dimensions:readDimensions(f)}});
    }catch(e){
     if(active()&&!e.stale){
      feedback(e.message);
