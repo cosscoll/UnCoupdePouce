@@ -1499,6 +1499,20 @@ const guidedHelp=(window.UCPAssistantAI||window.UCPGuidedHelp)?.create({
   if(previous){const saved=await action(saveDraft);if(!saved)return false}
   if(actor!==appState.user||session!==appState.csrf||currentDraft!==previous||dialogToken!==dialogEpoch||!$('#dialog').open)return false;
   if(proposal.trades.some(id=>!catalog.some(t=>t.id===id&&t.active!==false)))return false;
+  if(previous){
+   // AI text can replace draft wording, never its identity, private photos, budget or version.
+   const revised={...previous,title:proposal.title,description:proposal.description,
+    town:proposal.town,trades:[...proposal.trades],timing:proposal.timing};
+   const before=draftFingerprint(previous);
+   stopDraft();$('#dialog').close();appState.view='projects';menu();startWizard(revised);
+   const pending=draftState(currentDraft);
+   pending.lastSaved=before;
+   pending.changed=true;
+   pending.observed=draftFingerprint(currentDraft);
+   queueDraftAutosave(currentDraft);
+   msg('La proposition de Yahya a été insérée dans votre brouillon existant. Vérifiez vos modifications avant de publier.','success',false);
+   return true;
+  }
   stopDraft();$('#dialog').close();appState.view='projects';menu();startWizard(proposal);return true;
  }
 })||null;
