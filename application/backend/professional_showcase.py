@@ -117,6 +117,9 @@ def install(m):
                     if not row or not c.execute('SELECT 1 FROM showcase_photos WHERE id=? AND showcase_id=?',
                                               (work['photo_id'],row['id'])).fetchone():
                         error(422,'La photo ne correspond pas à cette présentation.')
+            photo_ids=[w['photo_id'] for w in payload['works'] if w.get('photo_id')]
+            if len(photo_ids)!=len(set(photo_ids)):
+                error(422,'Une photo ne peut pas représenter plusieurs réalisations.')
             try:
                 payload['intro']=m.precontact_safe(body.intro) if body.intro.strip() else ''
                 for work in payload['works']:
