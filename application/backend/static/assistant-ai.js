@@ -45,13 +45,24 @@ function create(hooks){
   const status=el('p',{class:'ai-status',role:'status','aria-live':'polite'});
   const retry=button('Réessayer de générer la réponse',()=>invoke('reply',null),'ai-retry');
   retry.hidden=true;
+  const lightRecovery=button('Essayer le modèle léger (1,5B)',()=>{
+   if(!valid(s)||s.busy||!s.consent||modelTier!=='quality')return;
+   modelTier='light';
+   qualitySelect.value='light';
+   saveModelTier('light');
+   hooks.local.reset();
+   lightRecovery.hidden=true;
+   status.textContent='Nouvel essai avec le modèle léger : chargement local en cours…';
+   invoke('reply',null);
+  },'ai-light-recovery');
+  lightRecovery.hidden=true;
   const textarea=el('textarea',{rows:2,maxlength:1200,required:true,'aria-label':'Votre message pour le chatbot IA',
    placeholder:'Écrivez votre message…'});
   const submit=el('button',{class:'ai-send',type:'submit',text:'Envoyer',disabled:true,'aria-label':'Envoyer le message'});
   const form=el('form',{class:'ai-compose-form'},el('div',{class:'ai-input-row'},textarea,submit));
   const acknowledge=el('input',{type:'checkbox',checked:s.consent});
   const agreement=el('label',{class:'ai-consent'},acknowledge,el('span',{text:'J’autorise le téléchargement du modèle IA gratuit dans ce navigateur (une seule fois).'}));
-  agreement.hidden=s.consent;
+  agreement.hidden=s.consent||!model.configured;
   const draft=button('Préparer mon annonce avec l’IA',()=>invoke('draft'),'ai-action');
   const search=button('Configurer ma recherche avec l’IA',()=>invoke('search'),'ai-action');
   const actions=el('div',{class:'ai-actions'},isRequester?draft:search);
@@ -115,13 +126,22 @@ function create(hooks){
    el('summary',{text:'À propos de cette IA'}),
    el('p',{text:'Qwen 3B offre des réponses généralement plus pertinentes que l’ancien modèle 0,5B, mais nécessite davantage de mémoire et un téléchargement initial important. Si votre appareil ne le charge pas, passez en mode léger (1,5B). L’IA fonctionne sur votre GPU avec WebGPU, sans API payante. Les messages ne quittent pas votre appareil. L’autorisation est conservée dans le navigateur, sauf navigation privée ou effacement des données. Utilisez des informations fictives en préproduction.'}),qualitySetting,revoke);
   const composer=el('div',{class:'ai-composer'},actions,form,agreement,info);
-  conversation.append(welcome,log,proposals,status,retry);
+  const unavailable=el('section',{class:'ai-unavailable',role:'region','aria-label':'Utiliser UCP sans modèle IA'},
+   el('h4',{text:'Continuer sans l’IA'}),
+   el('p',{text:'Votre navigateur ne peut pas exécuter le modèle local. Ces raccourcis ouvrent les fonctions habituelles d’UCP ; ils ne génèrent aucune réponse IA.'}),
+   el('div',{class:'ai-unavailable-links'},
+    ...(isRequester
+     ?[['Décrire mes travaux','projects'],['Voir mes messages','conversations'],['Contacter l’assistance','support']]
+     :[['Chercher des chantiers','projects'],['Suivre mes candidatures','applications'],['Contacter l’assistance','support']]
+    ).map(([label,view])=>button(label,()=>{if(valid(s))hooks.navigate?.(view)},'outline'))));
+  unavailable.hidden=!!model.configured;
+  conversation.append(welcome,unavailable,log,proposals,status,retry,lightRecovery);
   ui.append(headerActions,conversation,composer);
   function scrollBottom(){conversation.scrollTop=conversation.scrollHeight}
   function allowed(){
    const active=!!model.configured&&acknowledge.checked&&!s.busy;
    submit.disabled=!active||textarea.value.trim().length<2||textarea.value.length>1200;
-   textarea.disabled=s.busy;
+   textarea.disabled=s.busy||!model.configured;
    draft.disabled=!active||!s.messages.some(m=>m.role==='user');
    search.disabled=!active||!s.messages.some(m=>m.role==='user');
    newChat.disabled=s.busy;
@@ -200,7 +220,7 @@ function create(hooks){
    if(!s.messages.some(m=>m.role==='user')){
     status.textContent='Décrivez d’abord votre besoin.';return;
    }
-   s.busy=true;s.pending=null;retry.hidden=true;showPending();allowed();
+   s.busy=true;s.pending=null;retry.hidden=true;lightRecovery.hidden=true;showPending();allowed();
    status.classList.add('is-loading');
    status.textContent='L’assistant prépare sa réponse…';
    scrollBottom();
@@ -228,7 +248,9 @@ function create(hooks){
     if(valid(s)&&ui?.closest('dialog')?.open){
      status.textContent=(e?.message||'Le modèle local est indisponible. Réessayez.')+
       (modelTier==='quality'?' Si le modèle ne démarre pas, essayez le mode léger dans « À propos de cette IA ».':'');
-     retry.hidden=false;scrollBottom();
+     retry.hidden=false;
+     lightRecovery.hidden=modelTier!=='quality';
+     scrollBottom();
     }
    }finally{
     if(valid(s)){s.busy=false;status.classList.remove('is-loading');allowed();if(ui?.closest('dialog')?.open)textarea.focus()}
@@ -249,7 +271,7 @@ function create(hooks){
   hooks.show(ui);
   allowed();
   if(!model.configured)status.textContent=model.reason||'Ce navigateur ne prend pas en charge le modèle local.';
-  textarea.focus();
+  if(model.configured)textarea.focus();
  }
  return {open,sync,clear};
 }
