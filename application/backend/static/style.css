@@ -388,3 +388,21 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 .showcase-photo-card>button{justify-self:start;min-height:42px}
 @media(max-width:600px){.showcase-photo-card{padding:14px}.showcase-work-image{max-width:100%}
  .showcase-photo-card>button{width:100%}}
+
+/* F09–F13 : actionable requester overview and legible guided publication */
+.project-status-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:16px 0 24px}
+.project-status-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0;background:#f4f5fb;border:1px solid #dedee7;border-radius:12px;padding:18px}
+.project-status-count{display:block;font-family:Anton,'Arial Narrow',sans-serif;font-size:33px;line-height:1;color:var(--violet);font-weight:400}
+.project-status-card>span{font-size:12px;line-height:1.5;font-weight:600}
+.project-status-card>button{margin-top:auto;min-height:40px;padding:7px 12px;font-size:12px}
+.wizard-step-status{font-size:12px;font-weight:700;color:var(--violet);margin:8px 0 12px}
+.wizard-readiness{border:1px solid #dedee7;border-radius:12px;padding:15px 18px;background:#fafbff;margin:16px 0}
+.wizard-readiness>strong{font-size:13px;display:block;margin-bottom:8px}
+.wizard-readiness>p{font-size:12px;margin:4px 0;line-height:1.55}
+.wizard-readiness>.ready{color:#1a6b05}.wizard-readiness>.missing{color:#585b70}
+.review-edit-actions{display:flex;flex-wrap:wrap;align-items:center;gap:12px;border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:18px;background:white}
+.review-edit-actions p{flex-basis:100%;margin:0}
+.review-edit-actions button{font-size:12px;min-height:42px}
+.drafts-to-resume .item>div{flex:1;min-width:190px}
+@media(max-width:1000px){.project-status-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:480px){.project-status-overview{gap:9px}.project-status-card{padding:13px}.project-status-count{font-size:28px}.project-status-card>span{font-size:11px}.project-status-card>button{width:100%;padding:6px}.review-edit-actions button{width:100%}}
