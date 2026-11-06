@@ -90,12 +90,12 @@ def test_versions_block_stale_uploads_replacements_and_delete(setup):
     second=pro.post("/api/v4/showcase/photos/0",json=photo_payload("blue",version=2,exif=False))
     assert second.status_code==201 and second.json()["version"]==3
     assert second.json()["photo_id"]==photo_id
-    assert pro.delete("/api/v4/showcase/photos/0",json={"version":2}).status_code==409
-    deleted=pro.delete("/api/v4/showcase/photos/0",json={"version":3})
+    assert pro.request("DELETE","/api/v4/showcase/photos/0",json={"version":2}).status_code==409
+    deleted=pro.request("DELETE","/api/v4/showcase/photos/0",json={"version":3})
     assert deleted.status_code==200 and deleted.json()["version"]==4
     assert pro.get(f"/api/v4/showcase/photos/{photo_id}").status_code==404
     assert "photo_id" not in pro.get("/api/v4/showcase").json()["works"][0]
-    assert pro.delete("/api/v4/showcase/photos/0",json={"version":4}).json()["changed"] is False
+    assert pro.request("DELETE","/api/v4/showcase/photos/0",json={"version":4}).json()["changed"] is False
     with v["mod"].connect() as c:
         assert c.execute("SELECT COUNT(*) FROM showcase_photos").fetchone()[0]==0
 
