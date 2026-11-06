@@ -20,7 +20,7 @@ Les réponses tardives d'une ancienne navigation ne reprennent pas le focus.
 Le titre de l'onglet indique la section générique, sans recopier le titre privé d'un
 projet ; la déconnexion rétablit le titre d'accueil.
 
-Un dialogue place le focus dans son premier contrôle disponible. Lorsqu'il affiche
+Un dialogue place le focus dans son premier contrôle disponible sur grand écran. Pour une fenêtre de 960 pixels CSS ou moins, il place le focus sur son titre pour éviter l’ouverture immédiate du clavier tactile. Lorsqu'il affiche
 un nouveau contenu sans se fermer, son titre reçoit le focus pour réorienter la
 lecture. À la fermeture, le focus retourne au bouton d'origine s'il existe encore ;
 sinon il rejoint le titre de la page. Une confirmation suivie d'un rechargement
@@ -55,3 +55,24 @@ restent à tester. L’installation de la PWA relève d’une recette distincte.
 Les largeurs Chromium caractérisent le rendu à la taille indiquée. Voir les
 [critères de redistribution](https://www.w3.org/WAI/WCAG22/Understanding/reflow.html)
 et d’[agrandissement du texte](https://www.w3.org/WAI/WCAG22/Understanding/resize-text.html).
+
+## Reflow intermédiaire et contrastes — correction du 6 novembre 2026
+
+La barre latérale précédente restait visible dans la tranche **681–960 pixels CSS**.
+À 200 % de zoom sur un écran de 1 440 pixels de large, la fenêtre ne dispose
+plus que de **720 pixels CSS** : le contenu se retrouvait comprimé par la barre
+latérale. Cette tranche utilise désormais le même principe de menu dépliable
+qu’un mobile : titre de rubrique, bouton de menu, navigation clavier/Échap,
+contenu sur toute la largeur et deux colonnes maximum pour les grilles simples.
+Les champs texte adoptent 16 pixels CSS dans cette plage. La liste des conversations
+passe au-dessus du fil au lieu de rétrécir son espace d'écriture.
+
+Les états sélectionnés et le focus bénéficient de contours explicites lorsque
+`forced-colors: active` est détecté. Les styles `prefers-contrast: more`
+renforcent les bordures et le texte secondaire. Les tests DOM du menu, du dialogue
+et les assertions de structure CSS couvrent cette révision.
+
+**Limite de cette preuve :** les tests DOM ne simulent pas le moteur de rendu du
+navigateur ni un zoom réel. Les contrôles d’absence de défilement horizontal à
+200 %, le lecteur d’écran, le zoom 400 % et les téléphones physiques restent
+**à recetter**. Aucun niveau de conformité WCAG complet n'est revendiqué.

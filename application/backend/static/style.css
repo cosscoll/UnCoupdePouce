@@ -503,3 +503,51 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
  .chat-help-actions{gap:8px}
  .chat-help-actions button{min-height:44px}
 }
+
+/* F91: reflow for 200% zoom on 1440–1920px displays (CSS viewport 720–960px).
+   Previously the desktop sidebar stayed beside the workspace until 680px. */
+@media (min-width:681px) and (max-width:960px){
+ .dashboard{display:flex;flex-direction:column;max-width:100%;min-width:0}
+ .sidebar{position:sticky;top:0;z-index:6;width:100%;padding:10px 20px;gap:0;background:#fff;border-right:0;border-bottom:1px solid var(--line)}
+ .sidebar>.eyebrow,.sidebar-note{display:none}
+ .navigation-toggle{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:48px;text-align:left}
+ .navigation-toggle span:last-child{min-width:0;overflow-wrap:anywhere}
+ .sidebar nav{display:none;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:min(50dvh,420px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;margin-top:10px}
+ .sidebar[data-navigation-open="true"] nav{display:grid}
+ .navlink{min-width:0;min-height:48px;align-items:flex-start;white-space:normal;overflow-wrap:anywhere}
+ .nav-secondary,.nav-secondary-items{min-width:0}
+ .workspace{width:100%;min-width:0;padding:24px 26px 48px}
+ .welcome{grid-template-columns:minmax(0,1fr);gap:24px;max-width:740px;padding:34px 28px}
+ .welcome-copy{padding:0}
+ .auth-box{max-width:640px}
+ .accountbar{flex-direction:column;align-items:flex-start;gap:9px;margin-bottom:25px}
+ .accountbar-meta{display:flex;justify-content:flex-start;flex-wrap:wrap;gap:8px}
+ .mobile-install-link:not([hidden]){display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:9px 13px;border:1px solid #a5aaca;border-radius:9px;color:#35439c;background:#fff;font-size:12px;font-weight:700}
+ .page-head{flex-direction:column;align-items:stretch;gap:16px}
+ .page-head>button{align-self:flex-start}
+ .overview-grid{grid-template-columns:minmax(0,1fr)}
+ .stat-grid,.project-status-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .search-core{grid-template-columns:minmax(0,1fr)}
+ .search-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .project-row{grid-template-columns:44px minmax(0,1fr)}
+ .project-row .row-actions{grid-column:2;display:flex;flex-wrap:wrap}
+ .messages{display:block;min-width:0}
+ .conversation-list{max-height:none;overflow:visible;border-right:0;border-bottom:1px solid var(--line)}
+ .conversation-list-items{max-height:min(35dvh,260px);overflow-y:auto;overscroll-behavior:contain}
+ .chat{padding:20px}
+ .chat-compose textarea,.conversation-search-label input{font-size:16px}
+ input,textarea,select{font-size:16px}
+}
+@media(max-height:540px) and (max-width:960px){
+ .sidebar nav{max-height:45dvh}
+ dialog{max-height:calc(100dvh - 12px)}
+}
+@media(forced-colors:active){
+ .navlink.active,.conversation-choice[aria-pressed="true"],.pro-preset[aria-pressed="true"],.application-filter-card[aria-pressed="true"],#navigation-toggle[aria-expanded="true"]{outline:2px solid Highlight;outline-offset:-2px}
+ .bubble.mine{border:1px solid CanvasText}
+ button:focus-visible,a:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid Highlight;outline-offset:3px}
+}
+@media(prefers-contrast:more){
+ .hint,.quiet,.mini{color:var(--ink)}
+ .outline,.navlink,.conversation-choice{border-color:#74788e}
+}

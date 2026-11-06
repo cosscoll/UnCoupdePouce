@@ -106,7 +106,7 @@ function showDialog(title,content){
  dialog.setAttribute('aria-labelledby','dialog-title');
  dialog.showModal();
  // On narrow touch screens, do not summon the virtual keyboard before a form field is requested.
- const mobile=window.matchMedia?.('(max-width:680px)')?.matches===true;
+ const mobile=window.matchMedia?.('(max-width:960px)')?.matches===true;
  const first=n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]');
  (wasOpen||mobile?heading:first||$('#dialog-close')).focus();
 }
@@ -1572,6 +1572,7 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Mes candidatures : cartes cliquables pour consulter les demandes en attente, sélectionnées ou terminées, avec accès direct aux candidatures sélectionnées depuis l’accueil.'}),
    el('li',{text:'Sur téléphone : un bouton « Installer UCP sur ce téléphone » ouvre la procédure PWA depuis le tableau de bord ; aucune installation automatique et pas de publication sur les stores.'}),
    el('li',{text:'Sur téléphone : les fenêtres s’ouvrent sans afficher immédiatement le clavier ; le menu se ferme au toucher extérieur, et les notifications de connexion disposent d’un bouton Masquer.'}),
+   el('li',{text:'Accessibilité : navigation repliable aussi sur les fenêtres de 681 à 960 pixels CSS (dont le zoom à 200 % sur certains écrans), formulaires plus lisibles et états sélectionnés visibles en contraste renforcé.'}),
    el('li',{text:'Messagerie mobile : un seul défilement pour la liste de conversations, sélection tactile lisible et saisie de message plus confortable.'}),
    el('li',{text:'Messagerie : recherche locale par projet ou interlocuteur et ouverture du fil sur clic explicite. Les droits restent vérifiés par le serveur à chaque accès.'}),
    el('li',{text:'Envoi de message : le bouton exige un texte non vide, indique les envois non confirmés et propose un réessai avec le même identifiant pour éviter les doublons. Aucun renvoi automatique.'}),

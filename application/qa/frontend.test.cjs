@@ -405,7 +405,7 @@ test('PWA registration is scoped, installation requires a user gesture and accep
 test('F88 mobile install entry reuses the native prompt and hides only after browser confirmation',async()=>{
  let prompts=0;
  const x=await boot({},w=>{
-  w.matchMedia=query=>({matches:query==='(max-width:680px)',addEventListener(){}});
+  w.matchMedia=query=>({matches:query==='(max-width:960px)',addEventListener(){}});
  });
  try{
   loadPWA(x);
@@ -433,8 +433,47 @@ test('F88 mobile install entry reuses the native prompt and hides only after bro
  }finally{x.close()}
 });
 
+test('F91 simulated 200% zoom uses compact navigation and avoids automatic keyboard focus',async()=>{
+ const x=await boot({},w=>{
+  w.matchMedia=query=>({matches:query==='(max-width:960px)',addEventListener(){}});
+ });
+ try{
+  const d=x.w.document,toggle=d.querySelector('#navigation-toggle'),calls=x.calls.length;
+  toggle.click();
+  assert.equal(toggle.getAttribute('aria-expanded'),'true');
+  const first=d.querySelector('#tabs button');
+  first.focus();first.dispatchEvent(new x.w.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));
+  assert.equal(toggle.getAttribute('aria-expanded'),'false');
+  assert.equal(d.activeElement,toggle);
+  const opener=d.querySelector('#install-help');opener.focus();
+  const form=d.createElement('form'),entry=d.createElement('input');
+  entry.name='answer';form.append(entry);
+  x.w.showDialog('Zoom et saisie',form);
+  assert.equal(d.activeElement,d.querySelector('#dialog-title'));
+  assert.equal(d.querySelector('#dialog').getAttribute('aria-labelledby'),'dialog-title');
+  d.querySelector('#dialog-close').click();
+  assert.equal(d.activeElement,opener);
+  assert.equal(x.calls.length,calls,'zoom interactions must not post or mutate data');
+ }finally{x.close()}
+});
+
+test('F91 CSS reflow covers intermediate 681–960px viewports and forced-colors selection',()=>{
+ const sheet=fs.readFileSync(path.join(root,'style.css'),'utf8');
+ const marker=sheet.lastIndexOf('/* F91: reflow for 200% zoom');
+ assert.ok(marker>0,'keep a separately auditable reflow rule');
+ const reflow=sheet.slice(marker);
+ assert.match(reflow,/@media \(min-width:681px\) and \(max-width:960px\)/);
+ assert.match(reflow,/\.dashboard\{display:flex;flex-direction:column/);
+ assert.match(reflow,/\.sidebar\[data-navigation-open="true"\] nav\{display:grid\}/);
+ assert.match(reflow,/\.sidebar nav\{display:none/);
+ assert.match(reflow,/\.messages\{display:block/);
+ assert.match(reflow,/\.search-grid\{grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+ assert.match(reflow,/@media\(forced-colors:active\)/);
+ assert.match(reflow,/\.conversation-choice\[aria-pressed="true"\]/);
+});
+
 test('mobile manual dialog avoids automatic input focus and returns focus to its opener',async()=>{
- const x=await boot({},w=>{w.matchMedia=query=>({matches:query==='(max-width:680px)',addEventListener(){}})});
+ const x=await boot({},w=>{w.matchMedia=query=>({matches:query==='(max-width:960px)',addEventListener(){}})});
  try{
   const d=x.w.document,opener=d.querySelector('#install-help');
   opener.focus();
@@ -1903,9 +1942,9 @@ test('UX audit: account screen keeps install and logout after personal informati
 
 test('UX release: clearly labelled 2026-11-06 version and versioned static assets are present',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- assert.match(html,/Nouveau : installation et navigation mobile simplifiées · 6 novembre 2026/);
+ assert.match(html,/Nouveau : navigation et lisibilité au zoom améliorées · 6 novembre 2026/);
  for(const name of ['style.css','analytics.js','local-ai.js','assistant-ai.js','app.js','pwa.js']){
-  assert.ok(html.includes('/assets/'+name+'?v=ucp-mobile-20261106'),name+' should be release-versioned');
+  assert.ok(html.includes('/assets/'+name+'?v=ucp-reflow-20261106'),name+' should be release-versioned');
  }
  const x=await boot();
  try{
@@ -1921,6 +1960,7 @@ test('UX release: clearly labelled 2026-11-06 version and versioned static asset
   assert.match(x.w.document.querySelector('#dialog').textContent,/réessai avec le même identifiant/);
   assert.match(x.w.document.querySelector('#dialog').textContent,/Installer UCP sur ce téléphone/);
   assert.match(x.w.document.querySelector('#dialog').textContent,/toucher extérieur/);
+  assert.match(x.w.document.querySelector('#dialog').textContent,/681 à 960 pixels/);
   assert.match(x.w.document.querySelector('#dialog').textContent,/2026\.11\.06/);
  }finally{x.close()}
 });
