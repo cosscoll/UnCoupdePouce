@@ -111,3 +111,22 @@ réel le 27 octobre. Voir QA.md pour la recette du parcours et ses limites.
 La restauration PostgreSQL distante, la charge et la recette mobile restent à
 réaliser avant toute ouverture réelle. La PWA et les arbitrages D01–D13 restent
 hors validation. Aucune ouverture commerciale ni paiement réel activés.
+
+
+## Préparation du premier groupe de testeurs — 6 novembre 2026
+
+Un bouton « Comment tester UCP ? » avant connexion et « Guide de test » dans
+l'espace connecté donnent les étapes des deux rôles. Un testeur connecté peut
+envoyer un retour via l'assistance privée existante, sans nouvelle API.
+Ce guide n'accorde aucun droit professionnel et ne simule aucun paiement.
+
+Deux verrous d'accès subsistent : Vercel Authentication et le mot de passe
+HTTP Basic propre à UCP. Pour un testeur externe, autoriser d'abord une
+identité Vercel ou un partage temporaire privé, puis fournir le Basic
+séparément. Ne pas désactiver les deux protections ni inclure de secret dans
+GitHub, les tickets de support ou des URL publiques.
+
+Le contrôle manuel en lecture seule application/tools/beta_preflight.py
+vérifie le bon serveur PostgreSQL staging, les protections HTTP et l'interface
+des deux espaces. Il n'inscrit personne, ne valide aucun compte, ne crée pas
+de projet et ne touche jamais la base en écriture. Voir BETA_TEST_LANCEMENT.md.

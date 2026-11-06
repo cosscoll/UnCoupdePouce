@@ -25,6 +25,8 @@ reste une présentation séparée.
 
 [Pause et réouverture des candidatures](application/docs/PAUSE_CANDIDATURES.md) — développées et testées, **mise en ligne en attente de la limite Vercel**.
 
+[Préparer le premier test utilisateurs (conditions d'accès, scénarios, retour bêta et sauvegarde)](application/docs/BETA_TEST_LANCEMENT.md).
+
 ## Suivi du projet
 
 - [Vitrine publique vérifiée](https://cosscoll.github.io/UnCoupdePouce/site-vitrine/dist/index.html)
