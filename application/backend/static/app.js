@@ -1052,16 +1052,27 @@ async function renderApplications(n){
  const items=(await api('/my-applications')).items;
  if(!items.length){n.append(empty('Tout commence par un projet.','Parcourez les demandes qui correspondent à vos métiers.','Trouver un projet',()=>go('projects')));return}
  const count=fn=>items.filter(fn).length;
- n.append(el('div',{class:'stat-grid'},...[
-  ['En attente',count(a=>a.status==='pending'&&a.project_status!=='closed')],
-  ['Sélectionnées · projet non clôturé',count(a=>a.status==='accepted'&&a.project_status!=='closed')],
-  ['Projets terminés',count(a=>a.project_status==='closed')]
- ].map(([text,value])=>el('div',{class:'stat'},el('strong',{text:value}),text))));
  const filter=field('Afficher les candidatures','application_status','select',{required:false,options:{all:'Toutes',pending:'En attente',accepted:'Sélectionnées · projet non clôturé',rejected:'Non retenues',withdrawn:'Retirées',closed:'Projets terminés',cancelled:'Projets annulés',suspended:'Projets suspendus'}});
- const list=el('div',{'aria-live':'polite'});n.append(filter,list);
+ const selectedFilter=['pending','accepted','closed'].includes(appState.applicationFilter)?appState.applicationFilter:'all';
+ filter.querySelector('select').value=selectedFilter;
+ const quick=el('section',{class:'stat-grid application-quick-filters',role:'group','aria-label':'Afficher les candidatures par statut'});
+ const quickControls=[];
+ for(const [status,label,value] of [
+  ['all','Toutes les candidatures',items.length],
+  ['pending','En attente',count(a=>a.status==='pending'&&a.project_status!=='closed')],
+  ['accepted','Sélectionnées',count(a=>a.status==='accepted'&&a.project_status!=='closed')],
+  ['closed','Projets terminés',count(a=>a.project_status==='closed')]
+ ]){
+  const control=el('button',{class:'stat application-filter-card',type:'button','aria-pressed':'false',
+   onClick:()=>{filter.querySelector('select').value=status;draw();}},
+   el('strong',{text:value}),el('span',{text:label}));
+  quickControls.push([status,control]);quick.append(control);
+ }
+ const list=el('div',{'aria-live':'polite'});n.append(quick,filter,list);
  const explanations={not_selected:'La messagerie s’ouvre après sélection et selon les droits de test actifs.',closed:'Projet clôturé : les échanges sont fermés.',project_suspended:'Le demandeur a suspendu le projet. Les échanges sont interrompus jusqu’à sa reprise.',unavailable:'L’accès aux échanges est actuellement suspendu. Consultez votre profil ou contactez l’assistance.',linked_inactive:'Le profil lié est inactif. Consultez Mon entreprise.',test_access_required:'Candidature sélectionnée. L’accès messagerie de test doit être activé par l’administrateur.',available:'Vous pouvez échanger avec le demandeur.'};
  function draw(){
   clear(list);const value=filter.querySelector('select').value;
+  for(const [status,control] of quickControls)control.setAttribute('aria-pressed',String(status===value));
   const visible=items.filter(a=>value==='all'||(value==='closed'&&a.project_status==='closed')||
    (value==='cancelled'&&a.project_cancelled)||(value==='suspended'&&a.project_suspended)||(a.status===value&&(!['pending','accepted'].includes(value)||a.project_status!=='closed')));
   if(!visible.length){list.append(el('p',{class:'status-note',text:'Aucune candidature pour ce filtre.'}));return}
