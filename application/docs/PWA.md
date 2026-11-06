@@ -12,6 +12,19 @@ sa boîte de dialogue. Son acceptation n'est pas présentée comme une installat
 terminée : seule la confirmation `appinstalled` ou le mode standalone est reconnue.
 Sans événement d'installation, l'aide manuelle reste accessible.
 
+Depuis le 6 novembre, un bouton **Installer UCP sur ce téléphone** est disponible
+dans la barre de l'espace connecté sur écran étroit. Il ouvre exactement la même
+aide que le bouton de **Mon compte**, sans demander d'autorisation technique ni
+télécharger quoi que ce soit automatiquement. Les deux accès ne sont masqués
+qu'après `appinstalled` ou en mode `standalone`. Le lien d'aide du pied de page
+reste accessible si l'installation n'est pas proposée.
+
+Sur téléphone, les dialogues donnent d'abord le focus au titre : le clavier
+virtuel ne s'ouvre pas au lancement d'une aide, notamment dans Yahya. Le menu
+se referme lorsqu'on touche l'extérieur ; le bouton Échap et la fermeture
+après navigation restent disponibles. Les messages de statut réseau disposent
+d'un bouton **Masquer** : cette action ne recharge ni n'envoie aucune donnée.
+
 - Android : menu du navigateur, option Installer ou Ajouter à l'écran d'accueil.
 - iPhone : Safari, Partage, Sur l'écran d'accueil, selon la version.
 - Ordinateur : option du navigateur compatible.
