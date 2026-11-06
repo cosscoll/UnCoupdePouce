@@ -490,3 +490,16 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
  .mobile-install-link:not([hidden]){flex:1 1 100%;min-width:0}
  .release-notes-link{flex:1 1 100%}
 }
+
+/* Keep exactly one scrollable conversation picker on touch screens. */
+@media(max-width:680px){
+ .messages{min-width:0}
+ .conversation-list{max-height:none;overflow:visible}
+ .conversation-list-items{max-height:min(28dvh,220px);overflow-y:auto;overscroll-behavior:contain}
+ .conversation-search-label input{font-size:16px}
+ .chat{min-width:0;padding:16px}
+ .chat-log{height:min(38dvh,310px);min-height:150px;overscroll-behavior:contain}
+ .chat-compose textarea{font-size:16px;min-height:100px}
+ .chat-help-actions{gap:8px}
+ .chat-help-actions button{min-height:44px}
+}
