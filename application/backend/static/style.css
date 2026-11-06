@@ -337,3 +337,18 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
  .testbar{flex-wrap:wrap;gap:4px}
  .testbar span{font-size:10px}
 }
+
+/* Private end-of-project feedback — never presented as verified public reviews. */
+.project-feedback{margin-top:24px;border-left:4px solid var(--violet);background:#f8f9ff}
+.project-feedback h3{font-size:19px;line-height:1.4;margin:8px 0 13px}
+.project-feedback>.eyebrow{font-size:11px;letter-spacing:.1em;color:#4755ab;font-weight:750}
+.project-feedback .hint{font-size:12px;line-height:1.6;margin:10px 0 16px}
+.feedback-form{display:grid;gap:15px;max-width:600px}
+.feedback-form>label:not(.feedback-confirmation){display:grid;gap:7px;font-size:13px;font-weight:650}
+.feedback-form select,.feedback-form textarea{width:100%;max-width:100%;font-size:14px;color:var(--ink);background:#fff;border:1px solid #b5b9c7;border-radius:9px;padding:11px}
+.feedback-form textarea{resize:vertical;min-height:105px;line-height:1.55}
+.feedback-form .feedback-confirmation{display:flex;align-items:flex-start;gap:11px;font-size:12px;line-height:1.55;font-weight:500}
+.feedback-confirmation input{flex:none;width:19px;height:19px;min-height:19px;margin-top:2px}
+.feedback-form .primary{min-height:45px;justify-self:start}
+.feedback-rating{font-size:17px;font-weight:700;color:var(--violet)}
+@media(max-width:680px){.project-feedback{padding:18px}.feedback-form .primary{width:100%}}
