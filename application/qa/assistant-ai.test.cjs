@@ -128,6 +128,36 @@ test('Yahya can retry a failed quality-model message in light mode without sendi
  assert.equal(h.searched,null);
 });
 
+test('stopping a long generation ignores its eventual stale reply and keeps a safe retry',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ const originalSend=h.local.send;
+ let finish;
+ h.local.send=payload=>new Promise(resolve=>{h.calls.push(payload);finish=resolve});
+ const textarea=h.doc.querySelector('textarea');
+ textarea.value='Comment préparer une annonce de rénovation pour une salle de bains ?';
+ h.doc.querySelector('form').dispatchEvent(new h.doc.defaultView.Event('submit',{bubbles:true,cancelable:true}));
+ await settle();
+ assert.equal(h.calls.length,1);
+ const stop=btn(h.doc,'Arrêter cette réponse');
+ assert.equal(stop.hidden,false);
+ assert.equal(textarea.disabled,true);
+ stop.click();
+ assert.equal(h.resets,1,'stopping a reply releases the active local worker');
+ assert.equal(stop.hidden,true);
+ assert.equal(textarea.disabled,false);
+ assert.match(h.doc.querySelector('.ai-status').textContent,/question reste dans la conversation/);
+ assert.equal(btn(h.doc,'Réessayer de générer la réponse').hidden,false);
+ finish({reply:'Cette réponse devrait être ignorée.',draft:null,search:null});
+ await settle();
+ assert.equal(h.doc.querySelectorAll('.ai-message.from-assistant').length,0,'late completion is not shown');
+ assert.equal(h.doc.querySelectorAll('.ai-message.from-user').length,1);
+ h.local.send=originalSend;
+ btn(h.doc,'Réessayer de générer la réponse').click();await settle();
+ assert.equal(h.calls.length,2);
+ assert.equal(h.doc.querySelectorAll('.ai-message.from-user').length,1);
+ assert.equal(h.doc.querySelectorAll('.ai-message.from-assistant').length,1);
+});
+
 test('session change stops the local AI worker and clears conversation',async()=>{
  const h=harness();h.ai.open();h.sessionChange();
  assert.equal(h.resets,1);
