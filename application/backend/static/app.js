@@ -1134,6 +1134,23 @@ function reviewReport(report){
   });
   showDialog('Examiner le signalement #'+report.id,form);
 }
+// Internal notices link to a *section*, never to an unchecked private object ID.
+function notificationDestination(eventType,role){
+ const requesterProjects=['new_application','application_withdrawn'];
+ const professionalApplications=['application_accepted','application_rejected','project_closed','project_cancelled','project_suspended','project_resumed','project_updated','project_intake_paused','project_intake_resumed'];
+ const chat=['new_message','linked_conversation_paused','linked_conversation_changed'];
+ const assistance=['support_resolved','report_resolved'];
+ const professionalProfile=['profile_test_authorized','profile_review_required','profile_test_suspended','test_access_activated'];
+ const enterprise=['linked_profile_paused','linked_profile_resumed'];
+ if(role==='requester'&&requesterProjects.includes(eventType))return {view:'projects',label:'Voir mes projets'};
+ if(role==='professional'&&professionalApplications.includes(eventType))return {view:'applications',label:'Voir mes candidatures'};
+ if(chat.includes(eventType))return {view:'conversations',label:'Voir mes messages'};
+ if(assistance.includes(eventType))return {view:'support',label:'Ouvrir l’assistance'};
+ if(role==='professional'&&professionalProfile.includes(eventType))return {view:'profile',label:'Voir mon profil'};
+ if(role==='professional'&&enterprise.includes(eventType))return {view:'enterprise',label:'Voir mon entreprise'};
+ if(['account_suspended','account_restored'].includes(eventType))return {view:'personal-data',label:'Voir mon compte'};
+ return null;
+}
 async function renderNotifications(n){
  const epoch=renderEpoch,actor=appState.user,valid=()=>epoch===renderEpoch;
  n.append(heading('Votre actualité UCP.','Retrouvez les candidatures, sélections, messages et réponses de l’assistance.'));
@@ -1149,12 +1166,10 @@ async function renderNotifications(n){
   if(readers.has(note.id))return;
   const flag=el('span',{class:'chip '+(!note.read_at?'violet':''),text:note.read_at?'Lue':'Non lue'});
   const card=el('article',{class:'item'},el('p',{text:note.message}),el('time',{class:'small muted',text:new Date(note.created_at).toLocaleString('fr-FR')}),flag);
-  if(['project_updated','project_cancelled','project_suspended','project_resumed'].includes(note.event_type)&&actor.role==='professional'){
-   card.append(button('Voir ma candidature',async()=>{
-    await go('applications');
-    if(appState.user===actor&&appState.view==='applications')document.getElementById('application-'+note.entity_id)?.focus();
-   }));
-  }
+  const destination=notificationDestination(note.event_type,actor.role);
+  if(destination)card.append(button(destination.label,()=>{
+   if(valid()&&appState.user===actor)go(destination.view);
+  },'outline'));
   let done=!!note.read_at;const read=button('Marquer comme lue',async()=>{
    if(done||!valid())return;
    const result=await action(()=>api('/notifications/'+note.id+'/read',{method:'POST'}));
@@ -1340,6 +1355,7 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Recherche : filtres particuliers et professionnels séparés ; métier et commune visibles en premier pour les professionnels.'}),
    el('li',{text:'Artisans : spécialités et zones plus lisibles ; informations détaillées repliables et vérifications non réalisées clairement signalées.'}),
    el('li',{text:'Artisans : ajout d’une photo facultative par réalisation textuelle enregistrée, accessible depuis les candidatures autorisées et leur comparateur. Les photos restent déclaratives et non certifiées.'}),
+   el('li',{text:'Notifications : chaque événement reconnu propose un accès direct à la rubrique concernée (projets, candidatures, messages, assistance ou compte), sans exposer de dossier privé.'}),
    el('li',{text:'Navigation : le retour et l’avancement du navigateur fonctionnent entre les rubriques avec sauvegarde du brouillon avant de quitter.'}),
    el('li',{text:'Annonce de chantier : renseignez une surface, une longueur, une largeur ou une hauteur dans l’étape « Les détails ». Ces mesures facultatives sont enregistrées avec le brouillon, visibles dans le projet et modifiables avant sélection.'})
   ),
