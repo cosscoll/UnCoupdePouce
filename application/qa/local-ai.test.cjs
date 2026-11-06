@@ -76,3 +76,26 @@ test('only a professional can send sanitized current filters to the model',()=>{
  assert.equal(ai.cleanContext('requester',null,saved,trades).search,undefined);
  assert.equal(ai.cleanContext('professional',null,{...saved,trade:'unknown'},trades).search.trade,'');
 });
+
+test('local chat strips model reasoning and rejects empty visible replies',async()=>{
+ const originalWorker=global.Worker,originalNavigator=global.navigator,originalSecure=global.isSecureContext;
+ let reply='<think>internal reasoning</think>Réponse utile pour le chantier.';
+ class MockWorker{
+  postMessage({id}){setImmediate(()=>this.onmessage?.({data:{id,type:'result',text:reply,modelTier:'light'}}))}
+  terminate(){}
+ }
+ try{
+  Object.defineProperty(global,'Worker',{configurable:true,value:MockWorker});
+  Object.defineProperty(global,'navigator',{configurable:true,value:{gpu:{}}});
+  Object.defineProperty(global,'isSecureContext',{configurable:true,value:true});
+  const request={role:'requester',catalog:trades,messages:[{role:'user',content:'Comment décrire mon chantier ?'}]};
+  assert.equal((await ai.send(request)).reply,'Réponse utile pour le chantier.');
+  reply='<think>aucune réponse finale</think>';
+  await assert.rejects(ai.send(request),/pas produit de réponse exploitable/);
+ }finally{
+  ai.reset();
+  for(const[k,v]of [['Worker',originalWorker],['navigator',originalNavigator],['isSecureContext',originalSecure]]){
+   if(v===undefined)delete global[k];else Object.defineProperty(global,k,{configurable:true,value:v});
+  }
+ }
+});
