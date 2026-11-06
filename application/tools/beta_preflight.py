@@ -26,12 +26,13 @@ def validate_url(value, base=None):
 
 
 class SameOriginRedirect(HTTPRedirectHandler):
-    def __init__(self, hostname):
-        self.hostname = hostname
+    def __init__(self, origin):
+        self.origin = origin.lower()
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
-        if urlsplit(newurl).hostname != self.hostname:
-            raise ValueError("Redirection vers un autre domaine refusée")
+        destination = urlsplit(newurl)
+        if destination.scheme != "https" or destination.netloc.lower() != self.origin:
+            raise ValueError("Redirection HTTPS hors origine autorisée refusée")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -59,13 +60,15 @@ def evaluate_home(html, headers):
 
 def preflight(base, password, share_url=None, opener=None):
     host = validate_url(base)
+    if host.netloc.lower() != urlsplit(BASE).netloc.lower():
+        raise ValueError("Ce contrôle ne contacte que le domaine officiel de préproduction UCP")
     if host.query or host.path not in ("", "/"):
         raise ValueError("La base ne doit pas contenir de chemin ou de query")
     if len(password) < 24:
         raise ValueError("Mot de passe opérateur absent ou trop court")
     share = validate_url(share_url, base) if share_url else None
     client = opener or build_opener(
-        HTTPCookieProcessor(CookieJar()), SameOriginRedirect(host.hostname)
+        HTTPCookieProcessor(CookieJar()), SameOriginRedirect(host.netloc)
     )
     auth = base64.b64encode(("ucp:" + password).encode("utf-8")).decode("ascii")
     headers = {"Authorization": "Basic " + auth,

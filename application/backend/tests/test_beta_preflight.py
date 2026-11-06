@@ -22,6 +22,20 @@ def test_beta_url_rejects_http_credentials_and_cross_origin_shares():
         beta.validate_url("https://other-site.vercel.app/?_vercel_share=token", beta.BASE)
 
 
+def test_beta_preflight_never_sends_a_basic_password_to_untrusted_hosts():
+    client = ReadOnlyFake()
+    with pytest.raises(ValueError):
+        beta.preflight("https://different-project.vercel.app", "A" * 24, opener=client)
+    assert client.requests == []
+    from urllib.request import Request
+    origin = beta.SameOriginRedirect("ucp-preproduction.vercel.app")
+    request = Request(beta.BASE)
+    for target in ("http://ucp-preproduction.vercel.app/api/health",
+                   "https://ucp-preproduction.vercel.app:8443/"):
+        with pytest.raises(ValueError):
+            origin.redirect_request(request, None, 302, "redirect", {}, target)
+
+
 def test_beta_health_requires_staging_postgres_not_public_production():
     good = {"ok": True, "mode": "staging", "storage": "postgresql",
             "production": False}
