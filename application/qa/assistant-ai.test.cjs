@@ -5,7 +5,7 @@ const assistant=require('../backend/static/assistant-ai.js');
 function harness(role='requester',configured=true,sharedStorage=null,extraContext={}){
  const dom=new JSDOM('<!doctype html><html><body><dialog open></dialog></body></html>',{url:'https://ucp.test'});
  const doc=dom.window.document,dialog=doc.querySelector('dialog'),storage=sharedStorage||dom.window.localStorage;
- let actor={id:123,role},session='csrf-demo',applied=null,searched=null,resetCount=0;
+ let actor={id:123,role},session='csrf-demo',applied=null,searched=null,navigated=null,resetCount=0;
  const calls=[];
  const el=(tag,attrs={},...children)=>{const n=doc.createElement(tag);
   for(const[k,v]of Object.entries(attrs)){
@@ -24,9 +24,9 @@ function harness(role='requester',configured=true,sharedStorage=null,extraContex
  const ai=assistant.create({el,button,local,storage,
   context:()=>({actor,session,role,catalog:[{id:'plomberie',label:'Plomberie'}],wizardStep:null,...extraContext}),
   show:node=>{dialog.replaceChildren(node);dialog.open=true},close:()=>{dialog.open=false},
-  navigate:()=>{},apply:async d=>{applied=d;return true},search:async s=>{searched=s;return true}
+  navigate:view=>{navigated=view},apply:async d=>{applied=d;return true},search:async s=>{searched=s;return true}
  });
- return {ai,doc,calls,local,storage,set response(v){response=v},get applied(){return applied},get searched(){return searched},
+ return {ai,doc,calls,local,storage,set response(v){response=v},get applied(){return applied},get searched(){return searched},get navigated(){return navigated},
   get resets(){return resetCount},sessionChange(){actor={id:999,role};session='csrf-new';ai.sync()}};
 }
 const settle=async()=>{await Promise.resolve();await new Promise(resolve=>setImmediate(resolve))};
@@ -79,6 +79,52 @@ test('unsupported device never fakes an AI reply',async()=>{
  assert.match(h.doc.body.textContent,/WebGPU indisponible/);
  assert.equal(h.calls.length,0);
 });
+test('unsupported WebGPU offers real UCP navigation, never a scripted chatbot answer',()=>{
+ const requester=harness('requester',false);
+ requester.ai.open();
+ const fallback=requester.doc.querySelector('.ai-unavailable');
+ assert.equal(fallback.hidden,false);
+ assert.match(fallback.textContent,/sans l’IA/);
+ assert.equal(requester.doc.querySelector('textarea').disabled,true);
+ assert.equal(requester.doc.querySelector('.ai-consent').hidden,true,'no model download agreement without local GPU inference');
+ btn(requester.doc,'Décrire mes travaux').click();
+ assert.equal(requester.navigated,'projects');
+ assert.equal(requester.calls.length,0);
+ const pro=harness('professional',false);
+ pro.ai.open();
+ assert.equal(btn(pro.doc,'Décrire mes travaux'),undefined);
+ btn(pro.doc,'Suivre mes candidatures').click();
+ assert.equal(pro.navigated,'applications');
+ assert.equal(pro.calls.length,0);
+});
+
+test('Yahya can retry a failed quality-model message in light mode without sending it twice',async()=>{
+ const h=harness();h.ai.open();h.doc.querySelector('input[type=checkbox]').click();
+ h.response=Error('Mémoire GPU insuffisante pour charger Qwen 3B');
+ await say(h,'Comment préparer le chantier de ma cuisine ?');
+ const retry=btn(h.doc,'Réessayer de générer la réponse');
+ const light=btn(h.doc,'Essayer le modèle léger (1,5B)');
+ assert.equal(retry.hidden,false);
+ assert.equal(light.hidden,false);
+ assert.equal(h.calls.length,1);
+ assert.equal(h.doc.querySelectorAll('.ai-message.from-user').length,1);
+ h.response={reply:'Dans Mes projets, décrivez les travaux puis vérifiez votre commune.',draft:null,search:null};
+ light.click();await settle();
+ assert.equal(h.calls.length,2);
+ assert.equal(h.calls[0].modelTier,'quality');
+ assert.equal(h.calls[1].modelTier,'light');
+ assert.deepEqual(h.calls[0].messages,h.calls[1].messages,'same user message is retried locally');
+ assert.equal(h.doc.querySelectorAll('.ai-message.from-user').length,1,'no duplicated user bubble');
+ assert.equal(h.doc.querySelectorAll('.ai-message.from-assistant').length,1);
+ assert.equal(h.storage.getItem('ucp.ai.model-quality.v1'),'light');
+ assert.equal(h.doc.querySelector('.ai-quality-select').value,'light');
+ assert.equal(h.resets,1,'old model released');
+ assert.equal(light.hidden,true);
+ assert.equal(retry.hidden,true);
+ assert.equal(h.applied,null);
+ assert.equal(h.searched,null);
+});
+
 test('session change stops the local AI worker and clears conversation',async()=>{
  const h=harness();h.ai.open();h.sessionChange();
  assert.equal(h.resets,1);
