@@ -60,6 +60,66 @@ test('F46 conversations can be searched locally and opened only on explicit sele
  }finally{x.close()}
 });
 
+test('confirming a professional opens the exact project conversation',async()=>{
+ const project={id:91,title:'Cuisine fictive',description:'Description du projet fictif.',trade:'plomberie',town:'Toulouse',status:'open',photos:[]};
+ const x=await boot({
+  '/api/v4/projects/91':project,
+  '/api/projects/91/applications':{items:[{id:12,status:'pending',professional_name:'Atelier fictif',trade:'plomberie',town:'Toulouse'}]},
+  'POST /api/applications/12/accept':{ok:true,status:'accepted'},
+  '/api/conversations':{items:[{application_id:11,title:'Autre chantier',peer:'Autre artisan'},{application_id:12,title:project.title,peer:'Atelier fictif'}]},
+  'GET /api/conversations/12/messages':{items:[]}
+ },w=>{
+  w.HTMLDialogElement.prototype.close=function(){this.open=false;w.setTimeout(()=>this.dispatchEvent(new w.Event('close')),0)};
+ });
+ try{
+  const d=x.w.document;
+  await x.w.projectDetail(project);
+  savedButton(x.w,'Choisir ce professionnel','#view').click();
+  assert.equal(x.calls.some(c=>c.method==='POST'),false);
+  savedButton(x.w,'Confirmer','#dialog').click();await tick();
+  assert.equal(d.querySelector('#dialog').open,false);
+  assert.equal(x.w.location.hash,'#conversations');
+  assert.match(d.querySelector('.chat').textContent,/Atelier fictif.*Cuisine fictive/);
+  assert.equal(d.activeElement,d.querySelector('.chat h3'));
+  assert.deepEqual(x.calls.filter(c=>c.url.endsWith('/messages')).map(c=>c.url),['/api/conversations/12/messages']);
+ }finally{x.close()}
+});
+
+test('a professional can see the selected exchange without gaining permission to send',async()=>{
+ const x=await boot({
+  '/api/session':{id:2,name:'Atelier',role:'professional',csrf:'pro-token'},
+  '/api/my-applications':{items:[{id:12,title:'Cuisine fictive',trade:'plomberie',town:'Toulouse',status:'accepted',project_status:'selected',conversation_state:'test_access_required'}]},
+  '/api/conversations':{items:[{application_id:12,title:'Cuisine fictive',peer:'Camille',subscription_active:false}]},
+  'GET /api/conversations/12/messages':{status:403,data:{detail:'Accès chat suspendu : abonnement de test inactif'}}
+ },null,'http://localhost:8765/professionnel#applications');
+ try{
+  savedButton(x.w,'Consulter l’état de mes échanges','#view').click();await tick();
+  const d=x.w.document;
+  assert.match(d.querySelector('.chat-status').textContent,/abonnement de test inactif/);
+  assert.equal(d.querySelector('.chat-compose button[type=submit]').disabled,true);
+  assert.equal(x.calls.some(c=>c.method==='POST'),false);
+ }finally{x.close()}
+});
+
+test('message notices open only threads still listed for this account',async()=>{
+ const notice=(id,entity_id)=>({id,entity_id,event_type:'new_message',message:'Message de test',created_at:'2026-11-06T14:00:00Z'});
+ const x=await boot({
+  '/api/notifications':{items:[notice(31,99),notice(30,12)],unread:2,next_before_id:null},
+  '/api/conversations':{items:[{application_id:12,title:'Cuisine fictive',peer:'Atelier fictif'}]},
+  'GET /api/conversations/12/messages':{items:[]}
+ },null,'http://localhost:8765/particulier#notifications');
+ try{
+  const d=x.w.document;
+  d.querySelector('#view article button').click();await tick();
+  assert.match(d.querySelector('#view').textContent,/Cet échange n’est plus accessible/);
+  assert.equal(x.calls.some(c=>c.url.endsWith('/messages')),false);
+  await x.w.go('notifications');
+  d.querySelectorAll('#view article')[1].querySelector('button').click();await tick();
+  assert.equal(d.querySelector('.conversation-choice').getAttribute('aria-pressed'),'true');
+  assert.deepEqual(x.calls.filter(c=>c.url.endsWith('/messages')).map(c=>c.url),['/api/conversations/12/messages']);
+ }finally{x.close()}
+});
+
 test('F46-F50 message composer rejects blank messages and explains safe network retry',async()=>{
  let attempts=0;
  const x=await boot({
@@ -2240,8 +2300,9 @@ test('beta feedback preserves form contents after a server error',async()=>{
 
 test('UX release: clearly labelled 2026-11-06 version and versioned static assets are present',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- assert.match(html,/Nouveau : préparation des testeurs et accès de test administrables · 6 novembre 2026/);
- for(const name of ['style.css','analytics.js','local-ai.js','assistant-ai.js','app.js','pwa.js']){
+ assert.match(html,/Nouveau : accès direct à la conversation après sélection · 6 novembre 2026/);
+ assert.ok(html.includes('/assets/app.js?v=ucp-first-exchange-20261106'));
+ for(const name of ['style.css','analytics.js','local-ai.js','assistant-ai.js','pwa.js']){
   assert.ok(html.includes('/assets/'+name+'?v=ucp-admin-beta-20261106'),name+' should be release-versioned');
  }
  const x=await boot();

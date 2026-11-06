@@ -73,8 +73,12 @@ async function go(v,options={}){
  appState.view=v;
  if(!fromHistory)history.pushState({ucpView:v},'','#'+v);
  const token=renderEpoch+1;
- await render();
- if(token===renderEpoch)focusPageHeading();
+ const conversationId=v==='conversations'?options.conversationId:null;
+ await render({conversationId});
+ if(token===renderEpoch){
+  const chatHeading=conversationId&&$('#view .chat h3');
+  if(chatHeading)chatHeading.focus();else focusPageHeading();
+ }
  return true;
 }
 async function restoreHistoryNavigation(){
@@ -110,7 +114,26 @@ function showDialog(title,content){
  const first=n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]');
  (wasOpen||mobile?heading:first||$('#dialog-close')).focus();
 }
-function ask(title,desc,fn,success){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const dialogToken=dialogEpoch;const r=await action(fn,success);if(r){if(dialogToken===dialogEpoch&&$('#dialog').open)$('#dialog').close();const token=renderEpoch+1;await render();if(token===renderEpoch&&!$('#dialog').open)focusPageHeading()}},'primary'));showDialog(title,body)}
+function ask(title,desc,fn,success,onSuccess){
+ const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{
+  const dialogToken=dialogEpoch,viewToken=renderEpoch;
+  const result=await action(fn,success);
+  if(!result)return;
+  const dialog=$('#dialog'),sameDialog=dialogToken===dialogEpoch&&dialog.open;
+  if(onSuccess&&sameDialog&&viewToken===renderEpoch){
+   dialogReturnFocus=false;
+   dialog.close();
+   await onSuccess();
+   return;
+  }
+  if(sameDialog)dialog.close();
+  if(onSuccess&&(dialogToken!==dialogEpoch||viewToken!==renderEpoch))return;
+  const token=renderEpoch+1;
+  await render();
+  if(token===renderEpoch&&!dialog.open)focusPageHeading();
+ },'primary'));
+ showDialog(title,body);
+}
 
 function openBetaFeedback(){
  const role=appState.user?.role;
@@ -194,7 +217,7 @@ function menu(){
   for(const item of items)n.append(itemButton(item));
  }
 }
-async function render(){
+async function render(options={}){
  guidedHelp?.sync();const hasAssistant=!!appState.user&&['requester','professional'].includes(appState.user.role);$('#chatbot-launcher').hidden=!hasAssistant;
  ++chatEpoch;const epoch=++renderEpoch;clearInterval(chatTimer);chatTimer=null;const u=appState.user;
  $('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#account-actions').hidden=true;$('#beta-help').hidden=!!u&&!['requester','professional'].includes(u.role);
@@ -206,7 +229,7 @@ async function render(){
  const target=clear($('#view'));target.append(el('div',{class:'loading',text:'Chargement de votre espace…'}));const fragment=document.createElement('div');
  try{
   const f={'requester-home':renderRequesterHome,'professional-home':renderProfessionalHome,projects:renderProjects,favorites:renderFavorites,applications:renderApplications,conversations:renderConversations,profile:renderProfile,enterprise:renderEnterprise,admin:renderAdmin,moderation:renderModeration,catalog:renderCatalog,support:renderSupport,notifications:renderNotifications,'personal-data':renderPersonalData}[appState.view];
-  await f(fragment);if(epoch===renderEpoch)target.replaceChildren(...fragment.childNodes);
+  await f(fragment,options);if(epoch===renderEpoch)target.replaceChildren(...fragment.childNodes);
  }catch(e){if(epoch===renderEpoch){clear(target);viewError(target,e)}}
 }
 async function renderRequesterHome(n){
@@ -636,7 +659,7 @@ if(req){
   box.append(empty('Pas encore de candidature',availability));
  }
  if(d.suspended)box.append(el('p',{class:'status-note',text:'Le projet est suspendu. Reprenez-le pour traiter les candidatures ou accéder aux échanges.'}));
- renderCandidateCards(box,apps,d.id,d.suspended);n.append(box);
+ renderCandidateCards(box,apps,d.id,d.suspended,d.status!=='closed'&&!d.suspended&&!d.hidden);n.append(box);
  if(d.status==='closed'&&!d.cancelled)await renderProjectFeedback(n,d);
  if(d.status==='open'&&!d.suspended){
   n.append(button(d.applications_paused?'Rouvrir les candidatures':'Mettre les candidatures en pause',()=>ask(
@@ -902,7 +925,7 @@ function candidateFacts(a){
   if(a.public_details_restricted)terms.push(['Informations du profil','Certaines informations ont été masquées par précaution. Cela ne constitue pas une vérification professionnelle.']);
   return el('dl',{class:'candidate-facts'},...terms.flatMap(([t,v])=>[el('dt',{text:t}),el('dd',{text:v})]));
 }
-function renderCandidateCards(box,apps,projectId=null,suspended=false){
+function renderCandidateCards(box,apps,projectId,suspended,canOpenExchange){
   const chosen=new Set(),checks=[];
   const summary=el('p',{class:'small muted','aria-live':'polite'});
   const compare=button('Comparer les profils sélectionnés',async()=>{
@@ -936,9 +959,15 @@ function renderCandidateCards(box,apps,projectId=null,suspended=false){
       item.append(el('label',{class:'candidate-choice'},check,'Ajouter au comparatif'));
     }
     if(a.status==='pending'&&!suspended){
-      const select=a.eligible_for_selection!==false?button('Choisir ce professionnel',()=>ask('Choisir ce professionnel ?','Dans cette version, un professionnel peut être retenu par projet. Les autres candidatures seront refusées.',async()=>{const r=await api('/applications/'+a.id+'/accept',{method:'POST'});UCPAnalytics.track('match_confirmed');return r}),'primary'):el('p',{class:'hint',text:'Cette candidature ne peut pas être sélectionnée actuellement.'});
+      const select=a.eligible_for_selection!==false?button('Choisir ce professionnel',()=>ask(
+       'Choisir ce professionnel ?',
+       'Les autres candidatures seront refusées. Après confirmation, vous pourrez consulter l’échange de ce projet. L’envoi dépend des droits de messagerie du professionnel.',
+       async()=>{const r=await api('/applications/'+a.id+'/accept',{method:'POST'});UCPAnalytics.track('match_confirmed');return r},
+       'Professionnel sélectionné.',()=>go('conversations',{conversationId:a.id})),
+       'primary'):el('p',{class:'hint',text:'Cette candidature ne peut pas être sélectionnée actuellement.'});
       item.append(el('div',{class:'row'},select,button('Ne pas retenir',()=>ask('Ne pas retenir cette candidature ?','Le professionnel retrouvera ce statut dans son espace.',()=>api('/applications/'+a.id+'/reject',{method:'POST'})))));
     }
+    if(a.status==='accepted'&&canOpenExchange)item.append(button('Voir l’échange',()=>go('conversations',{conversationId:a.id}),'secondary'));
     if(projectId)item.append(button('Voir sa présentation',()=>openCandidateShowcase(projectId,a)));
     box.append(item);
   }
@@ -1154,15 +1183,20 @@ async function renderApplications(n){
    if(a.status==='pending'||a.status==='accepted'||state==='closed')card.append(el('p',{class:'hint',text:a.project_cancelled?'Projet annulé par le demandeur. Les échanges sont fermés.':explanations[state]||explanations.unavailable}));
    if(a.status==='pending')card.append(button('Retirer ma candidature',()=>ask('Retirer cette candidature ?','Elle ne pourra pas être renvoyée sur ce projet dans ce laboratoire.',()=>api('/applications/'+a.id+'/withdraw',{method:'POST'}))));
    if(a.status==='accepted'&&state==='project_suspended')card.append(button('Signaler cet échange',()=>report('conversation',a.id),'link'));
-   if(a.status==='accepted'&&['available','linked_inactive','test_access_required'].includes(state))card.append(button(state==='available'?'Ouvrir mes messages':'Consulter l’état de mes échanges',()=>go('conversations'),'secondary'));
+   if(a.status==='accepted'&&['available','linked_inactive','test_access_required'].includes(state))card.append(button(state==='available'?'Ouvrir mes messages':'Consulter l’état de mes échanges',()=>go('conversations',{conversationId:a.id}),'secondary'));
    list.append(card);
   }
  }
  filter.querySelector('select').addEventListener('change',draw);draw();
 }
-async function renderConversations(n){
+async function renderConversations(n,{conversationId}={}){
+ const epoch=renderEpoch;
  n.append(heading('Vos échanges, au même endroit.','Les conversations sont privées et liées à une candidature sélectionnée. Le serveur vérifie les droits à chaque ouverture et à chaque envoi.'));
  const items=(await api('/conversations')).items;
+ if(epoch!==renderEpoch)return;
+ // Match only conversations listed for the current account, even when a notice carries an older ID.
+ const requested=items.find(a=>a.application_id===conversationId);
+ if(conversationId&&!requested)n.append(el('p',{class:'status-note',role:'status',text:'Cet échange n’est plus accessible depuis votre compte.'}));
  if(!items.length){
   n.append(empty('Pas encore de conversation.','La messagerie devient disponible après sélection et activation des droits de test du professionnel.'));
   return;
@@ -1180,6 +1214,7 @@ async function renderConversations(n){
   selected=a.application_id;
   for(const [id,control] of buttons)control.setAttribute('aria-pressed',String(id===selected));
   openChat(chat,a);
+  if(chat.isConnected)chat.querySelector('h3').focus();
  }
  function draw(){
   const q=normalize(filter.value.trim());
@@ -1195,12 +1230,13 @@ async function renderConversations(n){
   if(!matches.length)list.append(el('p',{class:'hint',text:'Aucune conversation ne correspond à cette recherche.'}));
  }
  filter.addEventListener('input',draw);draw();
+ if(requested)select(requested);
 }
 async function openChat(n,a){
   const epoch=++chatEpoch;clearInterval(chatTimer);chatTimer=null;clear(n);
   const actor=appState.user,session=appState.csrf;
   const valid=()=>epoch===chatEpoch&&actor===appState.user&&session===appState.csrf;
-  n.append(el('h3',{text:a.peer}),el('p',{class:'small muted',text:a.title}));
+  n.append(el('h3',{tabindex:'-1',text:a.peer}),el('p',{class:'small muted',text:a.title}));
   const log=el('div',{class:'chat-log','aria-live':'polite','aria-label':'Messages'});
   const input=field('Votre message','body','textarea',{maxlength:2000});
   const textarea=input.querySelector('textarea');
@@ -1390,7 +1426,7 @@ function reviewReport(report){
   });
   showDialog('Examiner le signalement #'+report.id,form);
 }
-// Internal notices link to a *section*, never to an unchecked private object ID.
+// Message notices can open a thread only if it appears in the account’s conversation list.
 function notificationDestination(eventType,role){
  const requesterProjects=['new_application','application_withdrawn'];
  const professionalApplications=['application_accepted','application_rejected','project_closed','project_cancelled','project_suspended','project_resumed','project_updated','project_intake_paused','project_intake_resumed'];
@@ -1423,8 +1459,9 @@ async function renderNotifications(n){
   const flag=el('span',{class:'chip '+(!note.read_at?'violet':''),text:note.read_at?'Lue':'Non lue'});
   const card=el('article',{class:'item'},el('p',{text:note.message}),el('time',{class:'small muted',text:new Date(note.created_at).toLocaleString('fr-FR')}),flag);
   const destination=notificationDestination(note.event_type,actor.role);
-  if(destination)card.append(button(destination.label,()=>{
-   if(valid()&&appState.user===actor)go(destination.view);
+  const conversationId=note.event_type==='new_message'&&Number.isSafeInteger(note.entity_id)&&note.entity_id>0?note.entity_id:null;
+  if(destination)card.append(button(conversationId?'Ouvrir la conversation':destination.label,()=>{
+   if(valid()&&appState.user===actor)go(destination.view,{conversationId});
   },'outline'));
   let done=!!note.read_at;const read=button('Marquer comme lue',async()=>{
    if(done||!valid())return;
@@ -1696,7 +1733,7 @@ document.addEventListener('pointerdown',event=>{
   setNavigationOpen(false);
 });
 $('.sidebar').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#navigation-toggle').getAttribute('aria-expanded')==='true'){e.preventDefault();setNavigationOpen(false);$('#navigation-toggle').focus()}});
-$('#dialog').addEventListener('close',()=>{if($('#dialog').open)return;const previous=dialogReturnFocus;dialogReturnFocus=null;if(previous?.isConnected&&!previous.disabled&&!previous.closest('[hidden],dialog:not([open])'))previous.focus();else focusPageHeading()});
+$('#dialog').addEventListener('close',()=>{if($('#dialog').open)return;const previous=dialogReturnFocus;dialogReturnFocus=null;if(previous===false)return;if(previous?.isConnected&&!previous.disabled&&!previous.closest('[hidden],dialog:not([open])'))previous.focus();else focusPageHeading()});
 $('#dialog-close').addEventListener('click',()=>$('#dialog').close());
 $('#release-notes').addEventListener('click',()=>{
  const details=el('div',{class:'release-notes-dialog'},
@@ -1721,6 +1758,7 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Administration bêta : états des profils et accès aux conversations calculés sur les comptes de test, filtres en lecture seule, retrait ciblé des échanges et suspension du profil avec confirmation.'}),
    el('li',{text:'Messagerie mobile : un seul défilement pour la liste de conversations, sélection tactile lisible et saisie de message plus confortable.'}),
    el('li',{text:'Messagerie : recherche locale par projet ou interlocuteur et ouverture du fil sur clic explicite. Les droits restent vérifiés par le serveur à chaque accès.'}),
+   el('li',{text:'Premier échange : la confirmation d’un professionnel, le raccourci sur une candidature sélectionnée et la notification de nouveau message ouvrent directement la conversation du projet.'}),
    el('li',{text:'Envoi de message : le bouton exige un texte non vide, indique les envois non confirmés et propose un réessai avec le même identifiant pour éviter les doublons. Aucun renvoi automatique.'}),
    el('li',{text:'Assistance : suivi des signalements filtrable par statut, pagination et compteurs limités aux dossiers chargés ; accès direct à l’assistance depuis les conversations.'}),
    el('li',{text:'Notifications : chaque événement reconnu propose un accès direct à la rubrique concernée (projets, candidatures, messages, assistance ou compte), sans exposer de dossier privé.'}),
