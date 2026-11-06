@@ -342,6 +342,93 @@ test('support shows own case response and requests older pages without leaking m
  }finally{x.close()}
 });
 
+
+test('admin beta overview separates real profile authorization states without inventing tester invitations',async()=>{
+ const queue=[
+  {id:10,name:'Artisan en attente',trade:'plomberie',town:'Toulouse',approved:0,subscription_active:0},
+  {id:11,name:'Artisan validé',trade:'peinture',town:'Blagnac',approved:1,subscription_active:0},
+  {id:12,name:'Artisan actif',trade:'electricite',town:'Toulouse',approved:1,subscription_active:1}
+ ];
+ const x=await boot({
+  '/api/session':{id:99,name:'Admin test',role:'admin',csrf:'admin-token'},
+  '/api/admin/metrics':{counts:{requesters:3,professionals:5,projects:2,applications:1,accepted_applications:1,messages:3}},
+  '/api/admin/queue':{items:queue},
+  '/api/admin/audit':{items:[]}
+ });
+ try{
+  const d=x.w.document;
+  await x.w.go('admin');
+  assert.match(d.querySelector('#view').textContent,/Préparer les comptes artisans/);
+  const metrics=[...d.querySelectorAll('.beta-admin-metric')].map(n=>n.textContent);
+  assert.equal(metrics.length,4);
+  assert.ok(metrics.some(x=>x.includes('1À examiner')));
+  assert.ok(metrics.some(x=>x.includes('1Messagerie à activer')));
+  assert.ok(metrics.some(x=>x.includes('1Autorisés à échanger')));
+  assert.ok(metrics.some(x=>x.includes('2Sans profil déclaré')));
+  assert.match(d.querySelector('#view').textContent,/Aucune assurance/);
+  assert.equal(d.querySelectorAll('.beta-admin-record').length,3);
+  assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
+  const awaiting=[...d.querySelectorAll('.beta-admin-filters button')].find(b=>b.textContent==='Messagerie à activer');
+  awaiting.click();
+  assert.equal(awaiting.getAttribute('aria-pressed'),'true');
+  assert.equal(d.querySelectorAll('.beta-admin-record').length,1);
+  assert.match(d.querySelector('.beta-admin-record').textContent,/Artisan validé/);
+  assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
+  const active=[...d.querySelectorAll('.beta-admin-filters button')].find(b=>b.textContent==='Accès de test actif');
+  active.click();
+  assert.equal(d.querySelectorAll('.beta-admin-record').length,1);
+  assert.match(d.querySelector('.beta-admin-record').textContent,/Artisan actif/);
+  assert.equal([...d.querySelectorAll('.beta-admin-record button')].some(b=>b.textContent.includes('Activer l’accès')),false);
+ }finally{x.close()}
+});
+
+test('admin beta grants messaging entitlement only after an explicit button with CSRF',async()=>{
+ const x=await boot({
+  '/api/session':{id:99,name:'Admin test',role:'admin',csrf:'admin-token'},
+  '/api/admin/metrics':{counts:{professionals:1,projects:0,applications:0,accepted_applications:0,messages:0}},
+  '/api/admin/queue':{items:[{id:74,name:'Artisan à activer',trade:'plomberie',town:'Toulouse',approved:1,subscription_active:0}]},
+  '/api/admin/audit':{items:[]},
+  'POST /api/admin/professionals/74/activate-test-subscription':{ok:true,payment:'NONE'}
+ });
+ try{
+  const d=x.w.document;
+  await x.w.go('admin');
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+  const act=[...d.querySelectorAll('.beta-admin-record button')].find(b=>b.textContent.includes('Activer l’accès messagerie'));
+  assert.ok(act);act.click();await tick();
+  const writes=x.calls.filter(c=>c.method==='POST');
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].url,'/api/admin/professionals/74/activate-test-subscription');
+  assert.equal(writes[0].headers['x-ucp-csrf'],'admin-token');
+ }finally{x.close()}
+});
+
+test('admin beta suspension requires confirmation and never silently changes a profile',async()=>{
+ const x=await boot({
+  '/api/session':{id:99,name:'Admin test',role:'admin',csrf:'admin-token'},
+  '/api/admin/metrics':{counts:{professionals:1}},
+  '/api/admin/queue':{items:[{id:91,name:'Artisan actif',trade:'peinture',town:'Toulouse',approved:1,subscription_active:1}]},
+  '/api/admin/audit':{items:[]},
+  'POST /api/admin/professionals/91/suspend':{ok:true}
+ });
+ try{
+  const d=x.w.document;
+  await x.w.go('admin');
+  const action=[...d.querySelectorAll('.beta-admin-record button')].find(b=>b.textContent==='Suspendre le profil');
+  action.click();
+  assert.equal(d.querySelector('#dialog').open,true);
+  assert.match(d.querySelector('#dialog').textContent,/suspension désactive/);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+  d.querySelector('#dialog-close').click();
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+  const open=[...d.querySelectorAll('.beta-admin-record button')].find(b=>b.textContent==='Suspendre le profil');
+  open.click();
+  [...d.querySelectorAll('#dialog button')].find(b=>b.textContent==='Confirmer').click();await tick();
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,1);
+  assert.equal(x.calls.find(c=>c.method==='POST').url,'/api/admin/professionals/91/suspend');
+ }finally{x.close()}
+});
+
 test('admin case content requires explicit reason and case review before showing the response action',async()=>{
  const x=await boot({'/api/session':{id:99,name:'Admin',role:'admin',csrf:'admin-token'},'/api/admin/metrics':{counts:{}},'/api/admin/queue':{items:[]},'/api/admin/audit':{items:[]},'/api/v4/admin':{reports:[{id:6,kind:'message',target_id:41,reason:'Un signalement fictif',status:'open'}],projects:[],users:[]},'POST /api/v4/admin/reports/6/review':{report:{reason:'Un signalement fictif'},context:{project:null,messages:[{id:41,sender_name:'Atelier',body:'<img src=x>',created_at:'2026-10-27T12:00:00Z'}],next_before_id:null}},'POST /api/v4/admin/reports/6/resolve':{ok:true}});
  try{

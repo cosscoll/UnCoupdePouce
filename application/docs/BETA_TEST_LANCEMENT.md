@@ -107,3 +107,24 @@ campagne, conserver les tickets utiles dépourvus d'identifiants et
 planifier la purge uniquement après sauvegarde vérifiée et séparation
 claire des données hors campagne. Ne pas créer de cron ni de purge
 automatique.
+
+
+## Suivi administratif des comptes de test
+
+L'écran Administrateur → Vue d'ensemble affiche des compteurs calculés à partir
+des vrais profils professionnels enregistrés : « À examiner », « Messagerie à
+activer », « Autorisés à échanger » et « Sans profil déclaré ». Les chiffres
+proviennent exclusivement de /api/admin/queue et /api/admin/metrics ; ils ne
+comptent **pas** des invitations Vercel réellement remises ni des personnes
+ayant complété le scénario bêta. Aucun statut de vérification légale n'est
+inféré.
+
+Des filtres locaux permettent d'afficher uniquement les profils nécessitant
+une action. L'autorisation de test et l'accès messagerie requièrent toujours
+un clic explicite et les droits administrateur/CSRF existants. La suspension
+nécessite confirmation. Les contenus privés et les mots de passe ne sont
+pas présentés dans les compteurs. Le lien « Examiner les retours et
+signalements » ouvre la modération existante.
+
+Ces éléments servent à préparer le groupe de testeurs **après** leur
+inscription, pas à générer ou inviter automatiquement des comptes.

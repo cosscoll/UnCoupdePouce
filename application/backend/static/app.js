@@ -1459,7 +1459,90 @@ async function renderNotifications(n){
  }
  select.addEventListener('change',()=>load(true));await load(true);
 }
-async function renderAdmin(n){n.append(heading('Le pouls de votre bêta.','Indicateurs calculés sur les données de test. Aucun chiffre commercial.'));const m=(await api('/admin/metrics')).counts;n.append(el('div',{class:'stat-grid'},...[['Demandes',m.projects],['Candidatures',m.applications],['Mises en relation',m.accepted_applications],['Messages',m.messages]].map(([t,v])=>el('div',{class:'stat'},el('strong',{text:v}),t))));const queue=(await api('/admin/queue')).items;const box=panel('Profils professionnels','La revue autorise le scénario de test ; elle ne vérifie ni l’activité ni l’assurance.');for(const p of queue)box.append(el('div',{class:'item'},el('h4',{text:p.name}),el('p',{class:'small muted',text:(trades[p.trade]||p.trade)+' · '+p.town}),el('div',{class:'row'},badge(p.approved?'Autorisé en test':'À examiner'),button(p.approved?'Suspendre le profil':'Autoriser les tests',async()=>{const r=await action(()=>api('/admin/professionals/'+p.id+(p.approved?'/suspend':'/approve'),{method:'POST'}));if(r)render()}),p.approved&&!p.subscription_active?button('Activer l’accès messagerie de test',async()=>{const r=await action(()=>api('/admin/professionals/'+p.id+'/activate-test-subscription',{method:'POST'}));if(r)render()}):null)));if(!queue.length)box.append(el('p',{text:'Aucun profil à examiner.'}));n.append(box);const audit=panel('Journal d’audit','Actions sensibles enregistrées par le serveur.');for(const e of(await api('/admin/audit')).items.slice(0,20))audit.append(el('p',{class:'mini',text:e.created_at+' · '+e.action+' · #'+e.target_id}));n.append(audit)}
+async function renderAdmin(n){
+ n.append(heading('Le pouls de votre bêta.','Indicateurs provenant des données de test, pas de participants vérifiés ni de recettes commerciales.'));
+ const metrics=(await api('/admin/metrics')).counts;
+ n.append(el('div',{class:'stat-grid'},...[
+  ['Demandes',metrics.projects],['Candidatures',metrics.applications],
+  ['Mises en relation',metrics.accepted_applications],['Messages',metrics.messages]
+ ].map(([title,value])=>el('div',{class:'stat'},el('strong',{text:value??'—'}),title))));
+ const data=await api('/admin/queue');
+ const queue=Array.isArray(data.items)?data.items:[];
+ const pending=queue.filter(p=>!p.approved);
+ const notActive=queue.filter(p=>!!p.approved&&!p.subscription_active);
+ const active=queue.filter(p=>!!p.approved&&!!p.subscription_active);
+ const totalPros=Number(metrics.professionals);
+ const withoutProfile=Number.isFinite(totalPros)&&totalPros>=queue.length?totalPros-queue.length:null;
+ const readiness=panel('Préparer les comptes artisans pour la bêta',
+   'États réels des profils enregistrés dans cette préproduction, et non liste officielle des personnes invitées.');
+ const totals=el('div',{class:'beta-admin-metrics'});
+ for(const [name,count,desc] of [
+  ['À examiner',pending.length,'Profil déclaré, non autorisé'],
+  ['Messagerie à activer',notActive.length,'Profil autorisé, accès test inactif'],
+  ['Autorisés à échanger',active.length,'Profil et accès simulé actifs'],
+  ['Sans profil déclaré',withoutProfile,'Comptes professionnels sans profil de test']
+ ]){
+  totals.append(el('div',{class:'beta-admin-metric'},
+   el('strong',{text:count==null?'Indisponible':String(count)}),
+   el('span',{text:name}),el('small',{text:desc})));
+ }
+ readiness.append(totals,el('p',{class:'hint',text:'« Autorisé à échanger » signifie seulement que les droits du profil ont été activés : un projet compatible et une sélection restent nécessaires. Aucune assurance, identité légale ou invitation Vercel n’est vérifiée ici.'}));
+ readiness.append(button('Examiner les retours et signalements',()=>go('moderation'),'outline'));
+ n.append(readiness);
+
+ const box=panel('Profils professionnels','Filtrez les profils réellement déclarés ; chaque changement de droit reste une action administrateur explicite et journalisée.');
+ const filters=el('div',{class:'beta-admin-filters',role:'group','aria-label':'Filtrer les profils artisans selon leur accès de test'});
+ const shown=el('p',{class:'small muted',role:'status','aria-live':'polite'});
+ const records=el('div',{class:'beta-admin-rows'});
+ const choices=[
+  ['all','Tous les profils',queue],
+  ['pending','À examiner',pending],
+  ['awaiting','Messagerie à activer',notActive],
+  ['active','Accès de test actif',active]
+ ];
+ let current='all';
+ function paint(){
+  const selected=choices.find(([key])=>key===current);
+  for(const b of filters.querySelectorAll('button'))b.setAttribute('aria-pressed',String(b.dataset.filter===current));
+  shown.textContent=selected[2].length+' profil(s) affiché(s) sur '+queue.length+' profils déclarés.';
+  clear(records);
+  for(const p of selected[2]){
+   const isApproved=!!p.approved;
+   const isActive=isApproved&&!!p.subscription_active;
+   const status=isActive?'Accès de test activé':isApproved?'Accès messagerie à activer':'En attente de validation';
+   const profile=el('article',{class:'item beta-admin-record'},
+    el('h4',{text:p.name||'Profil sans nom'}),
+    el('p',{class:'small muted',text:(trades[p.trade]||p.trade||'Métier non renseigné')+' · '+(p.town||'Commune non renseignée')}),
+    el('span',{class:'chip '+(isActive?'green':isApproved?'amber':'violet'),text:status}));
+   const controls=el('div',{class:'row beta-admin-actions'});
+   if(!isApproved)controls.append(button('Autoriser les tests',async()=>{
+    const r=await action(()=>api('/admin/professionals/'+p.id+'/approve',{method:'POST'}),'Profil autorisé pour des tests fictifs.');
+    if(r)await render();
+   }));
+   else {
+    if(!isActive)controls.append(button('Activer l’accès messagerie de test',async()=>{
+     const r=await action(()=>api('/admin/professionals/'+p.id+'/activate-test-subscription',{method:'POST'}),'Accès de test activé, sans paiement.');
+     if(r)await render();
+    }));
+    controls.append(button('Suspendre le profil',()=>ask('Suspendre les droits de cet artisan ?',
+     'La suspension désactive son autorisation de test et son accès à la messagerie. Les échanges et candidatures existants restent soumis aux règles de contrôle du serveur.',
+     ()=>api('/admin/professionals/'+p.id+'/suspend',{method:'POST'}),'Profil suspendu.')));
+   }
+   profile.append(controls);records.append(profile);
+  }
+  if(!selected[2].length)records.append(el('p',{class:'small muted',text:current==='all'?'Aucun profil professionnel déclaré.':'Aucun profil dans cette catégorie.'}));
+ }
+ for(const [key,label] of choices)filters.append(el('button',{
+  type:'button',class:'outline',text:label,'data-filter':key,'aria-pressed':String(key===current),
+  onClick:()=>{current=key;paint()}
+ }));
+ box.append(filters,shown,records);
+ paint();
+ n.append(box);
+ const audit=panel('Journal d’audit','Actions sensibles enregistrées par le serveur.');
+ for(const e of(await api('/admin/audit')).items.slice(0,20))audit.append(el('p',{class:'mini',text:e.created_at+' · '+e.action+' · #'+e.target_id}));
+ n.append(audit);
+}
 function classifyProject(p){let selected=[];const f=el('form',{},el('p',{text:p.description}),tradePicker(selected,v=>selected=v,true),field('Motif du classement','reason','textarea',{minlength:10,maxlength:500}),el('button',{type:'submit',class:'primary',text:'Confirmer les métiers'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/admin/projects/'+p.id+'/classify',{method:'POST',body:{trades:selected,reason:formValue(f).reason}}),'Besoin classé et rendu accessible aux métiers concernés.');if(r){$('#dialog').close();render()}});showDialog('Classer ce besoin après lecture',f)}
 function adminDecision(title,path,value,label='Motif de la décision'){const f=el('form',{},field(label,'reason','textarea',{minlength:10,maxlength:500}),el('button',{class:'primary',type:'submit',text:'Enregistrer la décision'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api(path,{method:'POST',body:{value,reason:formValue(f).reason}}),'Décision appliquée et journalisée.');if(r){$('#dialog').close();render()}});showDialog(title,f)}
 async function renderModeration(n){n.append(heading('Un espace de confiance.','Signalez, examinez et agissez avec une trace de chaque décision.'));await renderSupportQueue(n);const d=await api('/v4/admin');const reports=panel('Signalements à examiner');for(const r of d.reports.filter(x=>x.status==='open'))reports.append(el('div',{class:'item'},el('h4',{text:'Signalement #'+r.id+' · '+reportKind(r.kind)+' #'+r.target_id}),el('p',{text:r.reason}),button('Examiner le signalement',()=>reviewReport(r))));if(!d.reports.some(x=>x.status==='open'))reports.append(el('p',{text:'Aucun signalement ouvert.'}));n.append(reports);const projects=panel('Demandes publiées');for(const p of d.projects)projects.append(el('div',{class:'item line'},el('strong',{text:p.title}),p.trade==='inconnu'?button('Classer le besoin',()=>classifyProject(p)):null,button(p.hidden?'Rendre visible':'Masquer',()=>adminDecision('Modérer la demande','/v4/admin/projects/'+p.id+'/hide',!p.hidden))));n.append(projects);const users=panel('Comptes utilisateurs');for(const u of d.users.filter(x=>x.role!=='admin'))users.append(el('div',{class:'item line'},el('strong',{text:u.name}),el('span',{class:'small',text:u.role}),button(u.suspended?'Rétablir le compte':'Suspendre le compte',()=>adminDecision('Gérer le compte','/v4/admin/users/'+u.id+'/suspend',!u.suspended))));n.append(users)}

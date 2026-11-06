@@ -569,3 +569,22 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 .beta-feedback-form textarea{min-height:150px}
 @media(max-width:680px){.beta-guide-link{flex:0 0 auto}.beta-guide-actions{display:grid}.beta-step{padding:13px}.beta-step .beta-step-action,.beta-guide-actions button{width:100%}}
 @media(max-width:360px){.accountbar-meta .beta-guide-link{flex:1 1 100%}}
+
+/* Administration bêta : états réels et filtres de profils, sans fausse approbation. */
+.beta-admin-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
+.beta-admin-metric{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0;padding:16px;border:1px solid #dfe2ee;border-radius:11px;background:#f8f9fd}
+.beta-admin-metric strong{font:400 29px Anton,'Arial Narrow',sans-serif;color:var(--violet);line-height:1.1}
+.beta-admin-metric span{font-size:12px;font-weight:700;line-height:1.45}
+.beta-admin-metric small{font-size:11px;line-height:1.5;color:var(--muted)}
+.beta-admin-filters{display:flex;flex-wrap:wrap;gap:7px;margin:18px 0}
+.beta-admin-filters button{min-height:44px;font-size:11px;padding:10px 13px}
+.beta-admin-filters button[aria-pressed="true"]{background:var(--violet);border-color:var(--violet);color:white}
+.beta-admin-rows{min-width:0}
+.beta-admin-record{min-width:0}
+.beta-admin-record h4,.beta-admin-record p{overflow-wrap:anywhere}
+.beta-admin-record .chip{display:inline-flex;margin-top:7px}
+.beta-admin-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.beta-admin-actions button{font-size:12px;min-height:44px;white-space:normal;text-align:center}
+@media(max-width:1050px){.beta-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.beta-admin-metrics{gap:8px}.beta-admin-metric{padding:13px}.beta-admin-metric strong{font-size:25px}.beta-admin-filters button{flex:1 1 44%}.beta-admin-actions button{width:100%}}
+@media(forced-colors:active){.beta-admin-filters button[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:2px}}
