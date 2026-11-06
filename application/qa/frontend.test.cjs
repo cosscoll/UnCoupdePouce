@@ -713,6 +713,38 @@ test('a mission opened from the professional overview returns to that overview',
  }finally{x.close()}
 });
 
+test('F79 notices navigate to the correct account section without assuming private entity IDs',async()=>{
+ const note=(id,event_type)=>({id,event_type,entity_id:987654,created_at:'2026-11-06T09:15:00Z',read_at:null,message:'Notification fictive '+id});
+ const requester=await boot({
+  '/api/notifications':{unread:2,items:[note(20,'new_application'),note(19,'new_message')],next_before_id:null}
+ },null,'http://localhost:8765/#notifications');
+ try{
+  await requester.w.go('notifications');
+  const cards=requester.w.document.querySelectorAll('#view article');
+  assert.equal(cards.length,2);
+  const projectButton=[...cards[0].querySelectorAll('button')].find(b=>b.textContent==='Voir mes projets');
+  assert.ok(projectButton,'requester has contextual project navigation');
+  assert.equal([...cards[0].querySelectorAll('button')].some(b=>/987654/.test(b.textContent)),false);
+  projectButton.click();await tick();
+  assert.equal(requester.w.location.hash,'#projects');
+  assert.equal(requester.calls.some(c=>c.url.includes('987654')),false,'notification never fetches a guessed private detail');
+ }finally{requester.close()}
+ const professional=await boot({
+  '/api/session':{id:2,name:'Pro',role:'professional',csrf:'test-token'},
+  '/api/notifications':{unread:2,items:[note(18,'application_accepted'),note(17,'profile_review_required')],next_before_id:null},
+  '/api/my-applications':{items:[]},
+  '/api/my-profile':{profile:null}
+ },null,'http://localhost:8765/#notifications');
+ try{
+  await professional.w.go('notifications');
+  const cards=professional.w.document.querySelectorAll('#view article');
+  assert.ok([...cards[0].querySelectorAll('button')].some(b=>b.textContent==='Voir mes candidatures'));
+  assert.ok([...cards[1].querySelectorAll('button')].some(b=>b.textContent==='Voir mon profil'));
+  [...cards[0].querySelectorAll('button')].find(b=>b.textContent==='Voir mes candidatures').click();await tick();
+  assert.equal(professional.w.location.hash,'#applications');
+ }finally{professional.close()}
+});
+
 test('notification center paginates unread history and marks only the selected notification',async()=>{
  const note=id=>({id,message:'Notification fictive '+id,created_at:'2026-10-28T10:00:00Z',read_at:null});
  const x=await boot({'/api/notifications':{unread:2,items:[note(9)],next_before_id:9},'/api/notifications?unread_only=true':{unread:2,items:[note(9)],next_before_id:9},'/api/notifications?unread_only=true&before_id=9':{unread:2,items:[note(8)],next_before_id:null},'POST /api/notifications/9/read':{ok:true,read_at:'2026-10-28T11:00:00Z',unread:1}});try{
