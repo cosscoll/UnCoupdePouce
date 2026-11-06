@@ -1517,3 +1517,58 @@ test('UX release: clearly labelled 2026-11-06 version and versioned static asset
   assert.match(x.w.document.querySelector('#dialog').textContent,/2026\.11\.06/);
  }finally{x.close()}
 });
+
+test('F19: a closed selected project offers private feedback with explicit confirmation',async()=>{
+ const project={id:72,title:'Salle de bains fictive',description:'Projet de rénovation fictif après mise en relation.',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'closed',cancelled:0,photos:[],content_editable:false};
+ const response={eligible:true,project_closed:true,cancelled:false,application_id:19,professional_name:'Artisan de test',feedback:null,visibility:'private_test'};
+ const x=await boot({
+  '/api/v4/projects/72':project,
+  '/api/projects/72/applications':{items:[{id:19,professional_name:'Artisan de test',status:'accepted',trade:'plomberie',town:'Toulouse'}]},
+  '/api/projects/72/feedback':response,
+  'POST /api/projects/72/feedback':call=>({ok:true,visibility:'private_test',feedback:{application_id:19,rating:call.body.rating,comment:call.body.comment,created_at:'2026-11-06T10:00:00+00:00'}})
+ });
+ try{
+  await x.w.projectDetail(project);
+  const p=x.w.document.querySelector('.project-feedback'),form=p?.querySelector('form');
+  assert.ok(form);
+  assert.match(p.textContent,/retour.*privé|retour.*mise en relation/i);
+  assert.match(p.textContent,/n’est pas une certification ni un avis public/i);
+  form.elements.rating.value='4';
+  form.elements.comment.value='Les échanges fictifs ont été clairs et les délais bien expliqués.';
+  form.elements.collaboration_confirmed.checked=true;
+  submit(x.w,'.feedback-form');
+  await new Promise(resolve=>setTimeout(resolve,30));
+  const sent=x.calls.filter(c=>c.url==='/api/projects/72/feedback'&&c.method==='POST');
+  assert.equal(sent.length,1);
+  assert.deepEqual(sent[0].body,{application_id:19,rating:4,comment:'Les échanges fictifs ont été clairs et les délais bien expliqués.',collaboration_confirmed:true});
+  assert.equal(sent[0].headers['x-ucp-csrf'],'test-token');
+  assert.equal(p.querySelector('.feedback-form'),null);
+  assert.match(p.textContent,/Votre retour est enregistré/);
+ }finally{x.close()}
+});
+test('F19: no feedback form after cancelled project or unselected closed project',async()=>{
+ const project={id:72,title:'Projet de test',description:'Description fictive des travaux.',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'closed',cancelled:1,photos:[]};
+ const x=await boot({'/api/v4/projects/72':project,'/api/projects/72/applications':{items:[]}});
+ try{
+  await x.w.projectDetail(project);
+  assert.equal(x.w.document.querySelector('.project-feedback'),null);
+  assert.equal(x.calls.filter(c=>c.url==='/api/projects/72/feedback').length,0);
+ }finally{x.close()}
+ const uncancelled={...project,cancelled:0};
+ const y=await boot({'/api/v4/projects/72':uncancelled,'/api/projects/72/applications':{items:[]},'/api/projects/72/feedback':{eligible:false,application_id:null,feedback:null}});
+ try{
+  await y.w.projectDetail(uncancelled);
+  assert.equal(y.w.document.querySelector('.project-feedback'),null);
+ }finally{y.close()}
+});
+test('F19: a saved private feedback is readable only on the requester project detail',async()=>{
+ const project={id:72,title:'Projet fictif',description:'Rénovation et réparation fictives.',trade:'plomberie',trades:['plomberie'],town:'Toulouse',status:'closed',cancelled:0,photos:[]};
+ const x=await boot({'/api/v4/projects/72':project,'/api/projects/72/applications':{items:[]},
+ '/api/projects/72/feedback':{eligible:false,feedback:{application_id:7,rating:5,comment:'Les échanges fictifs se sont bien déroulés.',created_at:'2026-11-06T10:00:00+00:00'}}});
+ try{
+  await x.w.projectDetail(project);
+  assert.equal(x.w.document.querySelector('.feedback-form'),null);
+  assert.match(x.w.document.querySelector('.project-feedback').textContent,/5 \/ 5/);
+  assert.match(x.w.document.querySelector('.project-feedback').textContent,/Ce retour fictif est privé/);
+ }finally{x.close()}
+});

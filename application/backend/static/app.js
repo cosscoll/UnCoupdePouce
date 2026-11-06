@@ -455,6 +455,7 @@ if(req){
  }
  if(d.suspended)box.append(el('p',{class:'status-note',text:'Le projet est suspendu. Reprenez-le pour traiter les candidatures ou accéder aux échanges.'}));
  renderCandidateCards(box,apps,d.id,d.suspended);n.append(box);
+ if(d.status==='closed'&&!d.cancelled)await renderProjectFeedback(n,d);
  if(d.status==='open'&&!d.suspended){
   n.append(button(d.applications_paused?'Rouvrir les candidatures':'Mettre les candidatures en pause',()=>ask(
    d.applications_paused?'Rouvrir les candidatures ?':'Mettre les candidatures en pause ?',
@@ -486,6 +487,59 @@ if(req){
 n.append(button('Signaler un problème',()=>report('project',p.id),'link'));
 if(epoch!==renderEpoch||actor!==appState.user)return false;
 $('#view').replaceChildren(...n.childNodes);focusPageHeading();UCPAnalytics.track('project_viewed');return true})}
+
+async function renderProjectFeedback(holder,project){
+ const section=el('section',{class:'panel project-feedback'});
+ try{
+  const data=await api('/projects/'+project.id+'/feedback');
+  if(!data.eligible&&!data.feedback)return;
+  holder.append(section);
+  const saved=feedback=>{
+   section.replaceChildren(
+    el('span',{class:'eyebrow',text:'RETOUR D’EXPÉRIENCE PRIVÉ'}),
+    el('h3',{text:'Votre retour est enregistré'}),
+    el('p',{class:'feedback-rating',text:'Note donnée : '+feedback.rating+' / 5'}),
+    el('p',{text:feedback.comment}),
+    el('p',{class:'hint',text:'Ce retour fictif est privé : il ne crée pas d’avis public, de note sur le profil ou de vérification de l’artisan.'})
+   );
+  };
+  if(data.feedback){saved(data.feedback);return}
+  const rating=el('select',{name:'rating',required:true,'aria-label':'Votre évaluation'},
+   ...[['','Choisissez une note'],['5','5 — Très satisfaisant'],['4','4 — Satisfaisant'],['3','3 — Mitigé'],['2','2 — Insatisfaisant'],['1','1 — Très insatisfaisant']]
+    .map(([value,label])=>el('option',{value,text:label})));
+  const comment=el('textarea',{name:'comment',minlength:20,maxlength:800,required:true,rows:4,
+   placeholder:'Décrivez votre expérience de manière factuelle, avec des données fictives.'});
+  const confirmed=el('input',{type:'checkbox',name:'collaboration_confirmed',required:true});
+  const submit=el('button',{class:'primary',type:'submit',text:'Enregistrer mon retour privé'});
+  const form=el('form',{class:'feedback-form'},
+   el('label',{},el('span',{text:'Évaluez votre expérience'}),rating),
+   el('label',{},el('span',{text:'Votre retour (20 à 800 caractères)'}),comment),
+   el('label',{class:'feedback-confirmation'},confirmed,
+    el('span',{text:'Je confirme avoir réellement échangé ou collaboré avec ce professionnel dans le cadre du projet fictif.'})),
+   submit);
+  section.append(el('span',{class:'eyebrow',text:'APRÈS LA CLÔTURE'}),
+   el('h3',{text:'Votre retour sur la mise en relation'}),
+   el('p',{class:'muted',text:'Professionnel sélectionné : '+data.professional_name}),
+   el('p',{class:'hint',text:'Réservé aux projets clôturés avec un professionnel sélectionné. Le retour reste privé, non modifiable et n’est pas une certification ni un avis public. Aucune information réelle.'}),
+   form);
+  form.addEventListener('submit',async event=>{
+   event.preventDefault();
+   if(!form.reportValidity())return;
+   submit.disabled=true;
+   try{
+    const result=await action(()=>api('/projects/'+project.id+'/feedback',{
+     method:'POST',
+     body:{application_id:data.application_id,rating:Number(rating.value),
+      comment:comment.value.trim(),collaboration_confirmed:confirmed.checked}
+    }),'Retour privé enregistré.');
+    if(result?.feedback)saved(result.feedback);
+   }finally{if(form.isConnected)submit.disabled=false}
+  });
+ }catch{
+  // Feedback is secondary. A temporary error must not hide the project's actions.
+  holder.append(el('p',{class:'hint',text:'Le module de retour d’expérience est momentanément indisponible.'}));
+ }
+}
 
 function projectApplication(project){
  const profiles=project.application_profiles;

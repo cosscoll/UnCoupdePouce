@@ -1261,6 +1261,7 @@ def account_export(user=Depends(get_user)):
         from saved_searches import serialize as serialize_search
         own_searches=[serialize_search(r) for r in c.execute('SELECT id,label,payload,created_at FROM saved_searches WHERE owner_id=? ORDER BY id DESC',(user['id'],))]
         own_favorites=[dict(r) for r in c.execute('SELECT project_id,created_at FROM project_favorites WHERE owner_id=? ORDER BY id DESC',(user['id'],))]
+        own_feedback=[dict(r) for r in c.execute('SELECT project_id,application_id,rating,comment,created_at FROM project_feedback WHERE requester_id=? ORDER BY created_at DESC',(user['id'],))]
         own_enterprise=c.execute('SELECT id,label,created_at FROM enterprise_accounts WHERE owner_id=?',(user['id'],)).fetchone()
         own_linked_artisans=([dict(r) for r in c.execute('SELECT id,alias,service_trades,service_areas,is_active,created_at FROM enterprise_artisans WHERE enterprise_id=?',(own_enterprise['id'],))]
                               if own_enterprise else [])
@@ -1268,7 +1269,7 @@ def account_export(user=Depends(get_user)):
             'profile':dict(profile) if profile else None,'beta_interest':dict(interest) if interest else None,
             'own_projects':projects_owned,'own_applications':applications_owned,'own_messages':messages_owned,
             'own_notifications':own_notices,'own_activity':own_activity,'own_saved_searches':own_searches,'own_project_favorites':own_favorites,'own_enterprise':dict(own_enterprise) if own_enterprise else None,
-            'own_linked_artisans':own_linked_artisans,'own_drafts':own_drafts,'own_photos':own_photos,'own_reports':own_reports,'own_support':own_support,'own_showcases':own_showcases}
+            'own_linked_artisans':own_linked_artisans,'own_drafts':own_drafts,'own_photos':own_photos,'own_reports':own_reports,'own_support':own_support,'own_showcases':own_showcases,'own_feedback':own_feedback}
 
 @app.delete('/api/beta-interest')
 def revoke_interest(user=Depends(require('professional'))):
@@ -1391,6 +1392,7 @@ from saved_searches import install as install_saved_searches
 from project_favorites import install as install_favorites
 from demo_access import install as install_demo_access
 from project_intake import install as install_project_intake
+from project_feedback import install as install_project_feedback
 if DATABASE_URL:
     from postgres import initialize_schema
     initialization = initialize_schema(DATABASE_URL, DATABASE_SCHEMA)
@@ -1405,6 +1407,7 @@ with initialization:
     install_favorites(sys.modules[__name__])
     install_demo_access(sys.modules[__name__])
     install_project_intake(sys.modules[__name__])
+    install_project_feedback(sys.modules[__name__])
     # Optional, one-time fictional seed under the initialization lock.
     if HOSTING.staging and os.getenv('UCP_DEMO_SEED_PASSWORD'):
         with connect() as c:
