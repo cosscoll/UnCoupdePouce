@@ -221,6 +221,42 @@ function budgetText(p){
   if(low!=null&&high!=null)return low===high?euros(low):'De '+euros(low)+' à '+euros(high);
   return low!=null?'Minimum annoncé : '+euros(low):'Maximum annoncé : '+euros(high);
 }
+const dimensionSpecs=[
+ ['surface_m2','Surface estimée (m²)','m²'],
+ ['length_m','Longueur (m)','m'],
+ ['width_m','Largeur (m)','m'],
+ ['height_m','Hauteur (m)','m']
+];
+function dimensionPayload(values={}){
+ const data={};for(const [key] of dimensionSpecs){
+  if(values?.[key]!=null&&values[key]!=='')data[key]=Number(values[key]);
+ }return data;
+}
+function readDimensions(form){
+ const out={};for(const [key] of dimensionSpecs){
+  const control=form.elements.namedItem(key);
+  if(control&&control.value!=='')out[key]=Number(control.value);
+ }return out;
+}
+function dimensionsText(values={}){
+ const entries=dimensionSpecs.filter(([key])=>values?.[key]!=null)
+  .map(([key,label,unit])=>label.replace(/ \(.*\)$/,'')+' : '+new Intl.NumberFormat('fr-FR',{maximumFractionDigits:2}).format(values[key])+' '+unit);
+ return entries.length?entries.join(' · '):'Non renseignées';
+}
+function measurementsPanel(values={}){
+ const available=dimensionPayload(values);
+ const inputs=dimensionSpecs.map(([key,label])=>el('label',{},
+  el('span',{text:label}),
+  el('input',{type:'number',name:key,min:'0.01',max:'10000',step:'0.01',
+   inputmode:'decimal',value:available[key]??'',
+   placeholder:'Facultatif'})));
+ const panel=el('details',{class:'measurements-panel'},
+  el('summary',{text:'Préciser des surfaces ou dimensions (facultatif)'}),
+  el('p',{class:'hint',text:'Valeurs approximatives déclarées par le demandeur. Jusqu’à deux décimales ; elles ne remplacent pas un métrage ou un devis.'}),
+  el('div',{class:'measurements-grid'},...inputs));
+ panel.open=Object.keys(available).length>0;
+ return panel;
+}
 function matchExplanation(p){
   if(!p.match)return null;
   if(p.matching_profile_count>1)return el('p',{class:'match-reason small',text:p.matching_profile_count+' profils correspondent. Choisissez le profil dans le détail du chantier.'});
@@ -445,7 +481,7 @@ function renderSavedSearches(n,searchForm,load,valid){
  refresh();
 }
 const normalize=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-async function projectDetail(p){if(acting)return;const epoch=++renderEpoch,actor=appState.user,sourceView=appState.view;await action(async()=>{const d=await api('/v4/projects/'+p.id);if(epoch!==renderEpoch||actor!==appState.user)return false;const n=el('div'),req=actor.role==='requester';n.append(button(sourceView==='professional-home'?'← Vue d’ensemble':sourceView==='favorites'?'← Mes favoris':actor.role==='professional'?'← Trouver des projets':'← Mes projets',()=>go(sourceView),'link'),heading(d.title,d.town+' · '+tradeNames(d)),projectBadge(d),intakeBadge(d),el('section',{class:'panel'},el('h3',{text:'Le projet en quelques mots'}),el('p',{text:d.description}),el('p',{class:'small muted',text:'Début souhaité : '+({flexible:'flexible',month:'dans le mois',quarter:'dans les trois mois',urgent:'dès que possible'}[d.timing]||'flexible')})));n.append(el('p',{class:'hint',text:'Budget indicatif : '+budgetText(d)+'. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.'}));if(d.photos.length)n.append(el('div',{class:'photos'},...d.photos.map(id=>el('a',{href:'/api/v4/photos/'+id,target:'_blank',rel:'noopener'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de test du projet',width:160,height:120})))));
+async function projectDetail(p){if(acting)return;const epoch=++renderEpoch,actor=appState.user,sourceView=appState.view;await action(async()=>{const d=await api('/v4/projects/'+p.id);if(epoch!==renderEpoch||actor!==appState.user)return false;const n=el('div'),req=actor.role==='requester';n.append(button(sourceView==='professional-home'?'← Vue d’ensemble':sourceView==='favorites'?'← Mes favoris':actor.role==='professional'?'← Trouver des projets':'← Mes projets',()=>go(sourceView),'link'),heading(d.title,d.town+' · '+tradeNames(d)),projectBadge(d),intakeBadge(d),el('section',{class:'panel'},el('h3',{text:'Le projet en quelques mots'}),el('p',{text:d.description}),el('p',{class:'small muted',text:'Début souhaité : '+({flexible:'flexible',month:'dans le mois',quarter:'dans les trois mois',urgent:'dès que possible'}[d.timing]||'flexible')})));n.append(el('p',{class:'hint',text:'Budget indicatif : '+budgetText(d)+'. Montant déclaré par le demandeur, sans valeur de devis ni paiement dans UCP.'}));if(Object.keys(dimensionPayload(d.dimensions)).length)n.append(el('section',{class:'panel project-measurements'},el('h3',{text:'Dimensions indicatives'}),el('p',{text:dimensionsText(d.dimensions)}),el('p',{class:'hint',text:'Mesures déclarées à titre indicatif, sans diagnostic ni validation technique.'})));if(d.photos.length)n.append(el('div',{class:'photos'},...d.photos.map(id=>el('a',{href:'/api/v4/photos/'+id,target:'_blank',rel:'noopener'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de test du projet',width:160,height:120})))));
 if(req){
  const apps=(await api('/projects/'+p.id+'/applications')).items;
  const box=panel('Les professionnels intéressés','Comparez les profils déclarés avant de choisir. Une candidature ne constitue pas un devis. Dans cette préproduction, le chat nécessite une sélection et des droits de test actifs.');
@@ -705,11 +741,15 @@ function editProject(d){
      const input=f.elements.namedItem(key);
      if((key==='town'&&latest.content_scope_locked)||input.value===String(base[key]??''))input.value=latest[key]??'';
     }
+    for(const [key] of dimensionSpecs){
+     const input=f.elements.namedItem(key);
+     if(input.value===String(base.dimensions?.[key]??''))input.value=latest.dimensions?.[key]??'';
+    }
     base=latest;
     setScope();
     published.replaceChildren(el('h4',{text:'Version actuellement publiée'}),
      ...Object.entries(fields).map(([key,label])=>el('p',{},el('strong',{text:label+' · '}),String(latest[key]??'Non renseigné'))),
-     el('p',{text:'Métiers · '+tradeNames(latest)}));
+     el('p',{text:'Métiers · '+tradeNames(latest)}),el('p',{text:'Dimensions · '+dimensionsText(latest.dimensions)}));
     published.hidden=false;
     reload.hidden=true;
     save.disabled=latest.content_editable===false||latest.status!=='open';
@@ -723,11 +763,11 @@ function editProject(d){
   field(fields.town,'town','text',{value:d.town,maxlength:90}),
   field(fields.description,'description','textarea',{value:d.description,minlength:20}),
   el('div',{class:'budget-fields'},amountField(fields.budget_min+' facultatif (€)','budget_min',d.budget_min),amountField(fields.budget_max+' facultatif (€)','budget_max',d.budget_max)),
-  guidance,status,reload,published,save);
- const inputs=Object.keys(fields).map(key=>f.elements.namedItem(key));
+  measurementsPanel(d.dimensions),guidance,status,reload,published,save);
+ const inputs=[...Object.keys(fields),...dimensionSpecs.map(([key])=>key)].map(key=>f.elements.namedItem(key));
  function setScope(){
   f.elements.namedItem('town').readOnly=!!base.content_scope_locked;
-  guidance.textContent=(base.content_scope_locked?'La commune et les métiers sont figés depuis la première candidature. ':'Les métiers restent identiques. ')+'Si le titre, la description ou le budget change, les candidats en attente seront avertis.';
+  guidance.textContent=(base.content_scope_locked?'La commune et les métiers sont figés depuis la première candidature. ':'Les métiers restent identiques. ')+'Si le titre, la description, les dimensions ou le budget changent, les candidats en attente seront avertis.';
  }
  setScope();
  function feedback(text){status.textContent=text;status.hidden=!text}
@@ -739,12 +779,15 @@ function editProject(d){
   e.preventDefault();
   if(acting||save.disabled||!active())return;
   const values=formValue(f);
+  const dimensions=readDimensions(f);
+  const includeDimensions=Object.keys(dimensions).length>0||Object.keys(dimensionPayload(base.dimensions)).length>0;
+  for(const [key] of dimensionSpecs)delete values[key];
   save.disabled=true;
   for(const input of inputs)input.readOnly=true;
   const result=await action(async()=>{
    try{
     return await api('/projects/'+d.id,{method:'PUT',body:{...values,trade:base.trade,content_version:base.content_version,
-     budget_min:amountValue(values.budget_min),budget_max:amountValue(values.budget_max)}});
+     budget_min:amountValue(values.budget_min),budget_max:amountValue(values.budget_max),...(includeDimensions?{dimensions}:{})}});
    }catch(e){
     if(active()&&!e.stale){
      feedback(e.message);
@@ -767,9 +810,9 @@ function editProject(d){
   else save.disabled=!reload.hidden;
  });
 }
-function startWizard(d=null){clearTimeout(draftSaveTimer);currentDraft=d?structuredClone(d):{title:'',description:'',town:'Toulouse',trades:[],timing:'flexible',budget_min:null,budget_max:null,version:0,photos:[]};wizardStep=1;draftState(currentDraft);UCPAnalytics.track('project_started',{step:1});wizard();document.title='Décrire mon projet · Un Coup de Pouce';focusPageHeading()}
+function startWizard(d=null){clearTimeout(draftSaveTimer);currentDraft=d?structuredClone(d):{title:'',description:'',town:'Toulouse',trades:[],timing:'flexible',budget_min:null,budget_max:null,dimensions:{},version:0,photos:[]};currentDraft.dimensions=dimensionPayload(currentDraft.dimensions);wizardStep=1;draftState(currentDraft);UCPAnalytics.track('project_started',{step:1});wizard();document.title='Décrire mon projet · Un Coup de Pouce';focusPageHeading()}
 function tradePicker(selected,onChange,professional=false){const wrapper=el('div'),search=el('input',{type:'search',placeholder:'Ex. fuite, électricité, toiture…','aria-label':'Rechercher un métier'}),chosen=el('div',{class:'selected-trades'}),list=el('div',{class:'category-browser'});function draw(){clear(chosen);clear(list);for(const id of selected)chosen.append(button((trades[id]||id)+' ×',()=>{selected.splice(selected.indexOf(id),1);onChange([...selected]);draw()}));const q=normalize(search.value);const filtered=catalog.filter(t=>(!professional||t.id!=='inconnu')&&normalize([t.label,t.group,...t.synonyms].join(' ')).includes(q));for(const group of [...new Set(filtered.map(t=>t.group))]){const details=el('details',{},el('summary',{text:group}));details.open=!!q;const items=el('div',{class:'category-items'});for(const t of filtered.filter(t=>t.group===group)){const input=el('input',{type:'checkbox',value:t.id,checked:selected.includes(t.id),onChange:e=>{if(e.target.checked){if(selected.length>=12){e.target.checked=false;msg('Vous pouvez choisir jusqu’à 12 métiers.','error');return}if(t.id==='inconnu')selected.splice(0);else if(selected.includes('inconnu'))selected.splice(selected.indexOf('inconnu'),1);selected.push(t.id)}else selected.splice(selected.indexOf(t.id),1);onChange([...selected]);draw();const active=[...list.querySelectorAll('input')].find(x=>x.value===t.id);if(active){active.closest('details').open=true;active.focus()}}});items.append(el('label',{},input,t.label))}details.append(items);list.append(details)}if(!filtered.length)list.append(el('p',{class:'status-note',text:'Aucun métier trouvé. Choisissez « Je ne sais pas quel professionnel contacter ».'}))}search.addEventListener('input',draw);wrapper.append(search,chosen,list);draw();return wrapper}
-function draftContent(d){return {title:d.title,description:d.description,town:d.town,trades:[...d.trades],timing:d.timing,budget_min:d.budget_min??null,budget_max:d.budget_max??null}}
+function draftContent(d){return {title:d.title,description:d.description,town:d.town,trades:[...d.trades],timing:d.timing,budget_min:d.budget_min??null,budget_max:d.budget_max??null,dimensions:dimensionPayload(d.dimensions)}}
 function draftFingerprint(d){return JSON.stringify(draftContent(d))}
 function draftState(d){
  if(!draftSaveStates.has(d)){const initial=draftFingerprint(d);draftSaveStates.set(d,{actor:appState.user,session:appState.csrf,key:crypto.randomUUID(),lastSaved:d.id?initial:null,observed:initial,changed:false,inFlight:null,creation:null,error:null})}
@@ -805,8 +848,8 @@ async function saveDraft(flush=true){
  const d=currentDraft;if(!d)throw staleResponse();const s=draftState(d);clearTimeout(draftSaveTimer);draftSaveTimer=null;
  if(!draftActive(d,s))throw staleResponse();
  if(s.inFlight){const result=await s.inFlight;if(!draftActive(d,s))throw staleResponse();if(draftFingerprint(d)===s.lastSaved)return result;return saveDraft(flush)}
- for(const input of document.querySelectorAll('.wizard [name=budget_min],.wizard [name=budget_max]'))if(!input.checkValidity()){
-  const e=Object.assign(Error('Corrigez les montants du budget : euros entiers sans valeur négative, ou champs vides.'),{localValidation:true});s.error=e;draftSaveStatus(d);throw e;
+ for(const input of document.querySelectorAll('.wizard [name=budget_min],.wizard [name=budget_max],.wizard [name=surface_m2],.wizard [name=length_m],.wizard [name=width_m],.wizard [name=height_m]'))if(!input.checkValidity()){
+  const e=Object.assign(Error('Corrigez les montants du budget ou les mesures : valeurs positives, au maximum deux décimales pour les dimensions.'),{localValidation:true});s.error=e;draftSaveStatus(d);throw e;
  }
  const creating=!d.id;
  if(creating&&!s.creation)s.creation={...draftContent(d),version:d.version};
@@ -838,8 +881,8 @@ function recoverDraft(d){
 }
 function wizard(){const n=clear($('#view')),d=currentDraft;n.append(button('← Retour à mes projets',()=>ask('Revenir à vos projets ?','Enregistrez les dernières modifications avant de quitter.',async()=>{await saveDraft();stopDraft();go('projects');return true}),'link'));n.append(button('Besoin d’aide pour mon annonce ?',openGuidedHelp,'link'));const box=el('div',{class:'wizard'});n.append(box);box.append(el('ol',{class:'steps'},...['Vos travaux','Les détails','Vérification'].map((t,i)=>el('li',{class:i+1===wizardStep?'active':'','aria-current':i+1===wizardStep?'step':'false'},el('b',{text:i+1}),t))));const names=['De quoi avez-vous besoin ?','Parlez-nous de votre projet.','Tout est prêt pour publier ?'];box.append(el('h2',{text:names[wizardStep-1]}),el('p',{class:'muted small',text:['Plusieurs métiers ? Sélectionnez tous ceux qui vous concernent.','Quelques précisions pour recevoir des candidatures adaptées.','Relisez votre demande. Vous gardez la main sur le choix du professionnel.'][wizardStep-1]}));const form=el('form');box.append(draftSavePanel(d),form);
 if(wizardStep===1){form.append(field('Un titre pour votre projet','title','text',{value:d.title,placeholder:'Ex. Rénover ma salle de bains',required:false,maxlength:120}),field('Votre besoin, avec vos mots','description','textarea',{value:d.description,placeholder:'Ce que vous souhaitez faire, la pièce concernée, ce qui est déjà en place…',required:false}));const content=()=>Object.assign(d,formValue(form));form.addEventListener('input',content);form.addEventListener('change',content);form.append(el('div',{class:'helper'},el('strong',{text:'Vous n’avez pas besoin de connaître le bon terme.'}),el('p',{text:'Recherchez un mot courant ou choisissez « Je ne sais pas ». Les suggestions restent à confirmer.'})));const suggestion=button('Me suggérer des métiers',()=>{const words=normalize(d.description+' '+d.title);const matches=catalog.filter(t=>[t.label,...t.synonyms].some(w=>w.length>3&&words.includes(normalize(w))));const b=el('div',{},el('p',{text:matches.length?'Suggestions par mots-clés : choisissez celles qui correspondent à vos travaux.':'Aucune suggestion fiable. Vous pouvez utiliser le choix « Je ne sais pas ».'}));for(const t of matches.slice(0,6))b.append(button(t.label,()=>{if(!d.trades.includes(t.id)&&d.trades.length<12){d.trades.push(t.id);queueDraftAutosave(d,true)}$('#dialog').close();wizard()}));showDialog('Pour vous aider à choisir',b)},'link');const selector=el('details',{class:'wizard-trade-picker'},el('summary',{text:'Choisir les métiers concernés'}),tradePicker([...d.trades],v=>{d.trades=v;queueDraftAutosave(d,true)}));selector.open=!!d.trades.length;form.append(suggestion,selector)}
-if(wizardStep===2){form.append(field('Dans quelle commune ?','town','text',{value:d.town,placeholder:'Toulouse',maxlength:90}),field('Quand souhaitez-vous commencer ?','timing','select',{value:d.timing,options:{flexible:'Je suis flexible',month:'Dans le mois',quarter:'Dans les trois mois',urgent:'Dès que possible'}}),el('p',{class:'hint',text:'Indiquez seulement la commune. L’adresse précise se partage après sélection.'}));form.append(el('h3',{text:'Votre budget · facultatif'}),el('p',{class:'hint',text:'Montants indicatifs en euros entiers, sans valeur de devis. Vous pouvez laisser les deux champs vides. Aucun paiement dans UCP.'}),el('div',{class:'budget-fields'},amountField('Minimum facultatif (€)','budget_min',d.budget_min),amountField('Maximum facultatif (€)','budget_max',d.budget_max)));const details=()=>{const v=formValue(form);Object.assign(d,{town:v.town,timing:v.timing,budget_min:amountValue(v.budget_min),budget_max:amountValue(v.budget_max)})};form.addEventListener('input',details);form.addEventListener('change',details);form.append(el('h3',{text:'Des photos pour mieux comprendre'}),el('p',{class:'hint',text:'Facultatif · 5 photos maximum, 4 Mo par photo. Photos fictives uniquement. Elles seront visibles après votre sélection.'}));const upload=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp','aria-label':'Ajouter une photo de test'});upload.addEventListener('change',async()=>{const file=upload.files[0];if(!file)return;if(file.size>4000000){msg('La photo dépasse 4 Mo.','error');return}const r=await action(async()=>{await saveDraft();const b64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(file)});const p=await api('/v4/drafts/'+d.id+'/photos',{method:'POST',body:{data:b64}});d.photos.push(p.id);d.version=p.version;return p},'Photo enregistrée.');if(r)wizard()});form.append(upload,el('div',{class:'photos'},...d.photos.map(id=>el('div',{class:'photo'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de votre demande'}),button('Retirer',async()=>{const r=await action(async()=>{await saveDraft();return api('/v4/photos/'+id,{method:'DELETE'})});if(r){d.photos=d.photos.filter(x=>x!==id);d.version=r.version;wizard()}}))))) }
-if(wizardStep===3){const rev=el('div',{class:'review'},el('h3',{text:d.title}),el('dl',{},el('dt',{text:'Travaux concernés'}),el('dd',{text:d.trades.map(x=>trades[x]).join(' · ')}),el('dt',{text:'Commune'}),el('dd',{text:d.town}),el('dt',{text:'Description'}),el('dd',{text:d.description}),el('dt',{text:'Début souhaité'}),el('dd',{text:timingNames[d.timing]||'Date flexible'}),el('dt',{text:'Budget indicatif'}),el('dd',{text:budgetText(d)}),el('dt',{text:'Photos privées'}),el('dd',{text:d.photos.length+' photo(s), partagées après sélection'})));form.append(rev,el('label',{},el('input',{type:'checkbox',required:true,name:'confirmed'}),'J’ai vérifié ma demande et elle ne contient aucune coordonnée directe.'))}
+if(wizardStep===2){form.append(field('Dans quelle commune ?','town','text',{value:d.town,placeholder:'Toulouse',maxlength:90}),field('Quand souhaitez-vous commencer ?','timing','select',{value:d.timing,options:{flexible:'Je suis flexible',month:'Dans le mois',quarter:'Dans les trois mois',urgent:'Dès que possible'}}),el('p',{class:'hint',text:'Indiquez seulement la commune. L’adresse précise se partage après sélection.'}));form.append(el('h3',{text:'Votre budget · facultatif'}),el('p',{class:'hint',text:'Montants indicatifs en euros entiers, sans valeur de devis. Vous pouvez laisser les deux champs vides. Aucun paiement dans UCP.'}),el('div',{class:'budget-fields'},amountField('Minimum facultatif (€)','budget_min',d.budget_min),amountField('Maximum facultatif (€)','budget_max',d.budget_max)));form.append(measurementsPanel(d.dimensions));const details=()=>{const v=formValue(form);Object.assign(d,{town:v.town,timing:v.timing,budget_min:amountValue(v.budget_min),budget_max:amountValue(v.budget_max),dimensions:readDimensions(form)})};form.addEventListener('input',details);form.addEventListener('change',details);form.append(el('h3',{text:'Des photos pour mieux comprendre'}),el('p',{class:'hint',text:'Facultatif · 5 photos maximum, 4 Mo par photo. Photos fictives uniquement. Elles seront visibles après votre sélection.'}));const upload=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp','aria-label':'Ajouter une photo de test'});upload.addEventListener('change',async()=>{const file=upload.files[0];if(!file)return;if(file.size>4000000){msg('La photo dépasse 4 Mo.','error');return}const r=await action(async()=>{await saveDraft();const b64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(file)});const p=await api('/v4/drafts/'+d.id+'/photos',{method:'POST',body:{data:b64}});d.photos.push(p.id);d.version=p.version;return p},'Photo enregistrée.');if(r)wizard()});form.append(upload,el('div',{class:'photos'},...d.photos.map(id=>el('div',{class:'photo'},el('img',{src:'/api/v4/photos/'+id,alt:'Photo de votre demande'}),button('Retirer',async()=>{const r=await action(async()=>{await saveDraft();return api('/v4/photos/'+id,{method:'DELETE'})});if(r){d.photos=d.photos.filter(x=>x!==id);d.version=r.version;wizard()}}))))) }
+if(wizardStep===3){const rev=el('div',{class:'review'},el('h3',{text:d.title}),el('dl',{},el('dt',{text:'Travaux concernés'}),el('dd',{text:d.trades.map(x=>trades[x]).join(' · ')}),el('dt',{text:'Commune'}),el('dd',{text:d.town}),el('dt',{text:'Description'}),el('dd',{text:d.description}),el('dt',{text:'Début souhaité'}),el('dd',{text:timingNames[d.timing]||'Date flexible'}),el('dt',{text:'Budget indicatif'}),el('dd',{text:budgetText(d)}),el('dt',{text:'Dimensions indicatives'}),el('dd',{text:dimensionsText(d.dimensions)}),el('dt',{text:'Photos privées'}),el('dd',{text:d.photos.length+' photo(s), partagées après sélection'})));form.append(rev,el('label',{},el('input',{type:'checkbox',required:true,name:'confirmed'}),'J’ai vérifié ma demande et elle ne contient aucune coordonnée directe.'))}
 form.addEventListener('input',()=>queueDraftAutosave(d,true));form.addEventListener('change',()=>queueDraftAutosave(d,true));
 const foot=el('div',{class:'wizard-footer'},button(wizardStep===1?'Enregistrer mon brouillon':'← Précédent',async()=>{if(wizardStep>1){const saved=await action(saveDraft);if(saved){wizardStep--;wizard();focusPageHeading()}return}const r=await action(saveDraft,'Brouillon enregistré dans votre compte.');if(r){stopDraft();go('projects')}},'outline'),el('button',{class:'primary',type:'submit',text:wizardStep===3?'Publier ma demande →':'Continuer →'}));form.append(foot);form.addEventListener('submit',async e=>{e.preventDefault();if(wizardStep===1&&(!d.trades.length||d.title.trim().length<5||d.description.trim().length<20)){if(!d.trades.length){const picker=form.querySelector('.wizard-trade-picker');if(picker)picker.open=true}msg('Indiquez un titre, décrivez vos travaux et sélectionnez au moins un métier (ou « Je ne sais pas »).','error');return}const r=await action(async()=>{await saveDraft();if(wizardStep===3)return await api('/v4/drafts/'+d.id+'/publish',{method:'POST',body:{version:d.version}});return true});if(r){if(wizardStep===3){UCPAnalytics.track('project_published');stopDraft();await render();msg('Votre demande est publiée dans cet environnement de test.','success')}else{wizardStep++;UCPAnalytics.track('project_step_completed',{step:wizardStep-1});wizard();focusPageHeading()}}})}
 async function renderProfile(n){n.append(button('Poser une question à l’assistant',openGuidedHelp,'link'));n.append(heading('Votre savoir-faire, bien présenté.','Indiquez vos spécialités et vos communes pour recevoir les bonnes demandes.'));const {profile:p}=await api('/my-profile');const selected=p?[p.trade,...p.additional_trades]:[];const form=el('form',{},field('Votre commune principale','town','text',{value:p?.town||'Toulouse',maxlength:90}),field('Autres communes · séparées par des virgules','zones','text',{value:(p?.service_zones||[]).filter(x=>x!==p.town).join(', '),required:false,placeholder:'Blagnac, Colomiers, Balma'}),field('SIREN de test','siren','text',{value:p?.siren||'',maxlength:9,minlength:9,placeholder:'123456782'}),el('p',{class:'hint',text:'Le format du numéro est contrôlé. L’existence de l’entreprise et ses assurances ne sont pas vérifiées.'}),el('h3',{text:'Vos spécialités · 5 maximum'}),tradePicker(selected,v=>{selected.splice(0,selected.length,...v)},true),el('button',{type:'submit',class:'primary',text:'Enregistrer mon profil →'}));form.addEventListener('submit',async e=>{e.preventDefault();if(!selected.length||selected.length>5){msg('Choisissez entre un et cinq métiers.','error');return}const v=formValue(form);const r=await action(()=>api('/profile',{method:'POST',body:{trade:selected[0],additional_trades:selected.slice(1),town:v.town,siren:v.siren,service_zones:v.zones.split(',').map(s=>s.trim()).filter(Boolean)}}),'Profil enregistré. Il doit être examiné par l’administrateur.');if(r)render()});n.append(el('div',{class:'status-note',text:p?(p.approved?'Profil autorisé pour les tests. Aucune certification réelle.':'Profil en attente de revue.'):'Complétez votre profil pour participer aux tests.'}),el('section',{class:'panel'},form));if(p)await renderShowcaseManagement(n)}
@@ -1222,7 +1265,8 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Menu professionnel : quatre rubriques principales ; favoris, entreprise, compte et autres fonctions dans « Mon activité et réglages ».'}),
    el('li',{text:'Recherche : filtres particuliers et professionnels séparés ; métier et commune visibles en premier pour les professionnels.'}),
    el('li',{text:'Artisans : spécialités et zones plus lisibles ; informations détaillées repliables et vérifications non réalisées clairement signalées.'}),
-   el('li',{text:'Navigation : le retour et l’avancement du navigateur fonctionnent entre les rubriques avec sauvegarde du brouillon avant de quitter.'})
+   el('li',{text:'Navigation : le retour et l’avancement du navigateur fonctionnent entre les rubriques avec sauvegarde du brouillon avant de quitter.'}),
+   el('li',{text:'Annonce de chantier : renseignez une surface, une longueur, une largeur ou une hauteur dans l’étape « Les détails ». Ces mesures facultatives sont enregistrées avec le brouillon, visibles dans le projet et modifiables avant sélection.'})
   ),
   el('p',{class:'small muted',text:'Version 2026.11.06. Les modifications concernent les espaces connectés. Une partie des informations est accessible après ouverture des sections repliables.'})
  );

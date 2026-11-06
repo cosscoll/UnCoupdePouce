@@ -4,9 +4,9 @@ from typing import Annotated
 from fastapi import Depends, Response, Query, Header
 from pydantic import BaseModel, Field, field_validator
 from PIL import Image, ImageOps, UnidentifiedImageError
-from project_budget import Budget
+from project_dimensions import MeasuredBudget
 
-class Draft(Budget):
+class Draft(MeasuredBudget):
     title: str = Field(default='',max_length=120)
     description: str = Field(default='',max_length=5000)
     town: str = Field(default='',max_length=90)
@@ -166,7 +166,7 @@ def install(m):
                 return {'id':r['project_id'],'status':current['status'],'already_published':True}
             if r['version']!=body.get('version'):error(409,'Le brouillon a changé. Rechargez le récapitulatif.')
             d=Draft(**json.loads(r['payload']));validate_draft(c,d,True)
-            cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at,trades_json,budget_min,budget_max) VALUES(?,?,?,?,?,?,?,?,?)',(user['id'],d.title.strip(),d.description.strip(),d.trades[0],d.town.strip(),now(),json.dumps(list(dict.fromkeys(d.trades))),d.budget_min,d.budget_max))
+            cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at,trades_json,budget_min,budget_max,dimensions_json) VALUES(?,?,?,?,?,?,?,?,?,?)',(user['id'],d.title.strip(),d.description.strip(),d.trades[0],d.town.strip(),now(),json.dumps(list(dict.fromkeys(d.trades))),d.budget_min,d.budget_max,json.dumps(d.dimensions.populated())))
             pid=cur.lastrowid
             c.execute('UPDATE drafts SET project_id=? WHERE id=?',(pid,id));audit(c,user,'project_published','project',pid);c.execute('COMMIT')
             return {'id':pid,'status':'open'}
@@ -233,7 +233,7 @@ def install(m):
         with m.authenticated_db(user,write=False) as c:
             r,matches=visible_project(c,id,user)
             photos=[x[0] for x in c.execute('SELECT photos.id FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.project_id=?',(id,))]
-            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version','cancelled','suspended')};row['trades']=list(m.project_trades(r))
+            row={k:r[k] for k in ('id','title','description','town','trade','status','hidden','created_at','budget_min','budget_max','applications_paused','intake_version','cancelled','suspended')};row['trades']=list(m.project_trades(r));row['dimensions']=json.loads(r['dimensions_json'] or '{}')
             if r['requester_id']==user['id']:
                 row['content_version']=r['content_version']
                 applications=m.project_edit_applications(c,id)
