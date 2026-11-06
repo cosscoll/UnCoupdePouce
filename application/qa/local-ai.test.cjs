@@ -50,6 +50,26 @@ test('worker bootstrap failure attempts in-page local engine, never an API call'
  }
 });
 
+test('missing Worker does not falsely disable a WebGPU-capable on-device chatbot',async()=>{
+ const originalWorker=global.Worker,originalNavigator=global.navigator,originalSecure=global.isSecureContext;
+ try{
+  Object.defineProperty(global,'Worker',{configurable:true,value:undefined});
+  Object.defineProperty(global,'navigator',{configurable:true,value:{gpu:{}}});
+  Object.defineProperty(global,'isSecureContext',{configurable:true,value:true});
+  assert.equal(ai.status().configured,true,'the page can use local WebGPU even without module Workers');
+  await assert.rejects(ai.send({role:'requester',catalog:trades,
+   messages:[{role:'user',content:'Aide-moi à décrire ma salle de bains.'}]}),
+   /Moteur IA local inaccessible depuis la page/,'node cannot load the browser engine, proving that the in-page fallback path was attempted');
+  Object.defineProperty(global,'isSecureContext',{configurable:true,value:false});
+  assert.equal(ai.status().configured,false,'insecure contexts never start the local model');
+ }finally{
+  ai.reset();
+  for(const[k,v]of [['Worker',originalWorker],['navigator',originalNavigator],['isSecureContext',originalSecure]]){
+   if(v===undefined)delete global[k];else Object.defineProperty(global,k,{configurable:true,value:v});
+  }
+ }
+});
+
 test('current wizard draft is sanitized and passed only for a requester',()=>{
  const entered={title:'Salle de bain',description:'Changer la douche',town:'Blagnac',
   trades:['plomberie','inconnu-metier'],timing:'quarter',budget_min:1000,budget_max:4000,
