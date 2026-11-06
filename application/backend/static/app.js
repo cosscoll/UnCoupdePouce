@@ -1096,25 +1096,75 @@ async function renderApplications(n){
  }
  filter.querySelector('select').addEventListener('change',draw);draw();
 }
-async function renderConversations(n){n.append(heading('Vos échanges, au même endroit.','Les conversations sont privées et liées à un projet.'));const items=(await api('/conversations')).items;if(!items.length){n.append(empty('Pas encore de conversation.','La messagerie devient disponible après sélection et activation des droits de test du professionnel.'));return}const list=el('div',{class:'conversation-list'}),chat=el('section',{class:'chat'},el('p',{text:'Choisissez un échange pour retrouver les messages.'}));n.append(el('div',{class:'messages'},list,chat));for(const a of items)list.append(button(a.title+' · '+a.peer,()=>openChat(chat,a)))}
+async function renderConversations(n){
+ n.append(heading('Vos échanges, au même endroit.','Les conversations sont privées et liées à une candidature sélectionnée. Le serveur vérifie les droits à chaque ouverture et à chaque envoi.'));
+ const items=(await api('/conversations')).items;
+ if(!items.length){
+  n.append(empty('Pas encore de conversation.','La messagerie devient disponible après sélection et activation des droits de test du professionnel.'));
+  return;
+ }
+ const filter=el('input',{type:'search',placeholder:'Rechercher un projet ou un interlocuteur…','aria-label':'Rechercher dans mes conversations',maxlength:120});
+ const list=el('div',{class:'conversation-list-items',role:'group','aria-label':'Sélectionner une conversation'});
+ const count=el('p',{class:'small muted',role:'status','aria-live':'polite'});
+ const sidebar=el('aside',{class:'conversation-list'},el('label',{class:'conversation-search-label'},'Mes conversations',filter),count,list,
+  el('p',{class:'hint',text:'Aucun accusé de lecture ni compteur de messages non lus n’est simulé.'}));
+ const chat=el('section',{class:'chat','aria-label':'Conversation choisie'},el('p',{text:'Choisissez un échange pour retrouver les messages.'}));
+ n.append(el('div',{class:'messages'},sidebar,chat));
+ let selected=null;
+ const buttons=new Map();
+ function select(a){
+  selected=a.application_id;
+  for(const [id,control] of buttons)control.setAttribute('aria-pressed',String(id===selected));
+  openChat(chat,a);
+ }
+ function draw(){
+  const q=normalize(filter.value.trim());
+  const matches=items.filter(a=>normalize(a.title+' '+a.peer).includes(q));
+  clear(list);buttons.clear();
+  count.textContent=matches.length+' conversation(s) affichée(s) sur '+items.length;
+  for(const a of matches){
+   const control=button(a.title+' · '+a.peer,()=>select(a),'conversation-choice');
+   control.setAttribute('aria-pressed',String(a.application_id===selected));
+   control.setAttribute('aria-label','Ouvrir la conversation du projet '+a.title+' avec '+a.peer);
+   buttons.set(a.application_id,control);list.append(control);
+  }
+  if(!matches.length)list.append(el('p',{class:'hint',text:'Aucune conversation ne correspond à cette recherche.'}));
+ }
+ filter.addEventListener('input',draw);draw();
+}
 async function openChat(n,a){
   const epoch=++chatEpoch;clearInterval(chatTimer);chatTimer=null;clear(n);
-  const valid=()=>epoch===chatEpoch;
+  const actor=appState.user,session=appState.csrf;
+  const valid=()=>epoch===chatEpoch&&actor===appState.user&&session===appState.csrf;
   n.append(el('h3',{text:a.peer}),el('p',{class:'small muted',text:a.title}));
   const log=el('div',{class:'chat-log','aria-live':'polite','aria-label':'Messages'});
+  const input=field('Votre message','body','textarea',{maxlength:2000});
+  const textarea=input.querySelector('textarea');
   const send=el('button',{type:'submit',class:'primary',text:'Envoyer le message →',disabled:true});
-  const form=el('form',{},field('Votre message','body','textarea',{maxlength:2000}),send);
+  const help=el('p',{class:'hint',text:'Votre message est privé. L’envoi ne sera pas relancé automatiquement si la connexion échoue.'});
+  const sendStatus=el('p',{class:'chat-send-status small',role:'status','aria-live':'polite'});
+  const form=el('form',{class:'chat-compose'},input,help,sendStatus,send);
   const status=el('p',{class:'status-note chat-status',role:'status',hidden:true});
   const retry=button('Réessayer de charger les messages',()=>refresh());retry.hidden=true;
   n.append(log,status,retry,form,button('Signaler cette conversation',()=>report('conversation',a.application_id),'link'));
-  let last='',pending=null,busy=false,blocked=true,timer=null;
+  let last='',pending=null,busy=false,blocked=true,timer=null,sending=false;
+  function updateSend(){
+   if(!valid())return;
+   const text=textarea.value.trim();
+   send.disabled=blocked||sending||acting||text.length===0||textarea.value.length>2000;
+   send.textContent=pending&&pending.body===text?'Réessayer l’envoi →':'Envoyer le message →';
+  }
+  textarea.addEventListener('input',()=>{
+   if(pending&&pending.body!==textarea.value.trim()){pending=null;sendStatus.textContent=''}
+   updateSend();
+  });
   function stop(){if(timer)clearInterval(timer);if(chatTimer===timer)chatTimer=null;timer=null}
   function poll(){if(!timer&&valid()){timer=setInterval(()=>{if(!valid()||!document.contains(n))stop();else if(!document.hidden)refresh()},7000);chatTimer=timer}}
   async function refresh(){
     if(!valid()||busy)return;busy=true;retry.disabled=true;
     try{
       const r=await api('/conversations/'+a.application_id+'/messages');if(!valid())return;
-      blocked=false;send.disabled=false;status.hidden=true;retry.hidden=true;
+      blocked=false;status.hidden=true;retry.hidden=true;
       const key=JSON.stringify(r);
       if(key!==last){last=key;clear(log);
         if(!r.items.length)log.append(el('p',{class:'muted small',text:'Présentez-vous et posez vos premières questions.'}));
@@ -1123,23 +1173,32 @@ async function openChat(n,a){
       }
       poll();
     }catch(e){
-      if(!valid())return;stop();blocked=true;send.disabled=true;
+      if(!valid())return;stop();blocked=true;
       if(e.status===403||e.status===404){clear(log);last='';}
-      // Keep both the last rendered messages and the unsent text in this page.
       status.textContent=e.message+' Votre saisie reste dans cette page. Aucun message n’est renvoyé automatiquement.';
       status.hidden=false;retry.hidden=false;
-    }finally{busy=false;retry.disabled=false}
+    }finally{busy=false;retry.disabled=false;updateSend()}
   }
   form.addEventListener('submit',async e=>{
-    e.preventDefault();if(acting||blocked||!valid())return;
-    const body=formValue(form).body.trim();if(!body)return;
+    e.preventDefault();if(acting||blocked||sending||!valid())return;
+    const body=textarea.value.trim();if(!body||body.length>2000)return;
     if(!pending||pending.body!==body)pending={body,key:crypto.randomUUID()};
-    const r=await action(()=>api('/conversations/'+a.application_id+'/messages',{method:'POST',body:{body},idempotencyKey:pending.key}));
-    if(r&&valid()){pending=null;form.reset();await refresh()}
+    sending=true;sendStatus.textContent='Envoi en cours…';updateSend();
+    try{
+     const result=await action(()=>api('/conversations/'+a.application_id+'/messages',{method:'POST',body:{body},idempotencyKey:pending.key}));
+     if(!valid())return;
+     if(result){
+      pending=null;form.reset();sendStatus.textContent='Message confirmé par le serveur.';
+      await refresh();
+     }else{
+      sendStatus.textContent='Envoi non confirmé. Vérifiez les messages avant de réessayer ; le même identifiant d’envoi sera réutilisé.';
+     }
+    }finally{
+     if(valid()){sending=false;updateSend()}
+    }
   });
   await refresh();
 }
-
 function report(kind,id){const f=el('form',{},field('Que se passe-t-il ?','reason','textarea',{minlength:10,maxlength:1000,placeholder:'Décrivez le problème pour aider la modération.'}),el('button',{type:'submit',class:'primary',text:'Envoyer mon signalement'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/reports',{method:'POST',body:{kind,target_id:id,reason:formValue(f).reason}}),'Signalement enregistré. Suivez sa réponse dans Assistance.');if(r)$('#dialog').close()});showDialog('Signaler un problème',f)}
 
 
