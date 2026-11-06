@@ -1500,9 +1500,9 @@ test('UX audit: account screen keeps install and logout after personal informati
 
 test('UX release: clearly labelled 2026-11-06 version and versioned static assets are present',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- assert.match(html,/Nouveau : dimensions des chantiers · 6 novembre 2026/);
+ assert.match(html,/Nouveau : photos des réalisations · 6 novembre 2026/);
  for(const name of ['style.css','analytics.js','local-ai.js','assistant-ai.js','app.js','pwa.js']){
-  assert.ok(html.includes('/assets/'+name+'?v=ucp-f11-20261106'),name+' should be release-versioned');
+  assert.ok(html.includes('/assets/'+name+'?v=ucp-f35-20261106'),name+' should be release-versioned');
  }
  const x=await boot();
  try{
