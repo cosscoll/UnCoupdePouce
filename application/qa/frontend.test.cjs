@@ -50,6 +50,43 @@ test('chat retry preserves idempotency key after lost response',async()=>{
  }finally{x.close()}
 });
 
+test('Yahya uses the existing requester draft identity and keeps private work during an AI rewrite',async()=>{
+ let hooks,version=1;
+ const initial={id:51,version:1,title:'Salle de bains à reprendre',
+  description:'Je souhaite refaire la douche et le carrelage.',town:'Toulouse',
+  trades:['plomberie'],timing:'month',budget_min:1200,budget_max:4500,
+  dimensions:{surface_m2:12},photos:[84]};
+ const proposed={title:'Changer la douche et la faïence',description:'Je souhaite remplacer la douche et refaire la faïence de la salle de bains.',
+  town:'Blagnac',trades:['plomberie'],timing:'quarter',budget_min:null,budget_max:null,version:0,photos:[]};
+ const x=await boot({
+  'PUT /api/v4/drafts/51':()=>({id:51,version:++version})
+ },w=>{w.UCPAssistantAI={create:received=>{hooks=received;return {sync(){},open(){}}}}});
+ try{
+  x.w.startWizard(initial);
+  x.w.showDialog('Yahya',x.w.document.createElement('section'));
+  assert.equal(await hooks.apply(proposed),true);
+  assert.equal(x.w.document.querySelector('#dialog').open,false);
+  assert.equal(x.w.document.querySelector('.wizard [name=title]').value,proposed.title);
+  assert.match(x.w.document.querySelector('#alert').textContent,/brouillon existant/);
+  const draft=x.w.eval('currentDraft');
+  assert.equal(draft.id,51);
+  assert.equal(draft.version,2,'the existing saved revision is retained');
+  assert.deepEqual(Array.from(draft.photos),[84],'private photo ID is preserved');
+  assert.equal(draft.dimensions.surface_m2,12);
+  assert.equal(draft.budget_min,1200);
+  assert.equal(draft.budget_max,4500);
+  assert.equal(draft.town,'Blagnac');
+  await x.w.saveDraft();
+  const writes=x.calls.filter(c=>c.method==='PUT'&&c.url==='/api/v4/drafts/51');
+  assert.equal(writes.length,2);
+  assert.equal(writes[1].body.version,2);
+  assert.equal(writes[1].body.title,proposed.title);
+  assert.equal(writes[1].body.budget_min,1200);
+  assert.equal(writes[1].body.dimensions.surface_m2,12);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0,'no new draft and no publication');
+ }finally{x.close()}
+});
+
 test('F13 requester overview resumes a private draft and filters own projects by status',async()=>{
  const projects=[
   {id:11,title:'Salle de bains',status:'open',town:'Toulouse',trade:'plomberie',trades:['plomberie'],timing:'flexible'},
