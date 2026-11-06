@@ -440,3 +440,27 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 .ai-chat .ai-cancel{display:inline-flex;align-items:center;justify-content:center;min-height:40px;margin:8px 0 2px;padding:7px 12px;border:1px solid #c7cada;border-radius:9px;background:#fff;color:#444b68;font-size:12px;font-weight:700}
 .ai-chat .ai-cancel:hover:not(:disabled){background:#f5f6fa}
 @media(max-width:480px){.ai-chat .ai-cancel{width:100%}}
+
+/* F45–F50: simple private conversations, clear delivery state and accessible support filters. */
+.conversation-list{min-width:0}
+.conversation-search-label{display:grid;gap:8px;margin:3px 0 10px;font-size:12px;font-weight:700}
+.conversation-search-label input{min-height:42px;padding:9px 11px;min-width:0;width:100%;font-size:13px}
+.conversation-list-items{display:grid;gap:5px;margin:10px 0}
+.conversation-list-items .conversation-choice{display:block;min-height:48px;width:100%;text-align:left;padding:11px 12px;background:#fff;border:1px solid transparent;border-radius:9px;font-size:12px;font-weight:600;white-space:normal;overflow-wrap:anywhere}
+.conversation-list-items .conversation-choice:hover{border-color:#c8cce2}
+.conversation-list-items .conversation-choice[aria-pressed="true"]{background:#e9ecff;border-color:var(--violet);color:#3946a3}
+.chat-compose{gap:10px;margin-top:18px}
+.chat-compose textarea{min-height:85px}
+.chat-compose .primary{justify-self:start}
+.chat-compose .hint{margin:0;font-size:11px;line-height:1.6}
+.chat-send-status{min-height:17px;line-height:1.5;color:#414b79}
+.chat-send-status:empty{display:none}
+.chat-help-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:9px}
+.support-report-list .panel{margin:12px 0;padding:19px;border-radius:10px}
+.support-report-list .panel h4{margin-top:13px}
+@media(max-width:680px){
+ .conversation-list-items{max-height:190px;overflow-y:auto}
+ .conversation-list-items .conversation-choice{min-height:48px}
+ .chat-compose .primary{width:100%}
+ .support-report-list .panel{padding:15px}
+}
