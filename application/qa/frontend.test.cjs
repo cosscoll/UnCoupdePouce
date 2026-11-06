@@ -1948,7 +1948,7 @@ test('private beta guide explains fictitious test data before login and never ch
   assert.ok(d.querySelector('#beta-start'));
   x.w.eval("appState.user=null;entrySpace='requester'");
   x.w.openBetaGuide();
-  assert.match(d.querySelector('#dialog').textContent,/parcours particulier/);
+  assert.match(d.querySelector('#dialog').textContent,/Parcours particulier/);
   assert.match(d.querySelector('#dialog').textContent,/travaux imaginaires/);
   assert.match(d.querySelector('#dialog').textContent,/Connectez-vous/);
   assert.equal(d.querySelector('#dialog .beta-step-action'),null);
