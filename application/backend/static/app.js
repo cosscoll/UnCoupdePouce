@@ -1159,6 +1159,21 @@ $('#navigation-toggle').addEventListener('click',()=>setNavigationOpen($('#navig
 $('.sidebar').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#navigation-toggle').getAttribute('aria-expanded')==='true'){e.preventDefault();setNavigationOpen(false);$('#navigation-toggle').focus()}});
 $('#dialog').addEventListener('close',()=>{if($('#dialog').open)return;const previous=dialogReturnFocus;dialogReturnFocus=null;if(previous?.isConnected&&!previous.disabled&&!previous.closest('[hidden],dialog:not([open])'))previous.focus();else focusPageHeading()});
 $('#dialog-close').addEventListener('click',()=>$('#dialog').close());
+$('#release-notes').addEventListener('click',()=>{
+ const details=el('div',{class:'release-notes-dialog'},
+  el('p',{text:'Mise à jour UX/UI du 6 novembre 2026. L’interface UCP conserve sa charte graphique ; voici les changements à retrouver dans votre espace.'}),
+  el('ul',{},
+   el('li',{text:'Accueil particulier : une prochaine étape adaptée à vos annonces, brouillons ou conversations. Les statistiques sont dans « Voir toute mon activité ».'}),
+   el('li',{text:'Accueil professionnel : accès direct aux chantiers et à l’action prioritaire selon votre profil et vos candidatures.'}),
+   el('li',{text:'Menu professionnel : quatre rubriques principales ; favoris, entreprise, compte et autres fonctions dans « Mon activité et réglages ».'}),
+   el('li',{text:'Recherche : filtres particuliers et professionnels séparés ; métier et commune visibles en premier pour les professionnels.'}),
+   el('li',{text:'Artisans : spécialités et zones plus lisibles ; informations détaillées repliables et vérifications non réalisées clairement signalées.'}),
+   el('li',{text:'Navigation : le retour et l’avancement du navigateur fonctionnent entre les rubriques avec sauvegarde du brouillon avant de quitter.'})
+  ),
+  el('p',{class:'small muted',text:'Version 2026.11.06. Les modifications concernent les espaces connectés. Une partie des informations est accessible après ouverture des sections repliables.'})
+ );
+ showDialog('Les nouveautés UX/UI d’UCP',details);
+});
 $('#privacy-open').addEventListener('click',()=>showDialog('Vos données dans cette version',el('div',{},el('p',{text:'Cette version privée conserve les comptes, projets et messages dans la base de cet environnement (PostgreSQL en préproduction, SQLite en local). N’utilisez que des données fictives. Aucun traceur PostHog, enregistrement de session ou paiement n’est activé.'}),el('p',{text:'Les photos sont réencodées sans métadonnées GPS. Elles ne sont accessibles qu’à leur propriétaire, à la modération et au professionnel sélectionné autorisé.'}),el('p',{text:'L’export est disponible dans Mon compte. La suppression d’un compte ayant un historique nécessite une intervention opérateur. Les conditions et durées de conservation doivent être validées avant toute ouverture.'}))));
 $('#reset-open').addEventListener('click',()=>{const f=el('form',{},el('p',{text:'Dans ce laboratoire, l’opérateur génère un code temporaire avec la commande recovery.py. Aucun email n’est envoyé. Saisissez le code ici.'}),field('Code de récupération','token','text',{minlength:20,maxlength:128}),field('Nouveau mot de passe','password','password',{minlength:12,maxlength:128}),el('button',{type:'submit',class:'primary',text:'Réinitialiser mon mot de passe'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/account/reset',{method:'POST',body:formValue(f)}),'Mot de passe remplacé. Les anciennes sessions ont été révoquées.');if(r)$('#dialog').close()});showDialog('Récupérer votre accès',f)});
 const guidedHelp=(window.UCPAssistantAI||window.UCPGuidedHelp)?.create({
