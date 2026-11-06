@@ -435,3 +435,8 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 .ai-chat .ai-unavailable-links{display:flex;flex-wrap:wrap;gap:8px}
 .ai-chat .ai-unavailable-links button{min-height:41px;font-size:12px;padding:8px 11px}
 @media(max-width:480px){.ai-chat .ai-unavailable{padding:15px}.ai-chat .ai-unavailable-links button,.ai-chat .ai-light-recovery{width:100%}}
+
+/* Yahya: explicit stop for long on-device model generation. */
+.ai-chat .ai-cancel{display:inline-flex;align-items:center;justify-content:center;min-height:40px;margin:8px 0 2px;padding:7px 12px;border:1px solid #c7cada;border-radius:9px;background:#fff;color:#444b68;font-size:12px;font-weight:700}
+.ai-chat .ai-cancel:hover:not(:disabled){background:#f5f6fa}
+@media(max-width:480px){.ai-chat .ai-cancel{width:100%}}
