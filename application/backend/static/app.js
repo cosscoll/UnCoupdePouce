@@ -779,12 +779,15 @@ function editProject(d){
   e.preventDefault();
   if(acting||save.disabled||!active())return;
   const values=formValue(f);
+  const dimensions=readDimensions(f);
+  const includeDimensions=Object.keys(dimensions).length>0||Object.keys(dimensionPayload(base.dimensions)).length>0;
+  for(const [key] of dimensionSpecs)delete values[key];
   save.disabled=true;
   for(const input of inputs)input.readOnly=true;
   const result=await action(async()=>{
    try{
     return await api('/projects/'+d.id,{method:'PUT',body:{...values,trade:base.trade,content_version:base.content_version,
-     budget_min:amountValue(values.budget_min),budget_max:amountValue(values.budget_max),dimensions:readDimensions(f)}});
+     budget_min:amountValue(values.budget_min),budget_max:amountValue(values.budget_max),...(includeDimensions?{dimensions}:{})}});
    }catch(e){
     if(active()&&!e.stale){
      feedback(e.message);
@@ -846,7 +849,7 @@ async function saveDraft(flush=true){
  if(!draftActive(d,s))throw staleResponse();
  if(s.inFlight){const result=await s.inFlight;if(!draftActive(d,s))throw staleResponse();if(draftFingerprint(d)===s.lastSaved)return result;return saveDraft(flush)}
  for(const input of document.querySelectorAll('.wizard [name=budget_min],.wizard [name=budget_max],.wizard [name=surface_m2],.wizard [name=length_m],.wizard [name=width_m],.wizard [name=height_m]'))if(!input.checkValidity()){
-  const e=Object.assign(Error('Corrigez le budget ou les mesures : valeurs positives, au maximum deux décimales pour les dimensions.'),{localValidation:true});s.error=e;draftSaveStatus(d);throw e;
+  const e=Object.assign(Error('Corrigez les montants du budget ou les mesures : valeurs positives, au maximum deux décimales pour les dimensions.'),{localValidation:true});s.error=e;draftSaveStatus(d);throw e;
  }
  const creating=!d.id;
  if(creating&&!s.creation)s.creation={...draftContent(d),version:d.version};
