@@ -605,7 +605,7 @@ function projectApplication(project){
  return box;
 }
 
-function showcaseContent(data){
+function showcaseContent(data,context=null){
  const n=el('section',{class:'showcase-content'});
  if(data.unavailable){n.append(el('p',{class:'hint',text:'Cette présentation n’est plus disponible.'}));return n}
  n.append(el('p',{class:'hint',text:data.declaration||'Informations déclarées, non vérifiées. Aucune certification ni avis client.'}));
@@ -613,7 +613,17 @@ function showcaseContent(data){
  else n.append(el('p',{class:'muted small',text:'Aucune présentation renseignée.'}));
  n.append(el('h4',{text:'Réalisations déclarées · '+data.works.length}));
  if(!data.works.length)n.append(el('p',{class:'small muted',text:'Aucune réalisation renseignée pour ce profil.'}));
- for(const work of data.works)n.append(el('details',{class:'showcase-work'},el('summary',{text:work.title+' · '+(trades[work.trade]||work.trade)+(work.year?' · '+work.year:'')}),el('p',{class:'case-text',text:work.description})));
+ for(const work of data.works){
+  const photoId=Number(work.photo_id);
+  const valid=Number.isSafeInteger(photoId)&&photoId>0;
+  const src=!valid?null:context?
+   '/api/projects/'+context.projectId+'/applications/'+context.applicationId+'/showcase/photos/'+photoId:
+   '/api/v4/showcase/photos/'+photoId;
+  n.append(el('details',{class:'showcase-work'},
+   el('summary',{text:work.title+' · '+(trades[work.trade]||work.trade)+(work.year?' · '+work.year:'')}),
+   src?el('img',{src,class:'showcase-work-image',alt:'Photo déclarée pour la réalisation « '+work.title+' »',loading:'lazy',width:540,height:330}):null,
+   el('p',{class:'case-text',text:work.description})));
+ }
  if(data.updated_at)n.append(el('p',{class:'small muted',text:'Présentation actuelle · mise à jour le '+new Date(data.updated_at).toLocaleDateString('fr-FR')}));
  return n;
 }
@@ -624,12 +634,12 @@ async function candidateShowcase(projectId,applicationId){
 async function openCandidateShowcase(projectId,a){
  const epoch=renderEpoch,dialogToken=dialogEpoch;
  const result=await action(()=>candidateShowcase(projectId,a.id));
- if(result&&epoch===renderEpoch&&dialogToken===dialogEpoch)showDialog('Présentation · '+(a.linked_artisan_alias||a.professional_name),showcaseContent(result));
+ if(result&&epoch===renderEpoch&&dialogToken===dialogEpoch)showDialog('Présentation · '+(a.linked_artisan_alias||a.professional_name),showcaseContent(result,{projectId,applicationId:a.id}));
 }
 async function renderShowcaseManagement(n){
  const epoch=renderEpoch,box=panel('Votre présentation et vos réalisations','Décrivez votre savoir-faire avec des exemples fictifs. Chaque profil lié conserve sa propre présentation. Les demandeurs la consultent seulement depuis une candidature reçue.');
  const scopeRow=scope=>el('div',{class:'item'},el('h4',{text:scope.alias}),scope.active===false?el('p',{class:'hint',text:'Profil inactif : sa présentation n’est pas visible aux demandeurs.'}):null,
-  el('div',{class:'row'},button('Modifier · '+scope.alias,()=>editShowcase(scope.id)),button('Aperçu · '+scope.alias,()=>previewShowcase(scope.id))));
+  el('div',{class:'row'},button('Modifier · '+scope.alias,()=>editShowcase(scope.id)),button('Photos · '+scope.alias,()=>manageShowcasePhotos(scope.id)),button('Aperçu · '+scope.alias,()=>previewShowcase(scope.id))));
  box.append(scopeRow({id:null,alias:'Mon profil individuel'}));
  const linked=el('div');box.append(linked);n.append(box);
  async function loadLinked(){
@@ -655,24 +665,92 @@ async function previewShowcase(linked){
 async function editShowcase(linked){
  const epoch=renderEpoch,dialogToken=dialogEpoch,path='/v4/showcase'+(linked?'?linked_profile_id='+linked:'');
  const data=await action(()=>api(path));if(!data||epoch!==renderEpoch||dialogToken!==dialogEpoch)return;
- const form=el('form',{},el('p',{class:'hint',text:'Données fictives uniquement. Présentation et réalisations sont déclaratives, sans vérification. Ne saisissez ni coordonnées, ni nom de client, ni adresse précise. Photos, avis et justificatifs ne sont pas proposés dans ce formulaire.'}),field('Présentez votre savoir-faire · facultatif','intro','textarea',{value:data.intro,maxlength:1200,required:false}));
+ const form=el('form',{},el('p',{class:'hint',text:'Données fictives uniquement. Présentation et réalisations sont déclaratives, sans vérification. Ne saisissez ni coordonnées, ni nom de client, ni adresse précise. Enregistrez vos textes avant de gérer les photos. Aucun avis ni justificatif certifié.'}),field('Présentez votre savoir-faire · facultatif','intro','textarea',{value:data.intro,maxlength:1200,required:false}));
  const list=el('div',{class:'showcase-editor'}),count=el('p',{class:'hint','aria-live':'polite'});
  const add=button('Ajouter une réalisation',()=>appendWork({}));
  function sync(){const total=list.children.length;count.textContent=total+' / 6 réalisations';add.disabled=total>=6}
  function appendWork(work){
   if(list.children.length>=6)return;
   const row=el('fieldset',{'data-work':'true'},el('legend',{text:'Réalisation déclarée'}),field('Titre','title','text',{value:work.title||'',minlength:3,maxlength:100}),field('Description','description','textarea',{value:work.description||'',minlength:20,maxlength:1000}),field('Métier du profil','trade','select',{value:work.trade,options:{'':'Choisissez un métier',...Object.fromEntries(data.scope.trades.filter(id=>catalog.some(t=>t.id===id)).map(id=>[id,trades[id]||id]))}}),el('label',{},el('span',{text:'Année · facultative'}),el('input',{name:'year',type:'number',min:1900,max:2100,step:1,value:work.year??''})),button('Retirer de ce formulaire',()=>{row.remove();sync()}));
+  row.dataset.photoId=work.photo_id||'';
   list.append(row);sync();
  }
  form.append(list,count,add,el('p',{class:'hint',text:'Les modifications et retraits sont enregistrés uniquement lorsque vous confirmez ci-dessous.'}),el('button',{type:'submit',class:'primary',text:'Enregistrer ma présentation'}));
  for(const work of data.works)appendWork(work);sync();
  form.addEventListener('submit',async e=>{
-  e.preventDefault();const formToken=dialogEpoch,viewToken=renderEpoch;const works=[...list.children].map(row=>{const value=name=>row.querySelector('[name='+name+']').value;return {title:value('title'),description:value('description'),trade:value('trade'),year:value('year')===''?null:Number(value('year'))}});
+  e.preventDefault();const formToken=dialogEpoch,viewToken=renderEpoch;const works=[...list.children].map(row=>{const value=name=>row.querySelector('[name='+name+']').value;return {title:value('title'),description:value('description'),trade:value('trade'),year:value('year')===''?null:Number(value('year')),...(row.dataset.photoId?{photo_id:Number(row.dataset.photoId)}:{})}});
   const result=await action(()=>api(path,{method:'PUT',body:{intro:form.querySelector('[name=intro]').value,works,version:data.version}}),'Présentation enregistrée. Elle reste déclarative.');
   if(result){data.version=result.version;if(formToken!==dialogEpoch||viewToken!==renderEpoch||!$('#dialog').open)return;$('#dialog').close();await render()}
  });
  showDialog('Présentation · '+data.scope.name,form);
 }
+async function manageShowcasePhotos(linked){
+ const epoch=renderEpoch,previousDialog=dialogEpoch;
+ const query=linked?'?linked_profile_id='+linked:'';
+ const path='/v4/showcase'+query;
+ let data=await action(()=>api(path));
+ if(!data||epoch!==renderEpoch||previousDialog!==dialogEpoch)return;
+ const content=el('div',{class:'showcase-photo-manager'});
+ showDialog('Photos des réalisations · '+data.scope.name,content);
+ const token=dialogEpoch;
+ async function updateFromServer(){
+  const latest=await api(path);
+  if(epoch!==renderEpoch||token!==dialogEpoch||!$('#dialog').open)return;
+  data=latest;draw();
+ }
+ function draw(){
+  if(epoch!==renderEpoch||token!==dialogEpoch||!$('#dialog').open)return;
+  content.replaceChildren(
+   el('p',{class:'hint',text:'Une photo facultative par réalisation enregistrée (six maximum par présentation). Images de test fictives ou autorisées, sans coordonnées ni informations personnelles. Les photos sont déclaratives et consultables seulement depuis une candidature reçue. Formats JPG, PNG, WebP, 4 Mo maximum.'}));
+  if(!data.works.length){
+   content.append(el('p',{class:'muted',text:'Enregistrez d’abord une réalisation depuis « Modifier » pour pouvoir lui ajouter une photo.'}));
+  }
+  data.works.forEach((work,index)=>{
+   const card=el('article',{class:'showcase-photo-card'},
+    el('h4',{text:work.title}),
+    el('p',{class:'small muted',text:'Réalisation déclarée · '+(trades[work.trade]||work.trade)}));
+   if(work.photo_id)card.append(el('img',{
+    src:'/api/v4/showcase/photos/'+Number(work.photo_id),
+    class:'showcase-work-image',alt:'Photo privée de votre réalisation « '+work.title+' »',
+    loading:'lazy',width:540,height:330
+   }));
+   else card.append(el('p',{class:'hint',text:'Aucune photo enregistrée pour cette réalisation.'}));
+   const upload=el('input',{type:'file',accept:'image/jpeg,image/png,image/webp',
+    'aria-label':(work.photo_id?'Remplacer':'Ajouter')+' une photo : '+work.title});
+   upload.addEventListener('change',async()=>{
+    const file=upload.files?.[0];if(!file)return;
+    if(file.size>4_000_000){msg('Photo limitée à 4 Mo.','error');upload.value='';return}
+    upload.disabled=true;
+    const result=await action(async()=>{
+     const encoded=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);
+      reader.onerror=()=>reject(Error('Impossible de lire ce fichier.'));reader.readAsDataURL(file);
+     });
+     return api('/v4/showcase/photos/'+index+query,{method:'POST',
+      body:{data:encoded,version:data.version}});
+    },'Photo de réalisation enregistrée.');
+    if(!result){upload.disabled=false;upload.value='';return}
+    if(epoch!==renderEpoch||token!==dialogEpoch||!$('#dialog').open)return;
+    await action(updateFromServer);
+   });
+   card.append(el('label',{class:'showcase-photo-upload'},
+    el('span',{text:work.photo_id?'Remplacer la photo':'Ajouter une photo'}),upload));
+   if(work.photo_id)card.append(button('Supprimer cette photo',async()=>{
+    const approved=await ask('Supprimer cette photo ?',
+     'La photo ne sera plus visible dans les présentations de ce profil.',async()=>{
+      const result=await action(()=>api('/v4/showcase/photos/'+index+query,
+       {method:'DELETE',body:{version:data.version}}),'Photo supprimée.');
+      if(result&&epoch===renderEpoch&&token===dialogEpoch&&$('#dialog').open)await action(updateFromServer);
+      return Boolean(result);
+     });
+    return approved;
+   }));
+   content.append(card);
+  });
+ }
+ draw();
+}
+
 function candidateFacts(a){
   const terms=[['Métiers déclarés',(a.trades||[a.trade]).map(t=>trades[t]||t).join(' · ')||'Non affichés'],
     ['Communes d’intervention',(a.service_zones||[a.town]).join(' · ')||'Non affichées'],
@@ -691,7 +769,7 @@ function renderCandidateCards(box,apps,projectId=null,suspended=false){
     const data=await action(async()=>projectId?await Promise.all(selection.map(a=>candidateShowcase(projectId,a.id))):selection.map(()=>null));
     if(!data||epoch!==renderEpoch||dialogToken!==dialogEpoch||chosen.size!==selection.length||selection.some(a=>!chosen.has(a.id)))return;
     const cards=el('div',{class:'candidate-comparison'},...selection.map((a,i)=>el('article',{class:'comparison-card'},
-      el('h4',{text:a.professional_name}),a.linked_artisan_alias?el('p',{text:'Profil lié : '+a.linked_artisan_alias}):null,candidateFacts(a),data[i]?showcaseContent(data[i]):null)));
+      el('h4',{text:a.professional_name}),a.linked_artisan_alias?el('p',{text:'Profil lié : '+a.linked_artisan_alias}):null,candidateFacts(a),data[i]?showcaseContent(data[i],{projectId,applicationId:a.id}):null)));
     showDialog('Comparer les candidatures',el('div',{},el('p',{class:'hint',text:'Comparez les métiers, les communes et les réalisations effectivement renseignées. Identités, assurances, avis et justificatifs : aucune vérification réelle disponible dans cette préproduction.'}),cards));
   },'secondary');compare.disabled=true;
   function update(){summary.textContent=chosen.size+' / 3 profils sélectionnés pour la comparaison';compare.disabled=chosen.size<2;for(const c of checks)c.disabled=chosen.size>=3&&!c.checked}
