@@ -350,7 +350,29 @@ async function renderProjects(n){
   const req=appState.user.role==='requester',epoch=renderEpoch,owner=appState.user.id;
   n.append(heading(req?'Mes projets de travaux':'Trouver un chantier',req?'Retrouvez vos annonces, brouillons et candidatures.':'Explorez les projets qui correspondent à vos métiers et à vos communes.',req?'Créer une annonce':null,()=>startWizard()));
   const initial=await api('/projects'),items=initial.items;
-  if(req){const ds=(await api('/v4/drafts')).items;if(ds.length){const box=panel('À reprendre','Vos brouillons sont enregistrés dans votre compte.');for(const d of ds)box.append(el('div',{class:'item line'},el('strong',{text:d.title||'Nouveau projet'}),button('Continuer',()=>startWizard(d)),button('Supprimer',()=>ask('Supprimer ce brouillon ?','La demande n’a pas été publiée. Ses photos seront également supprimées.',()=>api('/v4/drafts/'+d.id,{method:'DELETE'})))));n.append(box)}}
+  if(req){
+   const ds=(await api('/v4/drafts')).items;
+   const summary=el('section',{class:'project-status-overview',role:'region','aria-label':'Résumé de mes projets'});
+   const stages=[
+    ['Brouillons à terminer',ds.length,ds.length?()=>startWizard(ds[0]):null,'Reprendre'],
+    ['Annonces ouvertes',items.filter(p=>p.status==='open'&&!p.suspended).length,()=>filterOwnProjects('open'),'Afficher'],
+    ['Professionnel sélectionné',items.filter(p=>p.status==='selected'&&!p.suspended).length,()=>filterOwnProjects('selected'),'Afficher'],
+    ['Projets terminés',items.filter(p=>p.status==='closed').length,()=>filterOwnProjects('closed'),'Afficher']
+   ];
+   for(const [label,value,run,actionLabel] of stages)summary.append(el('div',{class:'project-status-card'},
+    el('strong',{class:'project-status-count',text:value}),el('span',{text:label}),
+    run?button(actionLabel,run,'outline'):el('span',{class:'small muted',text:'Aucun brouillon'})));
+   n.append(summary);
+   if(ds.length){
+    const box=panel('À reprendre','Vos brouillons restent privés et peuvent être modifiés avant publication.');
+    box.classList.add('drafts-to-resume');
+    for(const d of ds)box.append(el('div',{class:'item line'},
+     el('div',{},el('strong',{text:d.title||'Nouveau projet'}),el('p',{class:'small muted',text:'Brouillon non publié · '+(d.town||'Commune à compléter')})),
+     button('Continuer',()=>startWizard(d)),
+     button('Supprimer',()=>ask('Supprimer ce brouillon ?','La demande n’a pas été publiée. Ses photos seront également supprimées.',()=>api('/v4/drafts/'+d.id,{method:'DELETE'})))));
+    n.append(box);
+   }
+  }
   if(!req&&initial.search_scope!=='ready'&&initial.search_scope){
     n.append(empty(initial.search_scope==='profile_required'?'Complétez votre profil.':'Votre profil attend son examen.',
       'Les métiers, les communes et l’autorisation de test déterminent les missions que vous pouvez consulter.','Vérifier mon profil',()=>go('profile')));return;
@@ -375,10 +397,16 @@ async function renderProjects(n){
     !req?el('p',{class:'hint budget-filter-note',text:'Le budget annoncé doit recouper votre plage. Les projets sans budget sont exclus lorsque ce filtre est actif.'}):null));
   advanced.open=Object.entries(saved).some(([k,v])=>v&&(req?k==='status':!['q','sort','trade','town'].includes(k)));
   const order=select('Trier','sort',{newest:'Plus récents',oldest:'Plus anciens'});order.querySelector('select').value=saved.sort||'newest';
+  function filterOwnProjects(status){
+   if(!req||epoch!==renderEpoch||appState.user?.id!==owner)return;
+   for(const c of form.querySelectorAll('input,select'))c.value=c.name==='sort'?'newest':'';
+   form.querySelector('[name=status]').value=status;advanced.open=true;
+   action(()=>load()).then(()=>{if(epoch===renderEpoch)count.focus()});
+  }
   const reset=button('Effacer les filtres',()=>{for(const c of form.querySelectorAll('input,select'))c.value=c.name==='sort'?'newest':'';action(()=>load())});
   const core=el('div',{class:'search-core'},q,...(req?[]:[trade,town]));
   form.append(core,advanced,el('div',{class:'search-actions'},order,el('button',{type:'submit',class:'primary',text:req?'Filtrer':'Rechercher les chantiers'}),reset));
-  const list=el('div',{class:'project-list'}),count=el('p',{class:'count',role:'status','aria-live':'polite'});
+  const list=el('div',{class:'project-list'}),count=el('p',{class:'count',role:'status','aria-live':'polite',tabindex:'-1'});
   n.append(form,count,list);
   if(!req)n.append(el('p',{class:'hint',text:'La commune correspond aux zones déclarées de votre profil ou d’un profil lié actif. Aucun rayon ni temps de trajet n’est calculé.'}));
   function draw(rows){
