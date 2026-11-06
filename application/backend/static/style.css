@@ -425,3 +425,13 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 @media(max-width:1020px){.pro-quick-overview{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:480px){.pro-quick-overview{gap:9px}.pro-quick-card{padding:13px 12px}.pro-quick-count{font-size:29px}.pro-quick-card button{width:100%;padding:8px 7px}.application-filter-card{padding:13px}.application-filter-card strong{font-size:27px}.pro-search-shortcuts .pro-preset{flex:1 1 auto}}
 @media(prefers-reduced-motion:reduce){.application-filter-card{transition:none}}
+
+/* Yahya: a recoverable local-model error, without imitating an AI on unsupported devices. */
+.ai-chat .ai-light-recovery{display:inline-flex;align-items:center;justify-content:center;min-height:42px;margin:9px 0 0;padding:9px 14px;border:1px solid var(--violet);border-radius:9px;background:#f2f3ff;color:#39469d;font-size:12px;font-weight:700}
+.ai-chat .ai-light-recovery:hover:not(:disabled){background:#e9ebff}
+.ai-chat .ai-unavailable{max-width:440px;margin:20px auto;padding:18px 20px;border:1px solid var(--line);border-radius:12px;background:#fbfbfe;text-align:left}
+.ai-chat .ai-unavailable h4{margin:0 0 7px;font:700 15px Montserrat,Arial,sans-serif;color:var(--ink)}
+.ai-chat .ai-unavailable p{margin:0 0 15px;font-size:12px;line-height:1.65;color:var(--muted)}
+.ai-chat .ai-unavailable-links{display:flex;flex-wrap:wrap;gap:8px}
+.ai-chat .ai-unavailable-links button{min-height:41px;font-size:12px;padding:8px 11px}
+@media(max-width:480px){.ai-chat .ai-unavailable{padding:15px}.ai-chat .ai-unavailable-links button,.ai-chat .ai-light-recovery{width:100%}}
