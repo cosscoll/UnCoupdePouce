@@ -1500,9 +1500,9 @@ test('UX audit: account screen keeps install and logout after personal informati
 
 test('UX release: clearly labelled 2026-11-06 version and versioned static assets are present',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- assert.match(html,/Nouveau : dimensions des chantiers · 6 novembre 2026/);
+ assert.match(html,/Nouveau : photos des réalisations · 6 novembre 2026/);
  for(const name of ['style.css','analytics.js','local-ai.js','assistant-ai.js','app.js','pwa.js']){
-  assert.ok(html.includes('/assets/'+name+'?v=ucp-f11-20261106'),name+' should be release-versioned');
+  assert.ok(html.includes('/assets/'+name+'?v=ucp-f35-20261106'),name+' should be release-versioned');
  }
  const x=await boot();
  try{
@@ -1652,5 +1652,95 @@ test('F11: the existing project editor submits structured dimensions',async()=>{
   assert.ok(sent);
   assert.deepEqual(sent.body.dimensions,{surface_m2:8.25,height_m:2.4});
   assert.equal(sent.body.content_version,2);
+ }finally{x.close()}
+});
+
+test('F35: candidate showcase only creates a gated work image URL for supplied photo IDs',async()=>{
+ const candidate={intro:'Rénovation déclarée',works:[
+  {title:'Salle de bains fictive',trade:'plomberie',year:2025,description:'Rénovation de pièces et remplacement de sanitaires.',photo_id:71},
+  {title:'Cuisine fictive',trade:'plomberie',description:'Autre chantier sans photo déclarée.'}],
+ declaration:'Informations déclarées et non vérifiées.'};
+ const x=await boot({'/api/projects/4/applications/22/showcase':candidate});
+ try{
+  await x.w.openCandidateShowcase(4,{id:22,professional_name:'Atelier fictif'});
+  const dialog=x.w.document.querySelector('#dialog');
+  const image=dialog.querySelector('.showcase-work-image');
+  assert.ok(image);
+  assert.equal(image.getAttribute('src'),'/api/projects/4/applications/22/showcase/photos/71');
+  assert.match(image.getAttribute('alt'),/Salle de bains fictive/);
+  assert.equal(dialog.querySelectorAll('.showcase-work-image').length,1);
+  assert.match(dialog.textContent,/déclarées/);
+  assert.equal(x.calls.filter(c=>c.url.includes('/showcase/photos/')).length,0);
+ }finally{x.close()}
+});
+test('F35: private photo manager exposes a separate action for an existing linked realization',async()=>{
+ const body={intro:'Profil fictif',works:[{title:'Peinture intérieure',description:'Rénovation intérieure fictive et décoration complète.',trade:'peinture',year:2024,photo_id:27}],version:3,scope:{name:'Équipe liée',trades:['peinture'],active:true}};
+ const x=await boot({'/api/v4/showcase?linked_profile_id=7':body});
+ try{
+  await x.w.manageShowcasePhotos(7);
+  const dialog=x.w.document.querySelector('#dialog');
+  assert.match(dialog.textContent,/Photos des réalisations/);
+  assert.ok(dialog.querySelector('img[src="/api/v4/showcase/photos/27"]'));
+  assert.ok(dialog.querySelector('input[type=file][accept="image/jpeg,image/png,image/webp"]'));
+  assert.ok([...dialog.querySelectorAll('button')].some(b=>b.textContent==='Supprimer cette photo'));
+  const buttons=[...dialog.querySelectorAll('button')];
+  buttons.find(b=>b.textContent==='Supprimer cette photo').click();
+  assert.match(dialog.textContent,/Supprimer cette photo/);
+  assert.equal(x.calls.some(c=>c.method==='DELETE'),false);
+ }finally{x.close()}
+});
+test('F35: manager uploads a file to the exact saved work with version and linked scope',async()=>{
+ let n=0;
+ const base={intro:'Présentation fictive',works:[{title:'Peinture fictive',description:'Exemple de peinture intérieure entièrement fictif.',trade:'peinture',year:2025}],version:1,scope:{name:'Équipe peinture',trades:['peinture'],active:true}};
+ const x=await boot({
+  '/api/v4/showcase?linked_profile_id=7':()=>++n===1?base:{...base,version:2,works:[{...base.works[0],photo_id:77}]},
+  'POST /api/v4/showcase/photos/0?linked_profile_id=7':{ok:true,photo_id:77,version:2}
+ });
+ try{
+  await x.w.manageShowcasePhotos(7);
+  const file=new x.w.File(['image fictive'],'test-photo.jpg',{type:'image/jpeg'});
+  const control=x.w.document.querySelector('#dialog input[type=file]');
+  Object.defineProperty(control,'files',{configurable:true,value:[file]});
+  control.dispatchEvent(new x.w.Event('change',{bubbles:true}));
+  await new Promise(resolve=>setTimeout(resolve,95));
+  const sent=x.calls.find(c=>c.method==='POST');
+  assert.ok(sent);
+  assert.equal(sent.url,'/api/v4/showcase/photos/0?linked_profile_id=7');
+  assert.equal(sent.body.version,1);
+  assert.equal(sent.body.data,Buffer.from('image fictive').toString('base64'));
+  assert.equal(sent.headers['x-ucp-csrf'],'test-token');
+  assert.ok(x.w.document.querySelector('#dialog img[src="/api/v4/showcase/photos/77"]'));
+ }finally{x.close()}
+});
+test('F35: editing text retains saved photo identity and removing work drops it explicitly',async()=>{
+ const base={intro:'Texte fictif',works:[{title:'Cuisine fictive',description:'Pose de canalisations et sanitaires dans une cuisine.',trade:'plomberie',year:2025,photo_id:81}],version:3,scope:{name:'Atelier',trades:['plomberie'],active:true}};
+ const x=await boot({'/api/v4/showcase':base,'PUT /api/v4/showcase':{ok:true,version:4}});
+ try{
+  await x.w.editShowcase(null);
+  submit(x.w,'#dialog form');await tick();
+  let sent=x.calls.filter(c=>c.method==='PUT');
+  assert.equal(sent.length,1);
+  assert.equal(sent[0].body.works[0].photo_id,81);
+  assert.equal(sent[0].body.version,3);
+ }finally{x.close()}
+ const y=await boot({'/api/v4/showcase':base,'PUT /api/v4/showcase':{ok:true,version:4}});
+ try{
+  await y.w.editShowcase(null);
+  [...y.w.document.querySelectorAll('#dialog button')].find(b=>b.textContent==='Retirer de ce formulaire').click();
+  submit(y.w,'#dialog form');await tick();
+  const sent=y.calls.find(c=>c.method==='PUT');
+  assert.deepEqual(sent.body.works,[]);
+ }finally{y.close()}
+});
+test('F35: comparisons keep each candidate photo in the right authorized scope',async()=>{
+ const works=id=>({intro:'Profil fictif',works:[{title:'Travaux fictifs',description:'Réalisation de travaux déclarés fictifs.',trade:'plomberie',photo_id:id}]});
+ const x=await boot({'/api/projects/5/applications/31/showcase':works(101),'/api/projects/5/applications/32/showcase':works(202)});
+ try{
+  const box=x.w.document.querySelector('#view');
+  x.w.renderCandidateCards(box,[{id:31,professional_name:'Artisan A',status:'pending',trade:'plomberie',town:'Toulouse'},{id:32,professional_name:'Artisan B',status:'pending',trade:'plomberie',town:'Toulouse'}],5);
+  for(const c of box.querySelectorAll('.candidate-choice input')){c.checked=true;c.dispatchEvent(new x.w.Event('change'))}
+  [...box.querySelectorAll('button')].find(b=>b.textContent==='Comparer les profils sélectionnés').click();await tick();
+  const images=[...x.w.document.querySelectorAll('#dialog .comparison-card img')].map(i=>i.getAttribute('src'));
+  assert.deepEqual(images,['/api/projects/5/applications/31/showcase/photos/101','/api/projects/5/applications/32/showcase/photos/202']);
  }finally{x.close()}
 });
