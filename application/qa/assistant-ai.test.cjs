@@ -87,7 +87,10 @@ test('unsupported WebGPU offers real UCP navigation, never a scripted chatbot an
  assert.match(fallback.textContent,/sans l’IA/);
  assert.equal(requester.doc.querySelector('textarea').disabled,true);
  assert.equal(requester.doc.querySelector('.ai-consent').hidden,true,'no model download agreement without local GPU inference');
- btn(requester.doc,'Décrire mes travaux').click();
+ assert.equal(requester.doc.querySelector('.ai-compose-form').hidden,true,'a disabled composer must not pretend a chatbot is available');
+ assert.equal(requester.doc.querySelector('.ai-suggestions').hidden,true);
+ assert.equal(btn(requester.doc,'Nouveau chat').hidden,true);
+ [...fallback.querySelectorAll('button')].find(b=>b.textContent==='Décrire mes travaux').click();
  assert.equal(requester.navigated,'projects');
  assert.equal(requester.calls.length,0);
  const pro=harness('professional',false);
