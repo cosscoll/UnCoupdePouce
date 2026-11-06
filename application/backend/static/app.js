@@ -1252,20 +1252,53 @@ async function renderSupport(n){
   n.append(heading('Vos demandes et réponses.','Retrouvez ici le suivi de vos demandes et signalements.'));
   await renderOwnSupport(n);
   n.append(el('p',{class:'hint',text:'Pour signaler un problème, utilisez le bouton du projet, du message ou de la conversation concernés. Cette préproduction ne propose pas de support par email ni de délai de réponse garanti.'}));
-  const list=el('div'),more=el('div');n.append(list,more);
-  async function load(before=null){
-    const data=await api('/v4/reports'+(before?'?before_id='+before:''));
-    if(!before&&!data.items.length)list.append(empty('Aucun signalement.','Vos signalements et les réponses de l’équipe apparaîtront ici.'));
-    for(const r of data.items){
+  const epoch=renderEpoch,owner=appState.user,valid=()=>epoch===renderEpoch&&owner===appState.user;
+  const box=panel('Mes signalements','Suivez les incidents signalés depuis un projet, un message ou une conversation. Les chiffres concernent uniquement les dossiers chargés dans cette page.');
+  const filter=field('Afficher les signalements','report_filter','select',{required:false,options:{all:'Tous les signalements',open:'À examiner',resolved:'Réponses disponibles'}});
+  const count=el('p',{class:'small muted',role:'status','aria-live':'polite'});
+  const loadStatus=el('p',{class:'hint',role:'status'});
+  const list=el('div',{class:'support-report-list'}),more=el('div');
+  box.append(filter,count,loadStatus,list,more);n.append(box);
+  let reports=[],cursor=null,loading=false;
+  function draw(){
+    if(!valid())return;
+    clear(list);
+    const choice=filter.querySelector('select').value;
+    const visible=reports.filter(r=>choice==='all'||(choice==='open'?r.status==='open':r.status!=='open'));
+    count.textContent=visible.length+' signalement(s) affiché(s) sur '+reports.length+' chargé(s).';
+    for(const r of visible){
       const card=panel('Signalement #'+r.id+' · '+reportKind(r.kind)+' #'+r.target_id);
-      card.append(el('span',{class:'chip '+(r.status==='open'?'amber':'green'),text:r.status==='open'?'À examiner':'Réponse disponible'}),
+      card.append(el('span',{class:'chip '+(r.status==='open'?'amber':'green'),text:r.status==='open'?'À examiner':r.resolution?'Réponse disponible':'Dossier traité'}),
         el('p',{class:'small muted',text:new Date(r.created_at).toLocaleString('fr-FR')}),
         el('h4',{text:'Votre demande'}),el('p',{class:'case-text',text:r.reason}));
       if(r.resolution)card.append(el('h4',{text:'Réponse de l’équipe'}),el('p',{class:'case-text',text:r.resolution}));
       list.append(card);
     }
-    clear(more);if(data.next_before_id)more.append(button('Voir les signalements plus anciens',()=>action(()=>load(data.next_before_id))));
+    if(!reports.length)list.append(empty('Aucun signalement.','Vos signalements et les réponses de l’équipe apparaîtront ici.'));
+    else if(!visible.length)list.append(el('p',{class:'status-note',text:'Aucun signalement pour ce filtre parmi les dossiers chargés.'}));
   }
+  async function load(before=null){
+    if(loading||!valid())return false;
+    loading=true;loadStatus.textContent='Chargement des signalements…';clear(more);
+    try{
+      const data=await api('/v4/reports'+(before?'?before_id='+before:''));
+      if(!valid())return false;
+      if(!Array.isArray(data.items))throw Error('Réponse de signalements incomplète');
+      if(!before)reports=[];
+      const ids=new Set(reports.map(r=>r.id));
+      for(const item of data.items)if(!ids.has(item.id)){ids.add(item.id);reports.push(item)}
+      cursor=data.next_before_id||null;loadStatus.textContent='';
+      draw();
+      if(cursor)more.append(button('Voir les signalements plus anciens',()=>action(()=>load(cursor))));
+      return true;
+    }catch(e){
+      if(!valid()||e.stale||e.status===401)return false;
+      loadStatus.textContent='Impossible de charger les signalements. Les dossiers déjà affichés restent disponibles.';
+      more.append(button('Réessayer le chargement',()=>action(()=>load(before))));
+      return false;
+    }finally{loading=false}
+  }
+  filter.querySelector('select').addEventListener('change',draw);
   await load();
 }
 function reviewReport(report){
