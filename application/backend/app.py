@@ -20,6 +20,7 @@ sys.path.insert(0, str(ROOT))
 from demo_access import DEMO_ROLES
 from hosting import Hosting, database_url
 from project_budget import Budget, MAX_BUDGET
+from project_dimensions import MeasuredBudget
 HOSTING = Hosting.from_env()
 DATABASE_URL = database_url()
 DATABASE_SCHEMA = os.getenv('UCP_DATABASE_SCHEMA', 'ucp_private')
@@ -142,6 +143,7 @@ def init_db():
         project_cols=[r['name'] for r in c.execute('PRAGMA table_info(projects)').fetchall()]
         for column in ('budget_min','budget_max'):
             if column not in project_cols:c.execute(f'ALTER TABLE projects ADD COLUMN {column} INTEGER CHECK ({column}>=0)')
+        if 'dimensions_json' not in project_cols:c.execute("ALTER TABLE projects ADD COLUMN dimensions_json TEXT NOT NULL DEFAULT '{}'")
         if 'applications_paused' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN applications_paused INTEGER NOT NULL DEFAULT 0 CHECK (applications_paused IN (0,1))')
         if 'intake_version' not in project_cols:c.execute('ALTER TABLE projects ADD COLUMN intake_version INTEGER NOT NULL DEFAULT 0 CHECK (intake_version>=0)')
         if 'suspended' not in project_cols:
@@ -416,7 +418,7 @@ class BetaInterest(BaseModel):
     wants_interview: Literal['yes','maybe','no']
     consent: Literal[True]
 
-class Project(Budget):
+class Project(MeasuredBudget):
     title: str = Field(min_length=5,max_length=120)
     description: str = Field(min_length=20,max_length=5000)
     trade: str
@@ -438,7 +440,7 @@ class Project(Budget):
 class Message(BaseModel):
     body: str = Field(min_length=1,max_length=2000)
 
-class EditProject(Budget):
+class EditProject(MeasuredBudget):
     content_version: StrictInt = Field(ge=0)
     title: str = Field(min_length=5,max_length=120)
     description: str = Field(min_length=20,max_length=5000)
@@ -858,8 +860,8 @@ def my_profile(user=Depends(require('professional'))):
 @app.post('/api/projects',status_code=201)
 def create_project(body:Project,user=Depends(require('requester'))):
     with authenticated_db(user,write=True) as c:
-        cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at,budget_min,budget_max) VALUES(?,?,?,?,?,?,?,?)',
-                  (user['id'],body.title.strip(),body.description.strip(),body.trade,body.town.strip(),now(),body.budget_min,body.budget_max))
+        cur=c.execute('INSERT INTO projects(requester_id,title,description,trade,town,created_at,budget_min,budget_max,dimensions_json) VALUES(?,?,?,?,?,?,?,?,?)',
+                  (user['id'],body.title.strip(),body.description.strip(),body.trade,body.town.strip(),now(),body.budget_min,body.budget_max,json.dumps(body.dimensions.populated())))
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                   (user['id'],'create_project','project',cur.lastrowid,now()))
         c.execute('COMMIT')
@@ -895,12 +897,14 @@ def edit_project(project_id:int,body:EditProject,user=Depends(require('requester
         values={k:getattr(body,k) if k in body.model_fields_set else project[k] for k in ('budget_min','budget_max')}
         try:Budget.model_validate(values)
         except ValueError:error(422,'Le budget minimum ne peut pas dépasser le maximum')
-        changed=any(value!=project[key] for key,value in {'title':body.title,'description':body.description,**values}.items())
+        original_dimensions=json.loads(project['dimensions_json'] or '{}')
+        dimensions=body.dimensions.populated() if 'dimensions' in body.model_fields_set else original_dimensions
+        changed=any(value!=project[key] for key,value in {'title':body.title,'description':body.description,**values}.items()) or dimensions!=original_dimensions
         if not (changed or trade_changed or town_changed):
             return {'ok':True,'status':'open','content_version':body.content_version,'notified':0,'changed':False}
         if trade_changed:c.execute('UPDATE projects SET trades_json=? WHERE id=?',(json.dumps([body.trade]),project_id))
-        c.execute('UPDATE projects SET title=?,description=?,trade=?,town=?,budget_min=?,budget_max=?,content_version=content_version+1 WHERE id=?',
-                  (body.title,body.description,body.trade,body.town,values['budget_min'],values['budget_max'],project_id))
+        c.execute('UPDATE projects SET title=?,description=?,trade=?,town=?,budget_min=?,budget_max=?,dimensions_json=?,content_version=content_version+1 WHERE id=?',
+                  (body.title,body.description,body.trade,body.town,values['budget_min'],values['budget_max'],json.dumps(dimensions),project_id))
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                   (user['id'],'edit_project','project',project_id,now()))
         pending=[a for a in applications if a['status']=='pending']
@@ -1245,7 +1249,7 @@ def send_message(aid:int,body:Message,request:Request,user=Depends(get_user)):
 def account_export(user=Depends(get_user)):
     # Limited lab export: only the authenticated participant's records, never another user's messages.
     with authenticated_db(user,write=False) as c:
-        projects_owned=[dict(r) for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,applications_paused,intake_version,content_version,cancelled,suspended FROM projects WHERE requester_id=?',(user['id'],))]
+        projects_owned=[dict(r)|{'dimensions':json.loads(r['dimensions_json'] or '{}')} for r in c.execute('SELECT id,title,description,trade,trades_json,town,status,created_at,budget_min,budget_max,dimensions_json,applications_paused,intake_version,content_version,cancelled,suspended FROM projects WHERE requester_id=?',(user['id'],))]
         own_drafts=[dict(r) for r in c.execute('SELECT id,payload,version,project_id,updated_at FROM drafts WHERE owner_id=?',(user['id'],))]
         import base64
         own_photos=[{'id':r['id'],'draft_id':r['draft_id'],'jpeg_base64':base64.b64encode(r['body']).decode()} for r in c.execute('SELECT photos.id,draft_id,body FROM photos JOIN drafts ON drafts.id=photos.draft_id WHERE drafts.owner_id=?',(user['id'],))]
