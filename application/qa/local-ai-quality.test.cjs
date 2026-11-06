@@ -30,6 +30,30 @@ test('plain dialogue prompt explains role-specific UCP capabilities without a gi
  const draft=ai.buildPrompt('draft',{role:'requester',catalog:[{id:'plomberie',label:'Plomberie'}]});
  assert.match(draft,/plomberie : Plomberie/);
 });
+test('Yahya prompts specify actual requester and professional UCP navigation, without fake account access',async()=>{
+ const ai=await load();
+ const requester=ai.buildPrompt('reply',{role:'requester',catalog:[]});
+ assert.match(requester,/Mes projets/);
+ assert.match(requester,/trois étapes/);
+ assert.match(requester,/ne demande pas d’adresse précise/);
+ assert.match(requester,/préproduction/);
+ assert.match(requester,/ni lire leurs projets réels/);
+ const professional=ai.buildPrompt('reply',{role:'professional',catalog:[]});
+ assert.match(professional,/Mon profil/);
+ assert.match(professional,/Mes candidatures/);
+ assert.match(professional,/Messages après sélection/);
+ assert.match(professional,/assurances ou certifications/);
+ assert.doesNotMatch(professional,/ni lire leurs projets réels/);
+});
+
+test('model quality gate distinguishes vague nonanswers from direct UCP advice',async()=>{
+ const ai=await load();
+ const last=[{role:'user',content:'Tu peux faire quoi pour moi ?'}];
+ assert.equal(ai.isGenericNonanswer('Pouvez-vous me donner plus de détails ?',last),true);
+ assert.equal(ai.isGenericNonanswer('Dans Mes projets, décrivez vos travaux et créez un brouillon.',last),false);
+ assert.equal(ai.isGenericNonanswer('Pouvez-vous me donner plus de détails ?',[{role:'user',content:'Quels matériaux pour la toiture ?'}]),false);
+});
+
 test('detects repetitive UCP replies like the user-reported conversation',async()=>{
  const ai=await load();
  const first="D'accord, je vais essayer de vous aider à préparer une proposition de marché. Pourriez-vous me donner plus de détails sur ce qu'il y a à faire ?";
