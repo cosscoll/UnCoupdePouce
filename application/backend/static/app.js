@@ -432,7 +432,35 @@ async function renderProjects(n){
   const core=el('div',{class:'search-core'},q,...(req?[]:[trade,town]));
   form.append(core,advanced,el('div',{class:'search-actions'},order,el('button',{type:'submit',class:'primary',text:req?'Filtrer':'Rechercher les chantiers'}),reset));
   const list=el('div',{class:'project-list'}),count=el('p',{class:'count',role:'status','aria-live':'polite',tabindex:'-1'});
-  n.append(form,count,list);
+  const presets=[
+   {label:'Tous les délais',timing:'',published:''},
+   {label:'Dès que possible',timing:'urgent',published:''},
+   {label:'Dans le mois',timing:'month',published:''},
+   {label:'7 derniers jours',timing:'',published:'7'}
+  ];
+  const shortcuts=!req?el('section',{class:'pro-search-shortcuts',role:'group','aria-label':'Filtres rapides de chantiers'},
+   el('p',{class:'small muted',text:'Accès rapide · conservez vos autres critères, comme la commune et le métier.'})):null;
+  const presetButtons=[];
+  function syncShortcuts(){
+   if(!shortcuts)return;
+   const timing=form.querySelector('[name=timing]').value,published=form.querySelector('[name=published_within]').value;
+   for(const [preset,control] of presetButtons)control.setAttribute('aria-pressed',String(timing===preset.timing&&published===preset.published));
+  }
+  if(shortcuts){
+   for(const preset of presets){
+    const control=button(preset.label,()=>{
+     if(epoch!==renderEpoch||appState.user?.id!==owner)return;
+     form.querySelector('[name=timing]').value=preset.timing;
+     form.querySelector('[name=published_within]').value=preset.published;
+     syncShortcuts();
+     action(()=>load());
+    },'pro-preset');
+    presetButtons.push([preset,control]);shortcuts.append(control);
+   }
+   form.addEventListener('change',syncShortcuts);
+   syncShortcuts();
+  }
+  n.append(form,shortcuts,count,list);
   if(!req)n.append(el('p',{class:'hint',text:'La commune correspond aux zones déclarées de votre profil ou d’un profil lié actif. Aucun rayon ni temps de trajet n’est calculé.'}));
   function draw(rows){
     clear(list);count.textContent=rows.length+' projet'+(rows.length>1?'s':'')+' selon vos critères';
@@ -448,6 +476,7 @@ async function renderProjects(n){
   }
   let seq=0;
   async function load(){
+    syncShortcuts();
     const turn=++seq,values=formValue(form),params=new URLSearchParams();
     for(const [k,v] of Object.entries(values))if(v)params.set(k,v);
     try{const result=await api('/projects'+(params.size?'?'+params.toString():''));
