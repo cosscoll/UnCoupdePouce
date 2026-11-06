@@ -289,7 +289,7 @@ function create(hooks){
   hooks.show(ui);
   allowed();
   if(!model.configured)status.textContent=model.reason||'Ce navigateur ne prend pas en charge le modèle local.';
-  if(model.configured)textarea.focus();
+  if(model.configured&&!root.matchMedia?.('(max-width:680px)')?.matches)textarea.focus();
  }
  return {open,sync,clear};
 }
