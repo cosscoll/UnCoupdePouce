@@ -31,6 +31,97 @@ async function boot(overrides={},configure=null,url='http://localhost:8765/#proj
 function input(w,selector,value){const n=w.document.querySelector(selector);assert.ok(n,selector);n.value=value;n.dispatchEvent(new w.Event('input',{bubbles:true}));}
 function submit(w,selector){w.document.querySelector(selector).dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));}
 
+test('F46 conversations can be searched locally and opened only on explicit selection',async()=>{
+ const x=await boot({
+  '/api/session':{id:2,name:'Artisan',role:'professional',csrf:'pro-token'},
+  '/api/conversations':{items:[
+   {application_id:11,title:'Rénovation de salle de bains',peer:'Alice'},
+   {application_id:12,title:'Réparation cuisine',peer:'Benoît'},
+   {application_id:13,title:'Isolation toiture',peer:'Chloé'}
+  ]},
+  'GET /api/conversations/12/messages':{items:[{id:52,sender_id:5,body:'Bonjour pour la cuisine.',created_at:'2026-11-05T14:00:00Z'}]}
+ },null,'http://localhost:8765/professionnel#conversations');
+ try{
+  const d=x.w.document;
+  assert.equal(d.querySelectorAll('.conversation-choice').length,3);
+  assert.match(d.querySelector('.conversation-list').textContent,/aucun accusé de lecture/i);
+  assert.equal(x.calls.filter(c=>c.url.includes('/messages')).length,0,'chat history is not fetched before selection');
+  input(x.w,'.conversation-search-label input','cuisine');
+  assert.equal(d.querySelectorAll('.conversation-choice').length,1);
+  assert.match(d.querySelector('.conversation-list [role=status]').textContent,/1 conversation/);
+  const selected=d.querySelector('.conversation-choice');
+  selected.click();await tick();
+  assert.equal(selected.getAttribute('aria-pressed'),'true');
+  assert.match(d.querySelector('.chat-log').textContent,/Bonjour pour la cuisine/);
+  assert.ok(x.calls.some(c=>c.url==='/api/conversations/12/messages'));
+  input(x.w,'.conversation-search-label input','nom inexistant');
+  assert.match(d.querySelector('.conversation-list').textContent,/Aucune conversation ne correspond/);
+  assert.equal(d.querySelectorAll('.conversation-choice').length,0);
+ }finally{x.close()}
+});
+
+test('F46-F50 message composer rejects blank messages and explains safe network retry',async()=>{
+ let attempts=0;
+ const x=await boot({
+  'GET /api/conversations/12/messages':{items:[]},
+  'POST /api/conversations/12/messages':()=>{if(++attempts===1)throw Error('réponse réseau perdue');return {id:8,ok:true}}
+ });
+ try{
+  const holder=x.w.document.createElement('section');x.w.document.body.append(holder);
+  await x.w.openChat(holder,{application_id:12,peer:'Atelier',title:'Cuisine'});
+  const send=holder.querySelector('button[type=submit]'),textarea=holder.querySelector('textarea');
+  assert.equal(send.disabled,true,'empty messages are never sendable');
+  input(x.w,'body > section .chat-compose textarea','   ');
+  assert.equal(send.disabled,true,'whitespace does not enable send');
+  input(x.w,'body > section .chat-compose textarea','Bonjour, pouvez-vous examiner le chantier ?');
+  assert.equal(send.disabled,false);
+  submit(x.w,'body > section .chat-compose');await tick();
+  assert.equal(attempts,1,'no automatic resend after an uncertain network result');
+  assert.match(holder.querySelector('.chat-send-status').textContent,/Envoi non confirmé/);
+  assert.equal(textarea.value,'Bonjour, pouvez-vous examiner le chantier ?');
+  assert.match(send.textContent,/Réessayer/);
+  assert.equal(send.disabled,false);
+  submit(x.w,'body > section .chat-compose');await tick();
+  const posts=x.calls.filter(c=>c.method==='POST');
+  assert.equal(posts.length,2);
+  assert.equal(posts[0].headers['Idempotency-Key'],posts[1].headers['Idempotency-Key']);
+  assert.equal(textarea.value,'');
+  assert.equal(send.disabled,true);
+  assert.match(holder.querySelector('.chat-send-status').textContent,/confirmé par le serveur/);
+  assert.match(holder.textContent,/Contacter l’assistance/);
+ }finally{x.close()}
+});
+
+test('F49 support report filters are scoped to loaded own reports and preserve private text',async()=>{
+ const x=await boot({
+  '/api/v4/reports':{items:[
+   {id:11,kind:'message',target_id:6,reason:'Signalement en cours <img src=x>',status:'open',created_at:'2026-11-05T10:00:00Z'},
+   {id:10,kind:'conversation',target_id:3,reason:'Problème traité',status:'resolved',resolution:'Examen terminé.',created_at:'2026-11-04T10:00:00Z'}
+  ],next_before_id:10},
+  '/api/v4/reports?before_id=10':{items:[
+   {id:9,kind:'project',target_id:4,reason:'Ancien incident',status:'open',created_at:'2026-11-03T10:00:00Z'}
+  ],next_before_id:null}
+ });
+ try{
+  await x.w.go('support');
+  const d=x.w.document,view=d.querySelector('#view'),filter=view.querySelector('[name=report_filter]');
+  const list=view.querySelector('.support-report-list');
+  assert.equal(list.querySelectorAll('.panel').length,2);
+  assert.equal(list.querySelector('img'),null);
+  assert.match(list.textContent,/<img src=x>/);
+  filter.value='resolved';filter.dispatchEvent(new x.w.Event('change'));
+  assert.equal(list.querySelectorAll('.panel').length,1);
+  assert.match(list.textContent,/Examen terminé/);
+  assert.doesNotMatch(list.textContent,/Signalement en cours/);
+  [...view.querySelectorAll('button')].find(b=>b.textContent==='Voir les signalements plus anciens').click();await tick();
+  filter.value='open';filter.dispatchEvent(new x.w.Event('change'));
+  assert.equal(list.querySelectorAll('.panel').length,2);
+  assert.match(view.querySelector('.support-report-list').textContent,/Ancien incident/);
+  assert.match(view.querySelector('.support-report-list').parentElement.querySelector('[aria-live]').textContent,/2 signalement/);
+  assert.ok(x.calls.some(c=>c.url==='/api/v4/reports?before_id=10'));
+ }finally{x.close()}
+});
+
 test('chat retry preserves idempotency key after lost response',async()=>{
  let attempts=0;
  const x=await boot({'GET /api/conversations/12/messages':{items:[]},'POST /api/conversations/12/messages':()=>{if(++attempts===1)throw Error('response lost');return {id:3,ok:true}}});
@@ -360,7 +451,7 @@ test('late failure from an old conversation cannot hide the current chat or stop
   await x.w.openChat(holder,{application_id:12,peer:'Actuel',title:'Actuel'});const current=timers.length;
   finish({status:403,data:{detail:'Ancien accès révoqué'}});await old;
   assert.match(holder.textContent,/Conversation actuelle/);assert.doesNotMatch(holder.textContent,/Ancien accès révoqué/);
-  assert.equal(cleared.includes(current),false);assert.equal(holder.querySelector('button[type=submit]').disabled,false);
+  assert.equal(cleared.includes(current),false);assert.equal(holder.querySelector('button[type=submit]').disabled,true,'empty compose field is not sendable');
  }finally{x.close()}
 });
 
