@@ -97,7 +97,19 @@ window.addEventListener('popstate',onHistoryChange);
 window.addEventListener('hashchange',onHistoryChange);
 function focusPageHeading(){const target=$('#view h2')||$('#view h3')||$('#main');target.setAttribute('tabindex','-1');target.focus()}
 function setNavigationOpen(open){const toggle=$('#navigation-toggle');$('.sidebar').dataset.navigationOpen=String(open);toggle.setAttribute('aria-expanded',String(open))}
-function showDialog(title,content){++dialogEpoch;const dialog=$('#dialog'),wasOpen=dialog.open;if(!wasOpen)dialogReturnFocus=document.activeElement;const n=clear($('#dialog-content')),heading=el('h3',{id:'dialog-title',tabindex:'-1',text:title});n.append(heading,content);dialog.setAttribute('aria-labelledby','dialog-title');dialog.showModal();(wasOpen?heading:n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]')||$('#dialog-close')).focus()}
+function showDialog(title,content){
+ ++dialogEpoch;
+ const dialog=$('#dialog'),wasOpen=dialog.open;
+ if(!wasOpen)dialogReturnFocus=document.activeElement;
+ const n=clear($('#dialog-content')),heading=el('h3',{id:'dialog-title',tabindex:'-1',text:title});
+ n.append(heading,content);
+ dialog.setAttribute('aria-labelledby','dialog-title');
+ dialog.showModal();
+ // On narrow touch screens, do not summon the virtual keyboard before a form field is requested.
+ const mobile=window.matchMedia?.('(max-width:680px)')?.matches===true;
+ const first=n.querySelector('input:not([type=hidden]):not([disabled]),select:not([disabled]),textarea:not([disabled]),button:not([disabled]),a[href]');
+ (wasOpen||mobile?heading:first||$('#dialog-close')).focus();
+}
 function ask(title,desc,fn,success){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const dialogToken=dialogEpoch;const r=await action(fn,success);if(r){if(dialogToken===dialogEpoch&&$('#dialog').open)$('#dialog').close();const token=renderEpoch+1;await render();if(token===renderEpoch&&!$('#dialog').open)focusPageHeading()}},'primary'));showDialog(title,body)}
 function roleNavigation(role){
  const items=role==='requester'?[['requester-home','Mon accueil','home'],['projects','Mes projets','projects'],['conversations','Messages','messages']]:role==='professional'?[['professional-home','Vue d’ensemble','home'],['projects','Trouver des projets','search'],['favorites','Mes favoris','heart'],['applications','Mes candidatures','briefcase'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','people']]:[['admin','Vue d’ensemble','home'],['moderation','Modération','shield'],['catalog','Métiers du bâtiment','settings']];
@@ -1534,6 +1546,11 @@ function clearAccountSession(){
 }
 $('#logout').addEventListener('click',async()=>{const r=await action(()=>api('/logout',{method:'POST'}));if(r)await clearAccountSession()});
 $('#navigation-toggle').addEventListener('click',()=>setNavigationOpen($('#navigation-toggle').getAttribute('aria-expanded')!=='true'));
+document.addEventListener('pointerdown',event=>{
+ const toggle=$('#navigation-toggle'),sidebar=$('.sidebar');
+ if(toggle.getAttribute('aria-expanded')==='true'&&event.target instanceof Element&&!sidebar.contains(event.target))
+  setNavigationOpen(false);
+});
 $('.sidebar').addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#navigation-toggle').getAttribute('aria-expanded')==='true'){e.preventDefault();setNavigationOpen(false);$('#navigation-toggle').focus()}});
 $('#dialog').addEventListener('close',()=>{if($('#dialog').open)return;const previous=dialogReturnFocus;dialogReturnFocus=null;if(previous?.isConnected&&!previous.disabled&&!previous.closest('[hidden],dialog:not([open])'))previous.focus();else focusPageHeading()});
 $('#dialog-close').addEventListener('click',()=>$('#dialog').close());
