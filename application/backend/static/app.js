@@ -111,6 +111,58 @@ function showDialog(title,content){
  (wasOpen||mobile?heading:first||$('#dialog-close')).focus();
 }
 function ask(title,desc,fn,success){const body=el('div',{},el('p',{text:desc}),button('Confirmer',async()=>{const dialogToken=dialogEpoch;const r=await action(fn,success);if(r){if(dialogToken===dialogEpoch&&$('#dialog').open)$('#dialog').close();const token=renderEpoch+1;await render();if(token===renderEpoch&&!$('#dialog').open)focusPageHeading()}},'primary'));showDialog(title,body)}
+
+function openBetaFeedback(){
+ const role=appState.user?.role;
+ if(!['requester','professional'].includes(role))return;
+ const form=el('form',{class:'beta-feedback-form'},
+  el('p',{class:'hint',text:'Votre retour est transmis uniquement à l’assistance UCP. Ne donnez aucun mot de passe, coordonnées réelles ou photo personnelle.'}),
+  field('Sur quelle étape êtes-vous bloqué ?','subject','text',{minlength:5,maxlength:105,placeholder:'Exemple : envoyer une candidature'}),
+  field('Que s’est-il passé ?','body','textarea',{minlength:10,maxlength:1940,placeholder:'J’ai essayé de… Je pensais obtenir… À la place, j’ai observé… Appareil ou navigateur (facultatif).'}),
+  el('button',{type:'submit',class:'primary',text:'Envoyer mon retour de test'}));
+ form.addEventListener('submit',async event=>{
+  event.preventDefault();
+  if(!appState.user||appState.user.role!==role)return;
+  const values=formValue(form),token=dialogEpoch;
+  const payload={category:'other',subject:'Bêta UCP : '+values.subject.trim(),
+   body:'Parcours : '+(role==='requester'?'particulier':'professionnel')+'\n'+values.body.trim()};
+  const result=await action(()=>api('/v4/support',{method:'POST',body:payload}),
+   'Retour de test enregistré dans Assistance.');
+  if(result&&token===dialogEpoch&&$('#dialog').open){$('#dialog').close();await go('support')}
+ });
+ showDialog('Signaler un problème pendant le test',form);
+}
+function openBetaGuide(){
+ const role=appState.user?.role||entrySpace,professional=role==='professional';
+ const logged=!!appState.user&&['requester','professional'].includes(appState.user.role);
+ const steps=professional?[
+  ['1. Complétez votre profil','Déclarez un métier et une commune fictifs ; l’accès de test doit ensuite être validé par l’équipe UCP.','profile','Ouvrir mon profil'],
+  ['2. Recherchez un chantier','Filtrez les projets correspondant à votre métier et votre commune. Un particulier testeur doit déjà avoir publié un projet.','projects','Chercher des chantiers'],
+  ['3. Déposez une candidature','Après autorisation de votre profil et activation des droits de test, postulez et suivez votre statut. Aucun paiement réel.','applications','Suivre mes candidatures'],
+  ['4. Échangez avec le particulier','Le particulier doit d’abord vous sélectionner et les droits de conversation doivent être actifs.','conversations','Ouvrir mes messages']
+ ]:[
+  ['1. Créez une annonce fictive','Décrivez des travaux imaginaires, précisez une commune et vérifiez les informations avant de publier.','projects','Créer une annonce'],
+  ['2. Consultez les candidatures','Un artisan testeur doit déposer une candidature compatible avec votre chantier fictif.','projects','Suivre mon projet'],
+  ['3. Sélectionnez un professionnel','Comparez les candidatures et confirmez explicitement le choix de l’artisan testeur.','projects','Voir mes projets'],
+  ['4. Envoyez un message','Retrouvez votre conversation privée après sélection et activation des droits de test.','conversations','Ouvrir mes messages']
+ ];
+ const list=el('ol',{class:'beta-steps'});
+ for(const [title,explanation,view,label] of steps){
+  const item=el('li',{class:'beta-step'},el('strong',{text:title}),el('p',{text:explanation}));
+  if(logged)item.append(button(label,()=>{$('#dialog').close();go(view)},'outline beta-step-action'));
+  list.append(item);
+ }
+ const body=el('section',{class:'beta-guide',role:'region','aria-label':'Parcours de test de l’application'},
+  el('p',{class:'beta-guide-note',text:'Bêta privée. Testez avec des comptes, travaux et photos entièrement fictifs. Ne communiquez aucune donnée personnelle ni identifiant à d’autres testeurs.'}),
+  el('p',{class:'small muted',text:professional?'Parcours professionnel : validation manuelle de test avant toute candidature.':'Parcours particulier : utilisez un chantier inventé, sans adresse précise.'}),
+  list,el('p',{class:'hint',text:'Ce guide ne coche aucune étape automatiquement. Vos actions et résultats restent sous votre contrôle ; aucun paiement réel ou certification professionnelle n’est effectué.'}));
+ if(logged)body.append(el('div',{class:'beta-guide-actions'},
+  button('Signaler un problème de test',openBetaFeedback,'primary'),
+  button('Voir mes demandes d’assistance',()=>{$('#dialog').close();go('support')},'outline')));
+ else body.append(el('p',{class:'status-note',text:'Connectez-vous avec un compte de test ou créez un compte fictif pour suivre ces étapes. Les accès à la préproduction sont délivrés séparément par l’équipe UCP.'}));
+ showDialog('Tester UCP — parcours guidé',body);
+}
+
 function roleNavigation(role){
  const items=role==='requester'?[['requester-home','Mon accueil','home'],['projects','Mes projets','projects'],['conversations','Messages','messages']]:role==='professional'?[['professional-home','Vue d’ensemble','home'],['projects','Trouver des projets','search'],['favorites','Mes favoris','heart'],['applications','Mes candidatures','briefcase'],['conversations','Messages','messages'],['profile','Mon profil','profile'],['enterprise','Mon entreprise','people']]:[['admin','Vue d’ensemble','home'],['moderation','Modération','shield'],['catalog','Métiers du bâtiment','settings']];
  return [...items,['support','Assistance','help'],['notifications','Notifications','bell'],['personal-data','Mon compte','profile']];
@@ -145,7 +197,7 @@ function menu(){
 async function render(){
  guidedHelp?.sync();const hasAssistant=!!appState.user&&['requester','professional'].includes(appState.user.role);$('#chatbot-launcher').hidden=!hasAssistant;
  ++chatEpoch;const epoch=++renderEpoch;clearInterval(chatTimer);chatTimer=null;const u=appState.user;
- $('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#account-actions').hidden=true;
+ $('#anonymous').hidden=!!u;$('#dashboard').hidden=!u;$('#account-actions').hidden=true;$('#beta-help').hidden=!!u&&!['requester','professional'].includes(u.role);
  document.body.dataset.space=u?.role||entrySpace;
  if(!u){document.title='Un Coup de Pouce · Votre espace travaux';return}
  $('#actor-role').textContent={requester:'ESPACE PARTICULIER',professional:'ESPACE PROFESSIONNEL',admin:'ADMINISTRATION'}[u.role];
@@ -1545,6 +1597,8 @@ function clearAccountSession(){
  return render();
 }
 $('#logout').addEventListener('click',async()=>{const r=await action(()=>api('/logout',{method:'POST'}));if(r)await clearAccountSession()});
+$('#beta-start').addEventListener('click',openBetaGuide);
+$('#beta-help').addEventListener('click',openBetaGuide);
 $('#navigation-toggle').addEventListener('click',()=>setNavigationOpen($('#navigation-toggle').getAttribute('aria-expanded')!=='true'));
 document.addEventListener('pointerdown',event=>{
  const toggle=$('#navigation-toggle'),sidebar=$('.sidebar');
@@ -1573,6 +1627,7 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Sur téléphone : un bouton « Installer UCP sur ce téléphone » ouvre la procédure PWA depuis le tableau de bord ; aucune installation automatique et pas de publication sur les stores.'}),
    el('li',{text:'Sur téléphone : les fenêtres s’ouvrent sans afficher immédiatement le clavier ; le menu se ferme au toucher extérieur, et les notifications de connexion disposent d’un bouton Masquer.'}),
    el('li',{text:'Accessibilité : navigation repliable aussi sur les fenêtres de 681 à 960 pixels CSS (dont le zoom à 200 % sur certains écrans), formulaires plus lisibles et états sélectionnés visibles en contraste renforcé.'}),
+   el('li',{text:'Bêta privée : un guide de parcours distinct pour particuliers et professionnels et un formulaire de retour transmis à Assistance, sans paiement réel ni création automatique de compte.'}),
    el('li',{text:'Messagerie mobile : un seul défilement pour la liste de conversations, sélection tactile lisible et saisie de message plus confortable.'}),
    el('li',{text:'Messagerie : recherche locale par projet ou interlocuteur et ouverture du fil sur clic explicite. Les droits restent vérifiés par le serveur à chaque accès.'}),
    el('li',{text:'Envoi de message : le bouton exige un texte non vide, indique les envois non confirmés et propose un réessai avec le même identifiant pour éviter les doublons. Aucun renvoi automatique.'}),

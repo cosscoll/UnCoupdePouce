@@ -551,3 +551,21 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
  .hint,.quiet,.mini{color:var(--ink)}
  .outline,.navlink,.conversation-choice{border-color:#74788e}
 }
+
+/* Bêta privée : discreet entrypoint, role-specific steps and accessible feedback. */
+.beta-entry-link{width:100%;margin-top:13px;min-height:44px;text-align:center;background:#fff;border:1px solid #a5aaca;font-size:12px}
+.beta-guide-link{min-height:44px;padding:9px 13px;border:1px solid #969fc8;border-radius:9px;background:#fff;color:#3644a0;font-size:12px;font-weight:700}
+.beta-guide-link:hover,.beta-entry-link:hover{background:#eef0fc}
+.beta-guide{display:grid;gap:14px}
+.beta-guide-note{padding:12px 14px;border-left:3px solid var(--violet);border-radius:7px;background:#f5f6fc;line-height:1.6}
+.beta-guide .hint{line-height:1.6}
+.beta-steps{display:grid;gap:12px;margin:0;padding:0;list-style:none}
+.beta-step{min-width:0;padding:14px 16px;border:1px solid #e0e3ee;border-radius:10px;background:#fff;line-height:1.5}
+.beta-step strong{display:block;font:700 13px Montserrat,Arial,sans-serif;color:var(--ink)}
+.beta-step p{margin:8px 0 10px;font-size:12px;line-height:1.65;color:#424660}
+.beta-step .beta-step-action{min-height:44px;min-width:165px;font-size:12px;white-space:normal}
+.beta-guide-actions{display:flex;gap:9px;flex-wrap:wrap}
+.beta-guide-actions button{min-height:44px;font-size:12px;white-space:normal}
+.beta-feedback-form textarea{min-height:150px}
+@media(max-width:680px){.beta-guide-link{flex:0 0 auto}.beta-guide-actions{display:grid}.beta-step{padding:13px}.beta-step .beta-step-action,.beta-guide-actions button{width:100%}}
+@media(max-width:360px){.accountbar-meta .beta-guide-link{flex:1 1 100%}}

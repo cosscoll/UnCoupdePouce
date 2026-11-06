@@ -1940,11 +1940,103 @@ test('UX audit: account screen keeps install and logout after personal informati
  }finally{x.close()}
 });
 
+
+test('private beta guide explains fictitious test data before login and never changes a user',async()=>{
+ const x=await boot();
+ try{
+  const d=x.w.document;
+  assert.ok(d.querySelector('#beta-start'));
+  x.w.eval("appState.user=null;entrySpace='requester'");
+  x.w.openBetaGuide();
+  assert.match(d.querySelector('#dialog').textContent,/parcours particulier/);
+  assert.match(d.querySelector('#dialog').textContent,/travaux imaginaires/);
+  assert.match(d.querySelector('#dialog').textContent,/Connectez-vous/);
+  assert.equal(d.querySelector('#dialog .beta-step-action'),null);
+  d.querySelector('#dialog-close').click();
+  x.w.eval("entrySpace='professional'");
+  x.w.openBetaGuide();
+  assert.match(d.querySelector('#dialog').textContent,/validation manuelle de test/);
+  assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
+ }finally{x.close()}
+});
+test('requester beta guide opens the real projects page on explicit click',async()=>{
+ const x=await boot();
+ try{
+  const d=x.w.document;
+  d.querySelector('#beta-help').click();
+  assert.equal(d.querySelectorAll('.beta-step').length,4);
+  assert.match(d.querySelector('.beta-guide').textContent,/chantier inventé/);
+  assert.equal(d.querySelectorAll('.beta-steps input[type=checkbox]').length,0);
+  const open=[...d.querySelectorAll('.beta-step-action')].find(b=>b.textContent==='Créer une annonce');
+  assert.ok(open);open.click();await tick();
+  assert.equal(d.querySelector('#dialog').open,false);
+  assert.equal(x.w.location.hash,'#projects');
+  assert.match(d.querySelector('#view h2').textContent,/Mes projets/);
+ }finally{x.close()}
+});
+test('professional beta guide shows the approval requirement and profile entry',async()=>{
+ const x=await boot({
+  '/api/session':{id:2,name:'Pro test',role:'professional',csrf:'pro-token'},
+  '/api/projects':{items:[],search_scope:'profile_required'},
+  '/api/my-applications':{items:[]},'/api/conversations':{items:[]},
+  '/api/notifications?unread_only=true':{unread:0,items:[]}
+ });
+ try{
+  const d=x.w.document;
+  d.querySelector('#beta-help').click();
+  assert.match(d.querySelector('.beta-guide').textContent,/validation manuelle de test/);
+  assert.match(d.querySelector('.beta-guide').textContent,/aucun paiement réel/i);
+  const open=[...d.querySelectorAll('.beta-step-action')].find(b=>b.textContent==='Ouvrir mon profil');
+  assert.ok(open);open.click();await tick();
+  assert.equal(x.w.location.hash,'#profile');
+  assert.ok(x.calls.some(c=>c.url==='/api/my-profile'));
+ }finally{x.close()}
+});
+test('beta feedback posts one private support ticket with CSRF and role',async()=>{
+ const x=await boot({
+  'POST /api/v4/support':{id:82,status:'open'},
+  '/api/v4/support':{items:[],next_before_id:null,categories:{other:'Autre demande'}}
+ });
+ try{
+  const d=x.w.document;
+  d.querySelector('#beta-help').click();
+  [...d.querySelectorAll('.beta-guide-actions button')].find(b=>b.textContent==='Signaler un problème de test').click();
+  input(x.w,'#dialog [name=subject]','Publication fictive');
+  input(x.w,'#dialog [name=body]','Le titre ne s’affiche pas après la publication.');
+  submit(x.w,'#dialog form');await tick();await tick();
+  const writes=x.calls.filter(c=>c.method==='POST');
+  assert.equal(writes.length,1);
+  const sent=writes[0];
+  assert.equal(sent.url,'/api/v4/support');
+  assert.equal(sent.headers['x-ucp-csrf'],'test-token');
+  assert.equal(sent.body.category,'other');
+  assert.match(sent.body.subject,/^Bêta UCP : Publication/);
+  assert.match(sent.body.body,/Parcours : particulier/);
+  assert.equal(d.querySelector('#dialog').open,false);
+  assert.equal(x.w.location.hash,'#support');
+ }finally{x.close()}
+});
+test('beta feedback preserves form contents after a server error',async()=>{
+ const x=await boot({'POST /api/v4/support':{status:503,data:{detail:'Support temporairement indisponible'}}});
+ try{
+  const d=x.w.document;
+  d.querySelector('#beta-help').click();
+  [...d.querySelectorAll('.beta-guide-actions button')].find(b=>b.textContent==='Signaler un problème de test').click();
+  input(x.w,'#dialog [name=subject]','Test de candidature');
+  input(x.w,'#dialog [name=body]','Je ne vois pas la candidature dans mon tableau.');
+  submit(x.w,'#dialog form');await tick();
+  assert.equal(d.querySelector('#dialog').open,true);
+  assert.equal(d.querySelector('#dialog [name=body]').value,'Je ne vois pas la candidature dans mon tableau.');
+  assert.match(d.querySelector('#alert').textContent,/Support temporairement indisponible/);
+  assert.equal(x.w.location.hash,'#projects');
+ }finally{x.close()}
+});
+
 test('UX release: clearly labelled 2026-11-06 version and versioned static assets are present',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- assert.match(html,/Nouveau : navigation et lisibilité au zoom améliorées · 6 novembre 2026/);
+ assert.match(html,/Nouveau : parcours bêta et retours de test intégrés · 6 novembre 2026/);
  for(const name of ['style.css','analytics.js','local-ai.js','assistant-ai.js','app.js','pwa.js']){
-  assert.ok(html.includes('/assets/'+name+'?v=ucp-reflow-20261106'),name+' should be release-versioned');
+  assert.ok(html.includes('/assets/'+name+'?v=ucp-beta-20261106'),name+' should be release-versioned');
  }
  const x=await boot();
  try{
@@ -1961,6 +2053,7 @@ test('UX release: clearly labelled 2026-11-06 version and versioned static asset
   assert.match(x.w.document.querySelector('#dialog').textContent,/Installer UCP sur ce téléphone/);
   assert.match(x.w.document.querySelector('#dialog').textContent,/toucher extérieur/);
   assert.match(x.w.document.querySelector('#dialog').textContent,/681 à 960 pixels/);
+  assert.match(x.w.document.querySelector('#dialog').textContent,/Bêta privée : un guide de parcours/);
   assert.match(x.w.document.querySelector('#dialog').textContent,/2026\.11\.06/);
  }finally{x.close()}
 });
