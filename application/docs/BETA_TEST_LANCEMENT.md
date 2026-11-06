@@ -128,3 +128,23 @@ signalements » ouvre la modération existante.
 
 Ces éléments servent à préparer le groupe de testeurs **après** leur
 inscription, pas à générer ou inviter automatiquement des comptes.
+
+
+## Espace administrateur — préparation de la cohorte (6 novembre)
+
+L'accueil administrateur affiche une rubrique **Préparer les tests utilisateurs** :
+nombre de comptes particuliers, profils professionnels à examiner, profils approuvés
+sans accès aux conversations, profils à accès de test actif. Ces chiffres sont lus
+dans les données de préproduction ; **ils incluent les anciens comptes** et ne
+mesurent ni les invitations réellement envoyées ni les tests achevés. Les tâches
+externes (accès Vercel/Basic, sauvegarde réelle, recette téléphones) restent
+explicitement non vérifiées.
+
+La liste des professionnels se filtre localement entre **Tous**, **À examiner**,
+**Accès à activer** et **Accès actifs**. Les actions d'autorisation, d'activation
+des conversations et de retrait d'accès demandent une confirmation. Le retrait
+désactive uniquement le droit simulé d'échanger dans les conversations :
+l'autorisation du profil est conservée, les anciens messages ne sont pas effacés,
+les décisions sont journalisées et le professionnel est notifié. Une réactivation
+recontrôle les droits comme avant. Il ne s'agit **pas** d'un système d'invitations
+Vercel ou de gestion d'une cohorte nominative.

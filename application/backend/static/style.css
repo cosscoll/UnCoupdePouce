@@ -588,3 +588,25 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
 @media(max-width:1050px){.beta-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:520px){.beta-admin-metrics{gap:8px}.beta-admin-metric{padding:13px}.beta-admin-metric strong{font-size:25px}.beta-admin-filters button{flex:1 1 44%}.beta-admin-actions button{width:100%}}
 @media(forced-colors:active){.beta-admin-filters button[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:2px}}
+
+/* F bêta : revue des accès dans l’espace admin, sans statut de conformité inventé. */
+.beta-admin-overview,.beta-admin-queue{margin-top:22px}
+.beta-admin-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:20px 0}
+.beta-admin-metric{display:flex;flex-direction:column;gap:6px;min-width:0;border:1px solid #d7d9e7;border-radius:12px;background:#fafaff;padding:15px}
+.beta-admin-metric strong{font:400 29px Anton,'Arial Narrow',sans-serif;color:var(--violet);line-height:1}
+.beta-admin-metric span{font-weight:700;font-size:12px;line-height:1.45}
+.beta-admin-metric small{font-size:11px;color:#51566f;line-height:1.5}
+.beta-admin-checklist{display:grid;gap:10px;margin:20px 0 0;border-left:3px solid var(--violet);padding:13px 16px;background:#f6f6fc}
+.beta-admin-checklist h4{margin:0}
+.beta-admin-checklist p{font-size:12px;line-height:1.55}
+.beta-admin-filters{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 12px}
+.beta-admin-filters button{font-size:12px;min-height:44px;padding:9px 13px}
+.beta-admin-filters button[aria-pressed="true"]{background:var(--violet);color:white;border-color:var(--violet)}
+.beta-admin-profile-list{display:grid;gap:3px}
+.beta-admin-profile{padding:16px 0}
+.beta-admin-profile h4{font-size:14px}
+.beta-admin-profile-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.beta-admin-profile-actions button{min-height:44px;font-size:12px}
+@media(max-width:1050px){.beta-admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){.beta-admin-metrics{gap:8px}.beta-admin-metric{padding:12px}.beta-admin-profile-actions button{width:100%}}
+@media(forced-colors:active){.beta-admin-filters button[aria-pressed="true"]{outline:2px solid Highlight;outline-offset:-2px}}

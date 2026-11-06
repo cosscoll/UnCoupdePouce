@@ -262,6 +262,7 @@ NOTIFICATION_TYPES = {
     'profile_review_required': 'Après modification de votre profil, une nouvelle revue est nécessaire. Votre autorisation et votre accès de test ont été désactivés.',
     'profile_test_suspended': 'Votre autorisation professionnelle de test a été désactivée, ainsi que votre accès de test aux conversations.',
     'test_access_activated': 'Votre accès de test aux conversations a été activé. Les autres conditions d’accès restent applicables. Aucun paiement ni abonnement réel.',
+    'test_access_revoked': 'Votre accès de test aux conversations a été retiré par l’équipe UCP. Votre profil professionnel reste autorisé ; aucun paiement réel.',
     'account_suspended': 'Votre compte a été suspendu et ses sessions révoquées. Cet événement reste dans votre historique après réactivation.',
     'account_restored': 'La suspension de votre compte a été levée. Reconnectez-vous ; les autorisations professionnelles et les autres conditions d’accès restent applicables.',
     'linked_profile_paused': 'Un profil lié a été désactivé : ses candidatures en attente sont retirées et ses échanges sélectionnés sont bloqués.',
@@ -1347,6 +1348,21 @@ def activate_subscription(uid:int,user=Depends(require('admin'))):
         c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
                    (user['id'],'activate_simulated_subscription','professional',uid,now()))
     return {'ok':True,'payment':'NONE — simulation uniquement'}
+
+@app.post('/api/admin/professionals/{uid}/revoke-test-subscription')
+def revoke_test_subscription(uid:int,user=Depends(require('admin'))):
+    """Reversible beta access revocation; does not suspend the professional identity."""
+    with authenticated_db(user,write=True) as c:
+        current=c.execute('SELECT approved,subscription_active FROM profiles WHERE user_id=?',(uid,)).fetchone()
+        if not current:error(404,'Profil introuvable')
+        if not current['subscription_active']:error(409,'Cet accès aux conversations de test est déjà inactif')
+        c.execute('UPDATE profiles SET subscription_active=0 WHERE user_id=?',(uid,))
+        queue_notice(c,uid,'test_access_revoked',uid)
+        c.execute('INSERT INTO audit(actor_id,action,target_type,target_id,created_at) VALUES(?,?,?,?,?)',
+                  (user['id'],'revoke_simulated_subscription','professional',uid,now()))
+        c.execute('COMMIT')
+    return {'ok':True,'test_access_active':False,'profile_approved':bool(current['approved']),
+            'payment':'NONE — simulation uniquement'}
 
 @app.post('/api/admin/professionals/{uid}/suspend')
 def suspend(uid:int,user=Depends(require('admin'))):

@@ -1396,7 +1396,7 @@ function notificationDestination(eventType,role){
  const professionalApplications=['application_accepted','application_rejected','project_closed','project_cancelled','project_suspended','project_resumed','project_updated','project_intake_paused','project_intake_resumed'];
  const chat=['new_message','linked_conversation_paused','linked_conversation_changed'];
  const assistance=['support_resolved','report_resolved'];
- const professionalProfile=['profile_test_authorized','profile_review_required','profile_test_suspended','test_access_activated'];
+ const professionalProfile=['profile_test_authorized','profile_review_required','profile_test_suspended','test_access_activated','test_access_revoked'];
  const enterprise=['linked_profile_paused','linked_profile_resumed'];
  if(role==='requester'&&requesterProjects.includes(eventType))return {view:'projects',label:'Voir mes projets'};
  if(role==='professional'&&professionalApplications.includes(eventType))return {view:'applications',label:'Voir mes candidatures'};
@@ -1459,88 +1459,88 @@ async function renderNotifications(n){
  }
  select.addEventListener('change',()=>load(true));await load(true);
 }
-async function renderAdmin(n){
- n.append(heading('Le pouls de votre bêta.','Indicateurs provenant des données de test, pas de participants vérifiés ni de recettes commerciales.'));
- const metrics=(await api('/admin/metrics')).counts;
- n.append(el('div',{class:'stat-grid'},...[
-  ['Demandes',metrics.projects],['Candidatures',metrics.applications],
-  ['Mises en relation',metrics.accepted_applications],['Messages',metrics.messages]
- ].map(([title,value])=>el('div',{class:'stat'},el('strong',{text:value??'—'}),title))));
- const data=await api('/admin/queue');
- const queue=Array.isArray(data.items)?data.items:[];
- const pending=queue.filter(p=>!p.approved);
- const notActive=queue.filter(p=>!!p.approved&&!p.subscription_active);
- const active=queue.filter(p=>!!p.approved&&!!p.subscription_active);
- const totalPros=Number(metrics.professionals);
- const withoutProfile=Number.isFinite(totalPros)&&totalPros>=queue.length?totalPros-queue.length:null;
- const readiness=panel('Préparer les comptes artisans pour la bêta',
-   'États réels des profils enregistrés dans cette préproduction, et non liste officielle des personnes invitées.');
- const totals=el('div',{class:'beta-admin-metrics'});
- for(const [name,count,desc] of [
-  ['À examiner',pending.length,'Profil déclaré, non autorisé'],
-  ['Messagerie à activer',notActive.length,'Profil autorisé, accès test inactif'],
-  ['Autorisés à échanger',active.length,'Profil et accès simulé actifs'],
-  ['Sans profil déclaré',withoutProfile,'Comptes professionnels sans profil de test']
- ]){
-  totals.append(el('div',{class:'beta-admin-metric'},
-   el('strong',{text:count==null?'Indisponible':String(count)}),
-   el('span',{text:name}),el('small',{text:desc})));
- }
- readiness.append(totals,el('p',{class:'hint',text:'« Autorisé à échanger » signifie seulement que les droits du profil ont été activés : un projet compatible et une sélection restent nécessaires. Aucune assurance, identité légale ou invitation Vercel n’est vérifiée ici.'}));
- readiness.append(button('Examiner les retours et signalements',()=>go('moderation'),'outline'));
- n.append(readiness);
-
- const box=panel('Profils professionnels','Filtrez les profils réellement déclarés ; chaque changement de droit reste une action administrateur explicite et journalisée.');
- const filters=el('div',{class:'beta-admin-filters',role:'group','aria-label':'Filtrer les profils artisans selon leur accès de test'});
- const shown=el('p',{class:'small muted',role:'status','aria-live':'polite'});
- const records=el('div',{class:'beta-admin-rows'});
- const choices=[
-  ['all','Tous les profils',queue],
-  ['pending','À examiner',pending],
-  ['awaiting','Messagerie à activer',notActive],
-  ['active','Accès de test actif',active]
+function betaProfileStatus(p){
+ if(!p.approved)return 'review';
+ if(!p.subscription_active)return 'activation';
+ return 'active';
+}
+function betaProfileReviewAction(p){
+ if(!p.approved)return button('Autoriser le profil en test',()=>ask(
+  'Autoriser ce professionnel fictif ?',
+  'Autoriser « '+p.name+' » à consulter les missions compatibles avec son métier et sa commune déclarés ? Ce contrôle est fictif et ne certifie pas son activité, son SIREN ou son assurance.',
+  ()=>api('/admin/professionals/'+p.id+'/approve',{method:'POST'}),
+  'Profil autorisé pour les tests.'),'outline');
+ if(!p.subscription_active)return button('Activer les conversations de test',()=>ask(
+  'Activer l’accès de test aux conversations ?',
+  'L’accès aux échanges de « '+p.name+' » ne sera ouvert que si une candidature est sélectionnée et que les autres autorisations sont remplies. Aucun paiement réel.',
+  ()=>api('/admin/professionals/'+p.id+'/activate-test-subscription',{method:'POST'}),
+  'Accès aux conversations de test activé.'),'outline');
+ return button('Retirer l’accès aux conversations',()=>ask(
+  'Retirer l’accès de test aux conversations ?',
+  'Les messages des candidatures sélectionnées de « '+p.name+' » seront temporairement inaccessibles. Le profil restera autorisé et ses données ne seront pas supprimées. Réactivation possible ensuite, sans paiement.',
+  ()=>api('/admin/professionals/'+p.id+'/revoke-test-subscription',{method:'POST'}),
+  'Accès aux conversations de test retiré.'),'outline');
+}
+function betaAdminOverview(m,queue){
+ const panelNode=panel('Préparer les tests utilisateurs','Indicateurs calculés sur les données fictives de la préproduction, pas une liste de testeurs invités.');
+ panelNode.classList.add('beta-admin-overview');
+ const stats=[
+  ['Comptes particuliers',m.requesters||0,'Tous les comptes existants, y compris historiques'],
+  ['Profils à examiner',queue.filter(p=>betaProfileStatus(p)==='review').length,'Autorisation manuelle nécessaire'],
+  ['Accès à activer',queue.filter(p=>betaProfileStatus(p)==='activation').length,'Profils approuvés, messagerie de test inactive'],
+  ['Accès de test actifs',queue.filter(p=>betaProfileStatus(p)==='active').length,'Ne prouve pas la présence d’un testeur réel']
  ];
- let current='all';
- function paint(){
-  const selected=choices.find(([key])=>key===current);
-  for(const b of filters.querySelectorAll('button'))b.setAttribute('aria-pressed',String(b.dataset.filter===current));
-  shown.textContent=selected[2].length+' profil(s) affiché(s) sur '+queue.length+' profils déclarés.';
-  clear(records);
-  for(const p of selected[2]){
-   const isApproved=!!p.approved;
-   const isActive=isApproved&&!!p.subscription_active;
-   const status=isActive?'Accès de test activé':isApproved?'Accès messagerie à activer':'En attente de validation';
-   const profile=el('article',{class:'item beta-admin-record'},
-    el('h4',{text:p.name||'Profil sans nom'}),
-    el('p',{class:'small muted',text:(trades[p.trade]||p.trade||'Métier non renseigné')+' · '+(p.town||'Commune non renseignée')}),
-    el('span',{class:'chip '+(isActive?'green':isApproved?'amber':'violet'),text:status}));
-   const controls=el('div',{class:'row beta-admin-actions'});
-   if(!isApproved)controls.append(button('Autoriser les tests',async()=>{
-    const r=await action(()=>api('/admin/professionals/'+p.id+'/approve',{method:'POST'}),'Profil autorisé pour des tests fictifs.');
-    if(r)await render();
-   }));
-   else {
-    if(!isActive)controls.append(button('Activer l’accès messagerie de test',async()=>{
-     const r=await action(()=>api('/admin/professionals/'+p.id+'/activate-test-subscription',{method:'POST'}),'Accès de test activé, sans paiement.');
-     if(r)await render();
-    }));
-    controls.append(button('Suspendre le profil',()=>ask('Suspendre les droits de cet artisan ?',
-     'La suspension désactive son autorisation de test et son accès à la messagerie. Les échanges et candidatures existants restent soumis aux règles de contrôle du serveur.',
-     ()=>api('/admin/professionals/'+p.id+'/suspend',{method:'POST'}),'Profil suspendu.')));
-   }
-   profile.append(controls);records.append(profile);
+ const metrics=el('div',{class:'beta-admin-metrics'});
+ for(const [label,value,hint] of stats)metrics.append(el('div',{class:'beta-admin-metric'},
+  el('strong',{text:String(value)}),el('span',{text:label}),el('small',{text:hint})));
+ panelNode.append(metrics,el('p',{class:'hint',text:'Ces chiffres ne distinguent pas la prochaine cohorte des comptes historiques. Un accès actif n’atteste ni la connexion du testeur, ni une vérification professionnelle.'}));
+ const steps=el('div',{class:'beta-admin-checklist'},
+  el('h4',{text:'Contrôles manuels avant invitation'}),
+  el('p',{text:'Accès externe Vercel et mot de passe Basic distribués séparément : non vérifié dans cette interface.'}),
+  el('p',{text:'Paire de comptes distincts et parcours complet particulier → artisan : à revalider avec les futurs testeurs.'}),
+  el('p',{text:'Sauvegarde Neon réelle et essai Android/iPhone physiques : restent à confirmer.'}));
+ panelNode.append(steps);
+ return panelNode;
+}
+function betaAdminQueue(queue){
+ const box=panel('Autorisation des profils professionnels','Toutes les opérations nécessitent une confirmation. Aucun contrôle officiel ni paiement réel.');
+ box.classList.add('beta-admin-queue');
+ const states=[['all','Tous'],['review','À examiner'],['activation','Accès à activer'],['active','Accès actifs']];
+ const controls=el('div',{class:'beta-admin-filters',role:'group','aria-label':'Filtrer les autorisations de test'});
+ const list=el('div',{class:'beta-admin-profile-list'}),summary=el('p',{class:'mini','aria-live':'polite'});
+ let selected='all';
+ function draw(){
+  const items=queue.filter(p=>selected==='all'||betaProfileStatus(p)===selected);
+  for(const item of controls.querySelectorAll('button'))item.setAttribute('aria-pressed',String(item.dataset.filter===selected));
+  summary.textContent=items.length+' profil(s) affiché(s) sur '+queue.length+'.';
+  clear(list);
+  if(!items.length)list.append(el('p',{class:'muted small',text:'Aucun profil dans cette catégorie.'}));
+  for(const p of items){
+   const state=betaProfileStatus(p);
+   const name=el('h4',{text:p.name}),meta=el('p',{class:'small muted',text:(trades[p.trade]||p.trade)+' · '+p.town});
+   const status=el('span',{class:'chip '+(state==='active'?'green':state==='activation'?'violet':'amber'),
+    text:state==='active'?'Accès aux conversations actif':state==='activation'?'Profil autorisé · accès à activer':'Profil à examiner'});
+   list.append(el('div',{class:'item beta-admin-profile'},name,meta,
+    el('div',{class:'beta-admin-profile-actions'},status,betaProfileReviewAction(p))));
   }
-  if(!selected[2].length)records.append(el('p',{class:'small muted',text:current==='all'?'Aucun profil professionnel déclaré.':'Aucun profil dans cette catégorie.'}));
  }
- for(const [key,label] of choices)filters.append(el('button',{
-  type:'button',class:'outline',text:label,'data-filter':key,'aria-pressed':String(key===current),
-  onClick:()=>{current=key;paint()}
- }));
- box.append(filters,shown,records);
- paint();
- n.append(box);
+ for(const [key,label] of states){const control=button(label,()=>{selected=key;draw()},'outline');
+  control.dataset.filter=key;controls.append(control);}
+ box.append(controls,summary,list);
+ draw();
+ return box;
+}
+async function renderAdmin(n){
+ n.append(heading('Le pouls de votre bêta.','Indicateurs calculés sur les données de test. Aucun chiffre commercial.'));
+ const metrics=(await api('/admin/metrics')).counts;
+ n.append(el('div',{class:'stat-grid'},...[['Demandes',metrics.projects],['Candidatures',metrics.applications],
+  ['Mises en relation',metrics.accepted_applications],['Messages',metrics.messages]].map(([title,value])=>
+  el('div',{class:'stat'},el('strong',{text:String(value??0)}),title))));
+ const queue=(await api('/admin/queue')).items;
+ n.append(betaAdminOverview(metrics,queue),betaAdminQueue(queue));
  const audit=panel('Journal d’audit','Actions sensibles enregistrées par le serveur.');
- for(const e of(await api('/admin/audit')).items.slice(0,20))audit.append(el('p',{class:'mini',text:e.created_at+' · '+e.action+' · #'+e.target_id}));
+ for(const item of(await api('/admin/audit')).items.slice(0,20))
+  audit.append(el('p',{class:'mini',text:item.created_at+' · '+item.action+' · #'+item.target_id}));
  n.append(audit);
 }
 function classifyProject(p){let selected=[];const f=el('form',{},el('p',{text:p.description}),tradePicker(selected,v=>selected=v,true),field('Motif du classement','reason','textarea',{minlength:10,maxlength:500}),el('button',{type:'submit',class:'primary',text:'Confirmer les métiers'}));f.addEventListener('submit',async e=>{e.preventDefault();const r=await action(()=>api('/v4/admin/projects/'+p.id+'/classify',{method:'POST',body:{trades:selected,reason:formValue(f).reason}}),'Besoin classé et rendu accessible aux métiers concernés.');if(r){$('#dialog').close();render()}});showDialog('Classer ce besoin après lecture',f)}

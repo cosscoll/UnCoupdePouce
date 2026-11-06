@@ -849,3 +849,39 @@ def test_v35_lab_database_upgrades_seat_column_without_deleting_data(tmp_path,mo
         row=c.execute('SELECT id,owner_id,label,manager_artisan_active FROM enterprise_accounts').fetchone()
         assert dict(row)=={'id':9,'owner_id':1,'label':'Entreprise test v3.5','manager_artisan_active':0}
         assert c.execute('SELECT COUNT(*) FROM users').fetchone()[0]==1
+
+
+def test_beta_admin_can_revoke_only_test_chat_access_without_erasing_identity(setup):
+    v=setup
+    approve(v,paid=True)
+    project_id=project(v)
+    application=v['call'](v['pro'],v['pcsrf'],'post',f'/api/projects/{project_id}/apply')
+    assert application.status_code==201
+    application_id=application.json()['id']
+    assert v['call'](v['requester'],v['rcsrf'],'post',f'/api/applications/{application_id}/accept').status_code==200
+    assert v['pro'].get(f'/api/conversations/{application_id}/messages').status_code==200
+    url=f'/api/admin/professionals/{v["pid"]}/revoke-test-subscription'
+    assert v['pro'].post(url).status_code==403
+    assert v['requester'].post(url).status_code==403
+    assert v['admin'].post(url).status_code==403
+    revoked=v['call'](v['admin'],v['admcsrf'],'post',url)
+    assert revoked.status_code==200,revoked.text
+    assert revoked.json()['payment'].startswith('NONE')
+    assert revoked.json()['profile_approved'] is True
+    profile=v['pro'].get('/api/my-profile').json()['profile']
+    assert profile['approved']==1 and profile['subscription_active']==0
+    assert v['pro'].get(f'/api/conversations/{application_id}/messages').status_code==403
+    assert v['requester'].get(f'/api/conversations/{application_id}/messages').status_code==403
+    assert v['call'](v['admin'],v['admcsrf'],'post',url).status_code==409
+    with v['mod'].connect() as db:
+        rows=db.execute("SELECT action FROM audit WHERE action='revoke_simulated_subscription' AND target_id=?",(v['pid'],)).fetchall()
+        assert len(rows)==1
+    assert v['call'](v['admin'],v['admcsrf'],'post',f'/api/admin/professionals/{v["pid"]}/activate-test-subscription').status_code==200
+    assert v['pro'].get(f'/api/conversations/{application_id}/messages').status_code==200
+
+
+def test_beta_revoke_access_refuses_unknown_profile_and_preserves_csrf(setup):
+    v=setup
+    url='/api/admin/professionals/999999/revoke-test-subscription'
+    assert v['call'](v['admin'],v['admcsrf'],'post',url).status_code==404
+    assert v['requester'].get('/api/admin/queue').status_code==403

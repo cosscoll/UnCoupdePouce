@@ -2028,6 +2028,87 @@ test('UX audit: account screen keeps install and logout after personal informati
 });
 
 
+test('beta admin dashboard displays grounded access counts and read-only filters',async()=>{
+ const x=await boot({
+  '/api/session':{id:99,name:'Administrateur',role:'admin',csrf:'admin-token'},
+  '/api/admin/metrics':{counts:{requesters:4,professionals:3,projects:2,applications:1,accepted_applications:0,messages:0}},
+  '/api/admin/queue':{items:[
+   {id:11,name:'Atelier à examiner',trade:'plomberie',town:'Toulouse',approved:0,subscription_active:0},
+   {id:12,name:'Atelier à activer',trade:'plomberie',town:'Toulouse',approved:1,subscription_active:0},
+   {id:13,name:'Atelier actif',trade:'plomberie',town:'Toulouse',approved:1,subscription_active:1}
+  ]},
+  '/api/admin/audit':{items:[]}
+ });
+ try{
+  await x.w.go('admin');
+  const d=x.w.document,root=d.querySelector('.beta-admin-overview'),filterBox=d.querySelector('.beta-admin-queue');
+  assert.ok(root);assert.ok(filterBox);
+  assert.match(root.textContent,/Comptes particuliers/);
+  assert.match(root.textContent,/4/);
+  assert.match(root.textContent,/Profils à examiner/);
+  assert.match(root.textContent,/Accès à activer/);
+  assert.match(root.textContent,/ne distinguent pas la prochaine cohorte/);
+  assert.match(root.textContent,/non vérifié dans cette interface/);
+  assert.equal(filterBox.querySelectorAll('.beta-admin-profile').length,3);
+  const filters=[...filterBox.querySelectorAll('.beta-admin-filters button')];
+  filters.find(b=>b.textContent==='Accès actifs').click();
+  assert.equal(filterBox.querySelectorAll('.beta-admin-profile').length,1);
+  assert.match(filterBox.querySelector('.beta-admin-profile').textContent,/Atelier actif/);
+  assert.equal(filters.find(b=>b.textContent==='Accès actifs').getAttribute('aria-pressed'),'true');
+  filters.find(b=>b.textContent==='À examiner').click();
+  assert.match(filterBox.querySelector('.beta-admin-profile').textContent,/Atelier à examiner/);
+  assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
+ }finally{x.close()}
+});
+test('beta admin revocation requires deliberate confirmation and does not suspend identity',async()=>{
+ const x=await boot({
+  '/api/session':{id:99,name:'Administrateur',role:'admin',csrf:'admin-token'},
+  '/api/admin/metrics':{counts:{}},
+  '/api/admin/queue':{items:[{id:13,name:'Atelier actif',trade:'plomberie',town:'Toulouse',approved:1,subscription_active:1}]},
+  '/api/admin/audit':{items:[]},
+  'POST /api/admin/professionals/13/revoke-test-subscription':{ok:true,test_access_active:false,profile_approved:true}
+ });
+ try{
+  await x.w.go('admin');
+  const d=x.w.document,button=[...d.querySelectorAll('.beta-admin-profile-actions button')].find(b=>/Retirer l’accès/.test(b.textContent));
+  assert.ok(button);
+  button.click();
+  assert.equal(d.querySelector('#dialog').open,true);
+  assert.match(d.querySelector('#dialog').textContent,/profil restera autorisé/);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0,'opening confirmation must not modify data');
+  d.querySelector('#dialog-close').click();
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0,'closing the modal must not modify data');
+  button.click();
+  [...d.querySelectorAll('#dialog button')].find(b=>b.textContent==='Confirmer').click();
+  await tick();await tick();
+  const writes=x.calls.filter(c=>c.method==='POST');
+  assert.equal(writes.length,1);
+  assert.equal(writes[0].url,'/api/admin/professionals/13/revoke-test-subscription');
+  assert.equal(writes[0].headers['x-ucp-csrf'],'admin-token');
+ }finally{x.close()}
+});
+test('beta admin approval and activation also require explicit confirmations',async()=>{
+ const x=await boot({
+  '/api/session':{id:99,name:'Administrateur',role:'admin',csrf:'admin-token'},
+  '/api/admin/metrics':{counts:{}},
+  '/api/admin/queue':{items:[
+   {id:11,name:'Atelier à examiner',trade:'plomberie',town:'Toulouse',approved:0,subscription_active:0},
+   {id:12,name:'Atelier à activer',trade:'plomberie',town:'Toulouse',approved:1,subscription_active:0}]},
+  '/api/admin/audit':{items:[]}
+ });
+ try{
+  await x.w.go('admin');
+  const d=x.w.document,buttons=[...d.querySelectorAll('.beta-admin-profile-actions button')];
+  buttons.find(b=>b.textContent==='Autoriser le profil en test').click();
+  assert.match(d.querySelector('#dialog').textContent,/ne certifie pas/);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+  d.querySelector('#dialog-close').click();
+  buttons.find(b=>b.textContent==='Activer les conversations de test').click();
+  assert.match(d.querySelector('#dialog').textContent,/Aucun paiement réel/);
+  assert.equal(x.calls.filter(c=>c.method==='POST').length,0);
+ }finally{x.close()}
+});
+
 test('private beta guide explains fictitious test data before login and never changes a user',async()=>{
  const x=await boot();
  try{
@@ -2121,9 +2202,9 @@ test('beta feedback preserves form contents after a server error',async()=>{
 
 test('UX release: clearly labelled 2026-11-06 version and versioned static assets are present',async()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
- assert.match(html,/Nouveau : parcours bêta et retours de test intégrés · 6 novembre 2026/);
+ assert.match(html,/Nouveau : préparation des testeurs et accès de test administrables · 6 novembre 2026/);
  for(const name of ['style.css','analytics.js','local-ai.js','assistant-ai.js','app.js','pwa.js']){
-  assert.ok(html.includes('/assets/'+name+'?v=ucp-beta-20261106'),name+' should be release-versioned');
+  assert.ok(html.includes('/assets/'+name+'?v=ucp-admin-beta-20261106'),name+' should be release-versioned');
  }
  const x=await boot();
  try{
