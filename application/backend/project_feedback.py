@@ -28,10 +28,10 @@ def install(m):
     with m.connect() as c:
         c.executescript("""
             CREATE TABLE IF NOT EXISTS project_feedback(
-                application_id INTEGER PRIMARY KEY REFERENCES applications(id) ON DELETE CASCADE,
-                project_id INTEGER NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
-                requester_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                professional_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                application_id BIGINT NOT NULL PRIMARY KEY REFERENCES applications(id) ON DELETE CASCADE,
+                project_id BIGINT NOT NULL UNIQUE REFERENCES projects(id) ON DELETE CASCADE,
+                requester_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                professional_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                 rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
                 comment TEXT NOT NULL,
                 collaboration_confirmed INTEGER NOT NULL CHECK(collaboration_confirmed=1),
