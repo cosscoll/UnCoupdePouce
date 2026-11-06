@@ -1146,7 +1146,9 @@ async function openChat(n,a){
   const form=el('form',{class:'chat-compose'},input,help,sendStatus,send);
   const status=el('p',{class:'status-note chat-status',role:'status',hidden:true});
   const retry=button('Réessayer de charger les messages',()=>refresh());retry.hidden=true;
-  n.append(log,status,retry,form,button('Signaler cette conversation',()=>report('conversation',a.application_id),'link'));
+  n.append(log,status,retry,form,el('div',{class:'chat-help-actions'},
+   button('Signaler cette conversation',()=>report('conversation',a.application_id),'link'),
+   button('Contacter l’assistance',()=>go('support'),'link')));
   let last='',pending=null,busy=false,blocked=true,timer=null,sending=false;
   function updateSend(){
    if(!valid())return;
