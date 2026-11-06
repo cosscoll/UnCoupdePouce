@@ -464,3 +464,29 @@ body[data-space=professional] .home-priority .eyebrow{color:#a04608}
  .chat-compose .primary{width:100%}
  .support-report-list .panel{padding:15px}
 }
+
+/* Mobile/PWA audit: installation discoverable without adding another navigation category. */
+.mobile-install-link{display:none}
+.connection-dismiss{display:inline-flex;align-items:center;justify-content:center;min-height:42px;min-width:70px;margin:0 0 0 10px;padding:7px 12px;border:1px solid #9ba0b7;border-radius:8px;background:white;color:#373d61;font-size:12px}
+#connection-status{line-height:1.65}
+@media(max-width:680px){
+ .accountbar-meta{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+ .mobile-install-link:not([hidden]){
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:44px;padding:9px 13px;border:1px solid #a5aaca;border-radius:9px;
+  color:#35439c;background:#fff;font-size:12px;font-weight:700;
+ }
+ .sidebar nav{overscroll-behavior:contain}
+ .workspace{padding-bottom:calc(48px + env(safe-area-inset-bottom))}
+ #dialog{max-height:min(92dvh,calc(100dvh - 12px))}
+ .connection-dismiss{margin:8px 0 0}
+}
+@media(max-width:360px){
+ .workspace{padding-inline:14px}
+ .welcome{padding-inline:14px}
+ .auth-box{padding:20px 16px}
+ .page-head h2{font-size:30px}
+ .accountbar-meta{width:100%}
+ .mobile-install-link:not([hidden]){flex:1 1 100%;min-width:0}
+ .release-notes-link{flex:1 1 100%}
+}
