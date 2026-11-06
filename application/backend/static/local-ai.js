@@ -148,7 +148,7 @@ async function send({role,catalog,messages,mode='reply',modelTier='quality',draf
  const meta={modelTier:result.modelTier||modelTier,downgraded:result.downgraded===true};
  if(mode==='reply'){
   // Do not display an empty bubble or internal reasoning markers as a response.
-  const visible=String(result.text||'').replace(/<think>[\\s\\S]*?<\\/think>/g,'').trim();
+  const visible=String(result.text||'').replace(/<think>[\s\S]*?<\/think>/g,'').trim();
   if(!visible)throw Error('Le modèle n’a pas produit de réponse exploitable. Réessayez ou précisez votre question.');
   return {reply:visible.slice(0,1600),draft:null,search:null,...meta};
  }
