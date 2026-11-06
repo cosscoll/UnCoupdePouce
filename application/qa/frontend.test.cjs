@@ -735,6 +735,113 @@ test('a failure loading linked showcase profiles never hides the editable profes
  }finally{x.close()}
 });
 
+
+test('F30 professional overview shows actionable verified counts and opens selected applications',async()=>{
+ const pro={id:2,name:'Artisan',role:'professional',csrf:'pro-token'};
+ const x=await boot({
+  '/api/session':pro,
+  '/api/projects':{items:[{id:3,title:'Salle de bains',status:'open',town:'Toulouse'}],search_scope:'ready'},
+  '/api/my-applications':{items:[
+   {id:9,title:'Chantier proposé',status:'pending',project_status:'open',town:'Toulouse',trade:'plomberie'},
+   {id:10,title:'Chantier accepté',status:'accepted',project_status:'selected',town:'Toulouse',trade:'plomberie'},
+   {id:11,title:'Chantier terminé',status:'accepted',project_status:'closed',town:'Toulouse',trade:'plomberie'}
+  ]},
+  '/api/conversations':{items:[{application_id:10,subscription_active:true,linked_profile_id:null},{application_id:11,subscription_active:false}]},
+  '/api/my-profile':{profile:{approved:true,subscription_active:true}},
+  '/api/notifications?unread_only=true':{unread:0,items:[]}
+ },null,'http://localhost:8765/professionnel');
+ try{
+  await x.w.go('professional-home');
+  const cards=[...x.w.document.querySelectorAll('.pro-quick-card')];
+  assert.equal(cards.length,4);
+  assert.deepEqual(cards.map(c=>c.querySelector('.pro-quick-count').textContent),['1','1','1','1']);
+  assert.deepEqual(cards.map(c=>c.querySelector('.pro-quick-help').textContent),Array(4).fill('Données de votre compte'));
+  assert.equal(x.calls.every(c=>c.method==='GET'),true,'overview must not mutate data');
+  cards[2].querySelector('button').click();await tick();
+  assert.equal(x.w.location.hash,'#applications');
+  assert.equal(x.w.document.querySelector('[name=application_status]').value,'accepted');
+  assert.match(x.w.document.querySelector('#view [aria-live]').textContent,/Chantier accepté/);
+  assert.doesNotMatch(x.w.document.querySelector('#view [aria-live]').textContent,/Chantier proposé/);
+ }finally{x.close()}
+});
+
+test('F30 professional quick overview does not fabricate unavailable counts',async()=>{
+ const pro={id:2,name:'Artisan',role:'professional',csrf:'pro-token'};
+ const x=await boot({
+  '/api/session':pro,
+  '/api/projects':{items:[{id:3,title:'Chantier',status:'open'}],search_scope:'ready'},
+  '/api/my-applications':{status:503,data:{detail:'Service indisponible'}},
+  '/api/conversations':{items:[]},
+  '/api/my-profile':{profile:{approved:true}},
+  '/api/notifications?unread_only=true':{unread:0,items:[]}
+ },null,'http://localhost:8765/professionnel');
+ try{
+  await x.w.go('professional-home');
+  const cards=[...x.w.document.querySelectorAll('.pro-quick-card')];
+  assert.equal(cards[0].querySelector('.pro-quick-count').textContent,'1');
+  assert.equal(cards[1].querySelector('.pro-quick-count').textContent,'—');
+  assert.equal(cards[2].querySelector('.pro-quick-count').textContent,'—');
+  assert.match(cards[1].textContent,/Indisponible/);
+  assert.equal(cards[3].querySelector('.pro-quick-count').textContent,'0');
+ }finally{x.close()}
+});
+
+test('F24-F25 quick mission searches retain selected trade and town and issue actual server filters',async()=>{
+ const pro={id:2,name:'Artisan',role:'professional',csrf:'pro-token'};
+ const item={id:13,title:'Fuite plomberie',description:'Travaux fictifs',status:'open',town:'Toulouse',trade:'plomberie',trades:['plomberie'],timing:'urgent'};
+ const path='/api/projects?trade=plomberie&town=Toulouse';
+ const x=await boot({
+  '/api/session':pro,'/api/projects':{items:[item],search_scope:'ready'},
+  [path+'&timing=urgent&sort=newest']:{items:[item]},
+  [path+'&published_within=7&sort=newest']:{items:[]},
+  [path+'&sort=newest']:{items:[item]}
+ });
+ try{
+  const trade=x.w.document.querySelector('.project-search [name=trade]'),
+        town=x.w.document.querySelector('.project-search [name=town]');
+  trade.value='plomberie';town.value='Toulouse';
+  const shortcut=label=>[...x.w.document.querySelectorAll('.pro-search-shortcuts button')].find(b=>b.textContent===label);
+  assert.equal(shortcut('Tous les délais').getAttribute('aria-pressed'),'true');
+  shortcut('Dès que possible').click();await tick();
+  assert.equal(shortcut('Dès que possible').getAttribute('aria-pressed'),'true');
+  assert.ok(x.calls.some(c=>c.url===path+'&timing=urgent&sort=newest'));
+  shortcut('7 derniers jours').click();await tick();
+  assert.ok(x.calls.some(c=>c.url===path+'&published_within=7&sort=newest'));
+  assert.equal(trade.value,'plomberie');assert.equal(town.value,'Toulouse');
+  shortcut('Tous les délais').click();await tick();
+  assert.ok(x.calls.some(c=>c.url===path+'&sort=newest'));
+  assert.equal(shortcut('Tous les délais').getAttribute('aria-pressed'),'true');
+  assert.equal(x.calls.filter(c=>c.method!=='GET').length,0);
+ }finally{x.close()}
+});
+
+test('F33 application status cards filter without displaying unrelated applications',async()=>{
+ const pro={id:2,name:'Artisan',role:'professional',csrf:'pro-token'};
+ const x=await boot({
+  '/api/session':pro,
+  '/api/my-applications':{items:[
+   {id:51,title:'Chantier en attente',status:'pending',project_status:'open',town:'Toulouse',trade:'plomberie'},
+   {id:52,title:'Chantier sélectionné',status:'accepted',project_status:'selected',town:'Balma',trade:'plomberie'},
+   {id:53,title:'Chantier terminé',status:'accepted',project_status:'closed',town:'Toulouse',trade:'plomberie'}
+  ]}
+ });
+ try{
+  await x.w.go('applications');
+  const cards=[...x.w.document.querySelectorAll('.application-filter-card')];
+  assert.equal(cards.length,4);
+  assert.deepEqual(cards.map(c=>c.querySelector('strong').textContent),['3','1','1','1']);
+  cards[1].click();
+  assert.equal(x.w.document.querySelector('[name=application_status]').value,'pending');
+  assert.equal(cards[1].getAttribute('aria-pressed'),'true');
+  assert.match(x.w.document.querySelector('#view [aria-live]').textContent,/Chantier en attente/);
+  assert.doesNotMatch(x.w.document.querySelector('#view [aria-live]').textContent,/Chantier sélectionné/);
+  cards[3].click();
+  assert.match(x.w.document.querySelector('#view [aria-live]').textContent,/Chantier terminé/);
+  cards[0].click();
+  assert.equal(x.w.document.querySelectorAll('#view [aria-live] .panel').length,3);
+ }finally{x.close()}
+});
+
 test('professional overview counts only active applications and conversations actually accessible',async()=>{
  const x=await boot({'/api/session':{id:2,name:'Pro',role:'professional',csrf:'abc'},'/api/projects':{items:[{id:91,title:'Mission autorisée',town:'Toulouse',trade:'plomberie',status:'open'}],search_scope:'ready'},'/api/my-applications':{items:[{id:1,title:'En attente',status:'pending',project_status:'open'},{id:2,title:'Historique clôturé',status:'pending',project_status:'closed'},{id:3,title:'Sélection active',status:'accepted',project_status:'selected'}]},'/api/conversations':{items:[{application_id:3,subscription_active:1,linked_profile_id:null},{application_id:4,subscription_active:0},{application_id:5,subscription_active:1,linked_profile_id:7,linked_active:0}]},'/api/notifications?unread_only=true':{unread:2,items:[{message:'Notification fictive',read_at:null}]},'/api/my-profile':{profile:{approved:true,subscription_active:true}}});try{
   await x.w.go('professional-home');const panels=[...x.w.document.querySelectorAll('.overview-grid>.panel')],get=title=>panels.find(p=>p.querySelector('h3').textContent===title);
