@@ -1453,6 +1453,8 @@ $('#release-notes').addEventListener('click',()=>{
    el('li',{text:'Recherche : filtres particuliers et professionnels séparés ; métier et commune visibles en premier pour les professionnels.'}),
    el('li',{text:'Artisans : spécialités et zones plus lisibles ; informations détaillées repliables et vérifications non réalisées clairement signalées.'}),
    el('li',{text:'Artisans : ajout d’une photo facultative par réalisation textuelle enregistrée, accessible depuis les candidatures autorisées et leur comparateur. Les photos restent déclaratives et non certifiées.'}),
+   el('li',{text:'Yahya : après un échec du modèle 3B, le bouton « Essayer le modèle léger (1,5B) » relance la même question sans doublon. Les réponses trop vagues ou répétitives sont rejetées.'}),
+   el('li',{text:'Yahya : sur un navigateur sans WebGPU, des raccourcis clairs ouvrent les rubriques UCP sans faire semblant de générer une réponse IA ; sur un appareil WebGPU sans Worker, le moteur tente une exécution directement dans la page.'}),
    el('li',{text:'Espace professionnel : quatre compteurs visibles dès l’accueil pour les chantiers accessibles, candidatures en attente, candidatures sélectionnées et conversations autorisées. Une information indisponible n’est jamais remplacée par un faux zéro.'}),
    el('li',{text:'Recherche professionnelle : filtres rapides « Dès que possible », « Dans le mois » et « 7 derniers jours » ; les métiers et communes déjà choisis restent inchangés.'}),
    el('li',{text:'Mes candidatures : cartes cliquables pour consulter les demandes en attente, sélectionnées ou terminées, avec accès direct aux candidatures sélectionnées depuis l’accueil.'}),
