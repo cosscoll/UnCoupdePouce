@@ -1597,10 +1597,11 @@ test('F11: guided three-step project wizard keeps optional measurements in saved
   input(w,'.wizard [name=surface_m2]','8.75');
   input(w,'.wizard [name=length_m]','3.5');
   input(w,'.wizard [name=width_m]','2.5');
+  input(w,'.wizard [name=height_m]','2.4');
   submit(w,'.wizard form');await tick();
   const saved=calls.filter(c=>c.method==='PUT'&&c.url==='/api/v4/drafts/5').at(-1);
   assert.ok(saved);
-  assert.deepEqual(saved.body.dimensions,{surface_m2:8.75,length_m:3.5,width_m:2.5});
+  assert.deepEqual(saved.body.dimensions,{surface_m2:8.75,length_m:3.5,width_m:2.5,height_m:2.4});
   assert.match(w.document.querySelector('.wizard .review').textContent,/Surface estimée.*8,75 m²/);
   assert.match(w.document.querySelector('.wizard .review').textContent,/Longueur.*3,5 m/);
   assert.match(w.document.querySelector('.wizard .review').textContent,/Hauteur/);
