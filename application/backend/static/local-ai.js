@@ -146,7 +146,12 @@ async function send({role,catalog,messages,mode='reply',modelTier='quality',draf
  const context=cleanContext(role,draftContext,searchContext,items);
  const result=await inference({role,catalog:items,messages:history,mode,modelTier,...context},onProgress);
  const meta={modelTier:result.modelTier||modelTier,downgraded:result.downgraded===true};
- if(mode==='reply')return {reply:normalize(result.text,1600),draft:null,search:null,...meta};
+ if(mode==='reply'){
+  // Do not display an empty bubble or internal reasoning markers as a response.
+  const visible=String(result.text||'').replace(/<think>[\\s\\S]*?<\\/think>/g,'').trim();
+  if(!visible)throw Error('Le modèle n’a pas produit de réponse exploitable. Réessayez ou précisez votre question.');
+  return {reply:visible.slice(0,1600),draft:null,search:null,...meta};
+ }
  const parsed=parseJSON(result.text);
  if(mode==='draft'){
   const draft=validateDraft(parsed,items);
