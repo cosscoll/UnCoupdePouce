@@ -64,6 +64,7 @@ function create(hooks){
   function prefill(text){
    if(!valid(s)||s.busy)return;
    textarea.value=text;
+   allowed();
    textarea.focus();
   }
   const workingDraft=isRequester&&c.draftContext&&(c.draftContext.title||c.draftContext.description||c.draftContext.trades?.length);
@@ -119,7 +120,7 @@ function create(hooks){
   function scrollBottom(){conversation.scrollTop=conversation.scrollHeight}
   function allowed(){
    const active=!!model.configured&&acknowledge.checked&&!s.busy;
-   submit.disabled=!active;
+   submit.disabled=!active||textarea.value.trim().length<2||textarea.value.length>1200;
    textarea.disabled=s.busy;
    draft.disabled=!active||!s.messages.some(m=>m.role==='user');
    search.disabled=!active||!s.messages.some(m=>m.role==='user');
@@ -189,9 +190,12 @@ function create(hooks){
   async function invoke(mode,message=null){
    if(!valid(s)||s.busy||!acknowledge.checked||!model.configured)return;
    if(mode==='reply'&&message!==null){
-    if(typeof message!=='string'||message.trim().length<2||message.length>1200)return;
+    if(typeof message!=='string'||message.trim().length<2||message.length>1200){
+     status.textContent='Écrivez un message d’au moins deux caractères (1 200 maximum).';return;
+    }
     say('user',message.trim());
     textarea.value='';
+    allowed();
    }
    if(!s.messages.some(m=>m.role==='user')){
     status.textContent='Décrivez d’abord votre besoin.';return;
@@ -230,6 +234,7 @@ function create(hooks){
     if(valid(s)){s.busy=false;status.classList.remove('is-loading');allowed();if(ui?.closest('dialog')?.open)textarea.focus()}
    }
   }
+  textarea.addEventListener('input',allowed);
   form.addEventListener('submit',e=>{e.preventDefault();invoke('reply',textarea.value)});
   textarea.addEventListener('keydown',e=>{
    if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();invoke('reply',textarea.value)}
