@@ -7,11 +7,14 @@ const jobs=new Map();
 const CONTACT=/[\w.+-]+@[\w.-]+\.[a-z]{2,}|https?:\/\/|www\.|(?<!\d)(?:(?:\+33|0033)[ .-]?[1-9]|0[1-9])(?:[ .-]?\d{2}){4}(?!\d)|\d{1,4}\s*(?:bis|ter)?\s+(?:rue|avenue|boulevard|chemin|route|allee|allée|place)\b/i;
 function normalize(value,max=120){return typeof value==='string'?value.trim().slice(0,max):''}
 function supported(){
- return typeof Worker==='function'&&!!root.navigator?.gpu&&root.isSecureContext!==false;
+ // The shared in-page engine can run if module Workers are blocked or missing.
+ // WebGPU itself and a secure context remain mandatory for real local inference.
+ return !!root.navigator?.gpu&&root.isSecureContext!==false;
 }
 function status(){
- return {configured:supported(),local:true,model:'Qwen2.5-3B-Instruct (ou 1.5B léger)',
-  reason:supported()?'':'Cet appareil ou ce navigateur ne propose pas WebGPU. Essayez Chrome ou Edge à jour sur un ordinateur compatible.'};
+ const configured=supported();
+ return {configured,local:true,model:'Qwen2.5-3B-Instruct (ou 1.5B léger)',
+  reason:configured?'':'Cette IA locale nécessite WebGPU dans un navigateur sécurisé et compatible. Sur cet appareil, utilisez les fonctions UCP accessibles sans IA.'};
 }
 let workerUnavailable=false,mainModulePromise=null;
 function reset(){
@@ -91,6 +94,10 @@ function validateSearch(payload,catalog){
 function any(values){return values.some(Boolean)}
 async function inference(payload,onProgress){
  if(!supported())throw Error(status().reason);
+ if(typeof Worker!=='function'){
+  onProgress?.('Moteur WebGPU dans cette page : aucun Worker disponible…',0);
+  return mainThreadInference(payload,onProgress);
+ }
  if(!workerUnavailable){
   try{
    return await new Promise((resolve,reject)=>{
